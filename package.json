@@ -1,0 +1,39 @@
+{
+  "name": "elos",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node --env-file-if-exists=.env dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --exclude tests/postgres.test.ts",
+    "test:integration": "vitest run tests/postgres.test.ts",
+    "check": "npm run typecheck && npm test && npm run build",
+    "setup": "node scripts/setup.mjs"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.58",
+    "@ai-sdk/google": "^4.0.76",
+    "@ai-sdk/mcp": "^2.0.55",
+    "@ai-sdk/openai": "^4.0.72",
+    "@ai-sdk/openai-compatible": "^3.0.53",
+    "ai": "^7.0.108",
+    "fastify": "^5.12.5",
+    "pg": "^8.23.0",
+    "pg-boss": "^12.33.4",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  },
+  "description": "Gateway de agentes com identidade e contexto compartilhados entre sess\u00f5es."
+}

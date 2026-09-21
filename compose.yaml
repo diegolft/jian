@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: elos
+      POSTGRES_USER: elos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run npm run setup first}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U elos -d elos']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+  gateway:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://elos:${POSTGRES_PASSWORD}@postgres:5432/elos
+      HOST: 0.0.0.0
+      PORT: 4310
+    ports:
+      - '127.0.0.1:4310:4310'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:4310/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+volumes:
+  postgres_data:
