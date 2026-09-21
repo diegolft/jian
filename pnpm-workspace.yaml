@@ -1,0 +1,11 @@
+packages:
+  - '.'
+allowBuilds:
+  esbuild: true
+  fsevents: false
+minimumReleaseAgeExclude:
+  - '@ai-sdk/gateway@4.0.88'
+  - '@ai-sdk/mcp@2.0.55'
+  - '@ai-sdk/openai@4.0.72'
+  - ai@7.0.108
+  - pg-boss@12.33.4

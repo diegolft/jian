@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: elos
       POSTGRES_USER: elos
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run npm run setup first}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run pnpm run setup first}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

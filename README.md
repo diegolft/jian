@@ -18,14 +18,14 @@ Gateway de agentes com uma identidade persistente por perfil e contexto comparti
 
 ## Executar
 
-Instale Node.js 24 ou superior. Para hospedar com Compose, tenha Docker disponível.
+Instale Node.js 24 ou superior e pnpm 11.9.0 (versão fixada em `packageManager`). Para hospedar com Compose, tenha Docker disponível.
 
 ```bash
-npm ci
+pnpm install --frozen-lockfile
 ```
 
 ```bash
-npm run setup
+pnpm run setup
 ```
 
 O setup cria `.env` com credenciais aleatórias e permissão `0600`. Não sobrescreve um arquivo existente. Preencha ao menos uma chave `ELOS_PROVIDER_*` nesse arquivo. Uma assinatura de aplicativo não equivale automaticamente a uma chave de API.
@@ -39,7 +39,7 @@ A API fica em `http://127.0.0.1:4310`. O PostgreSQL mantém os dados em um volum
 Para desenvolvimento com um PostgreSQL **já disponível**, ajuste `DATABASE_URL` em `.env`:
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 `ELOS_ROLE=all` executa API e worker juntos. Para separar processos, use `ELOS_ROLE=api` e `ELOS_ROLE=worker`, com o mesmo banco e as mesmas credenciais dos providers no worker. Quatro execuções podem rodar simultaneamente por processo worker.
@@ -138,12 +138,36 @@ O contexto usa até 40 mensagens recentes e seleção lexical de memórias com o
 
 Esta versão é para **um único dono confiável por instalação**. Todas as sessões de um perfil compartilham a mesma fronteira de acesso. O campo `channel` é metadado: Telegram, Slack e outros conectores ainda não existem. Grupos, equipes e múltiplos usuários exigem ACLs próprias antes de serem conectados. As chaves dos providers só são acessadas no worker.
 
+## Qualidade e commits
+
+Biome formata o código, organiza imports e aplica as regras recomendadas. O lint falha também em warnings. A configuração usa dois espaços, aspas simples e linhas de até 100 caracteres; respeita `.gitignore` e exclui o lockfile gerado. Arquivos Markdown, YAML e shell não fazem parte do lint do Biome.
+
+```bash
+pnpm run lint
+```
+
+Para aplicar correções seguras e formatação:
+
+```bash
+pnpm run lint:fix
+```
+
+`pnpm run format` aplica somente formatação. A extensão recomendada em `.vscode` configura formatação e organização de imports ao salvar.
+
+`pnpm install --frozen-lockfile` instala o hook local do Husky pelo script `prepare`. Antes de cada commit, lint-staged executa Biome apenas nos arquivos JS, TS e JSON staged, aplica correções seguras e inclui essas correções no commit. Problemas restantes bloqueiam o commit. Alterações parcialmente staged usam a proteção padrão do lint-staged.
+
+```bash
+pnpm run lint:staged
+```
+
+CI, instalações com `NODE_ENV=production`, diretórios sem `.git` e instalações com `HUSKY=0` não instalam hooks. `pnpm run check` executa lint completo, typecheck, testes e build; o CI usa esse mesmo comando.
+
 ## Verificação
 
 Sem Docker e sem provider externo:
 
 ```bash
-npm run check
+pnpm run check
 ```
 
 Os testes locais usam armazenamento em memória, modelos de teste do AI SDK e um servidor MCP HTTP local. Cobrem contexto entre sessões, isolamento de perfis, idempotência, versões, leases, cancelamento, autenticação, eventos e ferramentas permitidas.
@@ -151,7 +175,7 @@ Os testes locais usam armazenamento em memória, modelos de teste do AI SDK e um
 Com um PostgreSQL descartável:
 
 ```bash
-TEST_DATABASE_URL='postgres://elos:password@localhost:5432/elos_test' npm run test:integration
+TEST_DATABASE_URL='postgres://elos:password@localhost:5432/elos_test' pnpm run test:integration
 ```
 
 O workflow de CI roda esses testes com PostgreSQL 17 e valida o build da imagem. Configurar o workflow não significa que ele já foi executado: o repositório ainda precisa ser publicado.

@@ -1,5 +1,10 @@
 import type { GatewayEvent, Kind, Records } from './domain.js';
-export type Selection = { profileId?: string; where?: Record<string, unknown>; limit?: number; descending?: boolean };
+export type Selection = {
+  profileId?: string;
+  where?: Record<string, unknown>;
+  limit?: number;
+  descending?: boolean;
+};
 export interface Reader {
   get<K extends Kind>(kind: K, id: string): Promise<Records[K] | null>;
   list<K extends Kind>(kind: K, options?: Selection): Promise<Records[K][]>;

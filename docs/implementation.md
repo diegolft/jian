@@ -18,8 +18,10 @@
 - [x] Agent execution: `src/runtime.ts`, `src/providers.ts`, `src/tools.ts`; `tests/runtime.test.ts` proves shared memory updates between steps, provider snapshots, bounded context and failure handling with scripted AI SDK models.
 - [x] HTTP and scheduling: `src/app.ts`, `src/queue.ts`, `src/main.ts`; `tests/app.test.ts` checks auth, strict inputs, API errors, replayable events and requests across sessions.
 - [x] Deployment: `Dockerfile`, `compose.yaml`, `.github/workflows/ci.yml`, `.env.example`, `README.md`; CI runs the PostgreSQL adapter and queue contract in `tests/postgres.test.ts`.
-- [x] Verification: run `npm run check`; smoke-test the compiled server with injected test storage; record checks not run.
+- [x] Verification: run `pnpm run check`; smoke-test the compiled server with injected test storage; record checks not run.
 
 ## Resultado
 
-`npm run check`: 25 testes locais, typecheck e build passaram. O teste MCP usa um servidor HTTP local e os modelos são os doubles oficiais do AI SDK. Inicialização compilada contra banco indisponível encerra com código 1 sem expor credenciais. Docker, PostgreSQL real, CI remota e chamadas com provider real ainda não foram executados.
+`pnpm run check`: 26 testes locais, typecheck e build passaram. O teste MCP usa um servidor HTTP local e os modelos são os doubles oficiais do AI SDK. Inicialização compilada contra banco indisponível encerra com código 1 sem expor credenciais. Docker, PostgreSQL real, CI remota e chamadas com provider real ainda não foram executados.
+
+Biome, Husky e lint-staged configurados; dependências migradas para pnpm 11.9.0 com instalação limpa usando o lockfile. Hook validado em repositório temporário: corrige conteúdo staged, preserva alterações não staged e bloqueia uma violação real de lint. Instalação de hooks é ignorada em CI e produção.
