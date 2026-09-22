@@ -47,28 +47,39 @@ packages/sdk/       Generated TypeScript client
 docs/               Architecture, security, channels, panel
 ```
 
-## Running it
+## Hosting it
 
-Node.js 24+, pnpm 11.9.0 and Docker for the local database.
+Docker, and a clone of this repository. `make up` starts the published gateway image with
+its own PostgreSQL, on `127.0.0.1:4310`.
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm setup
-pnpm db:up
-pnpm dev
+make setup
+make up
 ```
 
-`pnpm setup` writes a `.env` with local credentials and an encryption key, and never
-prints a secret. `pnpm dev` serves the API on `127.0.0.1:4310` and the panel with hot
-reload on `http://localhost:3000/ui/`.
+The same image runs in a plain container against your own PostgreSQL, or in Kubernetes.
+[Deploying](docs/deploy.md) has the exact command for each, the environment variables, and
+how to move between versions.
 
-To host it, build the image from the `Dockerfile` and point `DATABASE_URL` at your
-PostgreSQL. Put an HTTPS proxy in front of it for anything beyond localhost.
+## Developing it
+
+Node.js 24+, pnpm 11.9.0 and Docker for the local database. `make` alone lists the targets.
+
+```bash
+make install
+make setup
+make db-up
+make dev
+```
+
+`make setup` writes a `.env` with local credentials and an encryption key, and never
+prints a secret. `make dev` serves the API on `127.0.0.1:4310` and the panel with hot
+reload on `http://localhost:3000/ui/`.
 
 [Getting started](docs/getting-started.md) walks through creating the first profile and
 sending the first message. See also [architecture](docs/architecture.md),
-[security](docs/security.md), [channels](docs/channels.md) and
-[the web panel](docs/gateway-ui.md).
+[deploying](docs/deploy.md), [security](docs/security.md), [channels](docs/channels.md)
+and [the web panel](docs/gateway-ui.md).
 
 ## Status
 
