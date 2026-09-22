@@ -156,7 +156,6 @@ it('resolves a provider key from the profile vault and keeps it out of durable e
     name: 'Model',
     kind: 'openai',
     secret: vaultSecret,
-    models: [{ id: 'test', contextWindow: 16_000, maxOutputTokens: 2048 }],
   });
 
   const updated = await services.profiles.updateProfile(profile.id, {

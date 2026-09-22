@@ -11,6 +11,7 @@ import { WhatsAppConnections } from './channels/whatsapp/connections.js';
 import { createWhatsAppDeviceFactory } from './channels/whatsapp/driver.js';
 import { Coordination } from './coordination/service.js';
 import { CodexLogin } from './providers/codex/login.js';
+import { ProviderModels } from './providers/discovery.js';
 import { RunQueue } from './runs/queue.js';
 import { SecretBox } from './security/crypto.js';
 import { createSafeFetch } from './security/outbound.js';
@@ -71,6 +72,9 @@ const outbound = createSafeFetch({
     .filter(Boolean),
 });
 
+// Model listings go out through the same guarded client as every other provider call.
+const providerModels = new ProviderModels(services, outbound.fetch);
+
 const coordination = new Coordination(services);
 const whatsapp = new WhatsAppConnections(store, box, createWhatsAppDeviceFactory());
 const channelRegistry = new ChannelRegistry([
@@ -97,6 +101,7 @@ const app =
     ? createApp({
         ...services,
         codexLogin,
+        providerModels,
         channels,
         whatsapp,
         token: config.data.JIAN_API_TOKEN,

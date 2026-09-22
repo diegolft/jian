@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { GatewayError } from '../core/errors.js';
 import type { ProfileParams } from '../http/params.js';
 import type { CodexLogin } from './codex/login.js';
+import type { ProviderModels } from './discovery.js';
 import type { ProviderAdmin } from './port.js';
 import type { Providers } from './service.js';
 
@@ -9,6 +10,7 @@ type ProviderRouteServices = {
   providers: ProviderAdmin &
     Pick<Providers, 'createProvider' | 'revokeProvider' | 'modelDefaults' | 'setModelDefaults'>;
   codexLogin?: CodexLogin;
+  providerModels?: Pick<ProviderModels, 'list'>;
 };
 
 export function registerProviderRoutes(app: FastifyInstance, deps: ProviderRouteServices): void {
@@ -18,6 +20,14 @@ export function registerProviderRoutes(app: FastifyInstance, deps: ProviderRoute
     }
 
     return deps.codexLogin;
+  }
+
+  function providerModels() {
+    if (!deps.providerModels) {
+      throw new GatewayError(503, 'Model discovery is unavailable');
+    }
+
+    return deps.providerModels;
   }
 
   app.post<{ Params: ProfileParams }>(
@@ -38,6 +48,11 @@ export function registerProviderRoutes(app: FastifyInstance, deps: ProviderRoute
     reply
       .code(201)
       .send(await deps.providers.createProvider(request.params.profileId, request.body)),
+  );
+
+  app.get<{ Params: ProfileParams & { providerId: string } }>(
+    '/v1/profiles/:profileId/providers/:providerId/models',
+    async (request) => providerModels().list(request.params.profileId, request.params.providerId),
   );
 
   app.delete<{ Params: ProfileParams & { providerId: string } }>(

@@ -51,7 +51,6 @@ describe('profile vault', () => {
       name: 'OpenAI',
       kind: 'openai',
       secret: 'synthetic-first-key',
-      models: [{ id: 'sample', contextWindow: 16_000, maxOutputTokens: 2048 }],
     });
 
     expect(await services.vault.read(profile.id, providerSecret(first.id))).toBe(
@@ -62,7 +61,6 @@ describe('profile vault', () => {
       name: 'OpenAI',
       kind: 'openai',
       secret: 'synthetic-second-key',
-      models: [{ id: 'sample', contextWindow: 16_000, maxOutputTokens: 2048 }],
     });
 
     expect(await services.vault.read(profile.id, providerSecret(first.id))).toBeUndefined();

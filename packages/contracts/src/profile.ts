@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { modelSelectionSchema } from './providers.js';
+import { modelSelectionSchema, reasoningEffortSchema } from './providers.js';
 import { secretSchema } from './security.js';
 
 const endpointSchema = z.url().refine((value) => {
@@ -25,6 +25,8 @@ export const modelSchema = z
       .optional(),
     providerId: z.uuid().optional(),
     baseURL: endpointSchema.optional(),
+    // Frozen with the run: the effort chosen next to the model is what the request carries.
+    reasoningEffort: reasoningEffortSchema.optional(),
   })
   .superRefine((value, ctx) => {
     if (value.apiKeyEnv && value.providerId) {

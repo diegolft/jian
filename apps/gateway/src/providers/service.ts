@@ -15,13 +15,24 @@ import { recordEvent } from '../core/events.js';
 import type { Reader, Store } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
 import type { Vault } from '../security/vault.js';
-import { environmentProvider, type ProviderKind, providerCatalog } from './catalog.js';
+import { modelCapabilities } from './capabilities.js';
+import { environmentProvider, providerKinds } from './catalog.js';
 
 /** Where a provider's key lives in the vault. Revoking the provider takes the key with it. */
 export const providerSecret = (providerId: string) => `provider:${providerId}`;
 
 /** The ceilings a run freezes; the run record keeps them optional for pre-selection runs. */
 export type ContextPolicy = NonNullable<Run['contextPolicy']>;
+
+/**
+ * Providers registered before model discovery stored a hand-written model list. The record no
+ * longer declares one and the strict schema would reject it, so it is dropped on read.
+ */
+function current(record: ProviderRecord): ProviderRecord {
+  const { models: _legacy, ...rest } = record as ProviderRecord & { models?: unknown };
+
+  return rest;
+}
 
 export class Providers {
   constructor(
@@ -35,10 +46,10 @@ export class Providers {
     await this.profiles.profile(profileId);
 
     const stored = (await this.store.list('provider', { profileId, limit: 100 })).map((item) =>
-      providerRecordSchema.parse(item),
+      providerRecordSchema.parse(current(item)),
     );
     // A configured provider hides the host environment's key for the same vendor.
-    const environment = (Object.keys(providerCatalog) as ProviderKind[])
+    const environment = providerKinds
       .map((kind) => environmentProvider(profileId, kind))
       .filter((provider) => provider !== null)
       .filter((provider) => !stored.some((item) => !item.revokedAt && item.kind === provider.kind));
@@ -48,10 +59,6 @@ export class Providers {
 
   async createProvider(profileId: string, input: unknown) {
     const { secret, ...data } = providerInputSchema.parse(input);
-
-    if (new Set(data.models.map((model) => model.id)).size !== data.models.length) {
-      throw new GatewayError(400, 'Model IDs must be unique within a provider');
-    }
 
     return this.register(
       profileId,
@@ -69,7 +76,6 @@ export class Providers {
         name: 'OpenAI',
         kind: 'openai',
         authMode: 'codex',
-        models: [{ id: 'gpt-5.6-terra', contextWindow: 1_000_000, maxOutputTokens: 128_000 }],
         createdAt: nowIso(this.clock),
       }),
       secret,
@@ -122,15 +128,14 @@ export class Providers {
     await this.profiles.profile(profileId);
     const defaults = await this.store.get('modelDefault', profileId);
 
-    return (
-      defaults ?? {
-        id: profileId,
-        profileId,
-        conversation: null,
-        channel: null,
-        updatedAt: nowIso(this.clock),
-      }
-    );
+    // Parsed on the way out so a record written before a role existed reads back as empty
+    // for that role instead of leaving the field missing from the response.
+    return modelDefaultsRecordSchema.parse({
+      ...defaults,
+      id: profileId,
+      profileId,
+      updatedAt: defaults?.updatedAt ?? nowIso(this.clock),
+    });
   }
 
   async setModelDefaults(profileId: string, input: unknown) {
@@ -139,7 +144,9 @@ export class Providers {
     return this.store.transaction(profileId, async (tx) => {
       await this.profiles.profile(profileId, tx);
 
-      for (const selection of [data.conversation, data.channel]) {
+      // Every role is validated, including the ones no runtime executes yet: a selection that
+      // cannot resolve today would fail silently the day its runtime lands.
+      for (const selection of Object.values(data)) {
         if (selection) {
           await this.selectedModel(profileId, selection, tx);
         }
@@ -166,20 +173,34 @@ export class Providers {
   ): Promise<{ config: ModelConfig; policy: ContextPolicy }> {
     const provider =
       (await reader.get('provider', selection.providerId)) ??
-      (Object.keys(providerCatalog) as ProviderKind[])
+      providerKinds
         .map((kind) => environmentProvider(profileId, kind))
         .find((item) => item?.id === selection.providerId);
-    const model = provider?.models.find((item) => item.id === selection.modelId);
 
-    if (!provider || provider.profileId !== profileId || provider.revokedAt || !model) {
+    if (!provider || provider.profileId !== profileId || provider.revokedAt) {
       throw new GatewayError(409, 'Selected provider or model is unavailable');
+    }
+
+    // Which models exist is the provider's answer and can change between two requests, so a
+    // selection is never checked against a list: a provider outage would otherwise revoke a
+    // model the owner already chose. Only the provider itself has to be live.
+    const model = modelCapabilities(provider.kind, selection.modelId);
+
+    if (selection.reasoningEffort && !model.reasoningEfforts.includes(selection.reasoningEffort)) {
+      throw new GatewayError(
+        409,
+        model.known
+          ? 'This model does not accept the selected reasoning effort'
+          : 'Reasoning effort is not catalogued for this model',
+      );
     }
 
     // Ceilings, not targets: a large context window must not inflate routine memory/history.
     return {
       config: {
         provider: provider.authMode === 'codex' ? ('openai-codex' as const) : provider.kind,
-        modelId: model.id,
+        modelId: selection.modelId,
+        ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
         ...(provider.apiKeyEnv ? { apiKeyEnv: provider.apiKeyEnv } : { providerId: provider.id }),
       },
       policy: {

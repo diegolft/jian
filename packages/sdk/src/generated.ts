@@ -36,6 +36,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/profiles/{profileId}/providers/{providerId}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Required permission: admin. */
+        get: operations["listProviderModels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/profiles/{profileId}/providers/{providerId}": {
         parameters: {
             query?: never;
@@ -927,11 +944,6 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         kind: "openai" | "anthropic" | "google";
-                        models: {
-                            id: string;
-                            contextWindow: number;
-                            maxOutputTokens: number;
-                        }[];
                         apiKeyEnv?: string;
                         /** @enum {string} */
                         authMode?: "api" | "codex";
@@ -1063,11 +1075,6 @@ export interface operations {
                     /** @enum {string} */
                     kind: "openai" | "anthropic" | "google";
                     secret: string;
-                    models: {
-                        id: string;
-                        contextWindow: number;
-                        maxOutputTokens: number;
-                    }[];
                 };
             };
         };
@@ -1082,11 +1089,6 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         kind: "openai" | "anthropic" | "google";
-                        models: {
-                            id: string;
-                            contextWindow: number;
-                            maxOutputTokens: number;
-                        }[];
                         apiKeyEnv?: string;
                         /** @enum {string} */
                         authMode?: "api" | "codex";
@@ -1098,6 +1100,144 @@ export interface operations {
                         createdAt: string;
                         /** Format: date-time */
                         revokedAt?: string;
+                    };
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+        };
+    };
+    listProviderModels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileId: string;
+                providerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        providerId: string;
+                        models: {
+                            contextWindow: number;
+                            maxOutputTokens: number;
+                            reasoningEfforts: ("none" | "minimal" | "low" | "medium" | "high")[];
+                            inputModalities: ("text" | "image" | "audio" | "video" | "pdf")[];
+                            known: boolean;
+                            id: string;
+                            displayName?: string;
+                        }[];
+                        /** Format: date-time */
+                        fetchedAt: string;
+                        stale: boolean;
+                        reason?: string;
                     };
                 };
             };
@@ -1224,11 +1364,6 @@ export interface operations {
                         name: string;
                         /** @enum {string} */
                         kind: "openai" | "anthropic" | "google";
-                        models: {
-                            id: string;
-                            contextWindow: number;
-                            maxOutputTokens: number;
-                        }[];
                         apiKeyEnv?: string;
                         /** @enum {string} */
                         authMode?: "api" | "codex";
@@ -1362,15 +1497,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @default null */
                         conversation: {
                             /** Format: uuid */
                             providerId: string;
                             modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         } | null;
+                        /** @default null */
                         channel: {
                             /** Format: uuid */
                             providerId: string;
                             modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                        } | null;
+                        /** @default null */
+                        compaction: {
+                            /** Format: uuid */
+                            providerId: string;
+                            modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                        } | null;
+                        /** @default null */
+                        image: {
+                            /** Format: uuid */
+                            providerId: string;
+                            modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                        } | null;
+                        /** @default null */
+                        audio: {
+                            /** Format: uuid */
+                            providerId: string;
+                            modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                        } | null;
+                        /** @default null */
+                        speech: {
+                            /** Format: uuid */
+                            providerId: string;
+                            modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                        } | null;
+                        /** @default null */
+                        transcription: {
+                            /** Format: uuid */
+                            providerId: string;
+                            modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         } | null;
                         /** Format: uuid */
                         id: string;
@@ -1494,15 +1675,61 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    conversation: {
+                    /** @default null */
+                    conversation?: {
                         /** Format: uuid */
                         providerId: string;
                         modelId: string;
+                        /** @enum {string} */
+                        reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                     } | null;
-                    channel: {
+                    /** @default null */
+                    channel?: {
                         /** Format: uuid */
                         providerId: string;
                         modelId: string;
+                        /** @enum {string} */
+                        reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                    } | null;
+                    /** @default null */
+                    compaction?: {
+                        /** Format: uuid */
+                        providerId: string;
+                        modelId: string;
+                        /** @enum {string} */
+                        reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                    } | null;
+                    /** @default null */
+                    image?: {
+                        /** Format: uuid */
+                        providerId: string;
+                        modelId: string;
+                        /** @enum {string} */
+                        reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                    } | null;
+                    /** @default null */
+                    audio?: {
+                        /** Format: uuid */
+                        providerId: string;
+                        modelId: string;
+                        /** @enum {string} */
+                        reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                    } | null;
+                    /** @default null */
+                    speech?: {
+                        /** Format: uuid */
+                        providerId: string;
+                        modelId: string;
+                        /** @enum {string} */
+                        reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                    } | null;
+                    /** @default null */
+                    transcription?: {
+                        /** Format: uuid */
+                        providerId: string;
+                        modelId: string;
+                        /** @enum {string} */
+                        reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                     } | null;
                 };
             };
@@ -1515,15 +1742,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @default null */
                         conversation: {
                             /** Format: uuid */
                             providerId: string;
                             modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         } | null;
+                        /** @default null */
                         channel: {
                             /** Format: uuid */
                             providerId: string;
                             modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                        } | null;
+                        /** @default null */
+                        compaction: {
+                            /** Format: uuid */
+                            providerId: string;
+                            modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                        } | null;
+                        /** @default null */
+                        image: {
+                            /** Format: uuid */
+                            providerId: string;
+                            modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                        } | null;
+                        /** @default null */
+                        audio: {
+                            /** Format: uuid */
+                            providerId: string;
+                            modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                        } | null;
+                        /** @default null */
+                        speech: {
+                            /** Format: uuid */
+                            providerId: string;
+                            modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                        } | null;
+                        /** @default null */
+                        transcription: {
+                            /** Format: uuid */
+                            providerId: string;
+                            modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         } | null;
                         /** Format: uuid */
                         id: string;
@@ -1948,11 +2221,15 @@ export interface operations {
                             providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         modelSelection?: {
                             /** Format: uuid */
                             providerId: string;
                             modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         contextPolicy?: {
                             /** @default 16000 */
@@ -4828,6 +5105,8 @@ export interface operations {
                             providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         /**
                          * @default {
@@ -5031,6 +5310,8 @@ export interface operations {
                         providerId?: string;
                         /** Format: uri */
                         baseURL?: string;
+                        /** @enum {string} */
+                        reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                     };
                     /**
                      * @default {
@@ -5124,6 +5405,8 @@ export interface operations {
                             providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         /**
                          * @default {
@@ -5335,6 +5618,8 @@ export interface operations {
                             providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         /**
                          * @default {
@@ -5533,6 +5818,8 @@ export interface operations {
                         providerId?: string;
                         /** Format: uri */
                         baseURL?: string;
+                        /** @enum {string} */
+                        reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                     };
                     identity?: {
                         /** @default  */
@@ -5605,6 +5892,8 @@ export interface operations {
                             providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         /**
                          * @default {
@@ -5820,6 +6109,8 @@ export interface operations {
                                 providerId?: string;
                                 /** Format: uri */
                                 baseURL?: string;
+                                /** @enum {string} */
+                                reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                             };
                             /**
                              * @default {
@@ -6422,6 +6713,8 @@ export interface operations {
                         /** Format: uuid */
                         providerId: string;
                         modelId: string;
+                        /** @enum {string} */
+                        reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                     };
                 };
             };
@@ -6466,11 +6759,15 @@ export interface operations {
                             providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         modelSelection?: {
                             /** Format: uuid */
                             providerId: string;
                             modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         contextPolicy?: {
                             /** @default 16000 */
@@ -6907,11 +7204,15 @@ export interface operations {
                             providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         modelSelection?: {
                             /** Format: uuid */
                             providerId: string;
                             modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         contextPolicy?: {
                             /** @default 16000 */
@@ -7084,11 +7385,15 @@ export interface operations {
                             providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         modelSelection?: {
                             /** Format: uuid */
                             providerId: string;
                             modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         contextPolicy?: {
                             /** @default 16000 */
@@ -7261,11 +7566,15 @@ export interface operations {
                             providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         modelSelection?: {
                             /** Format: uuid */
                             providerId: string;
                             modelId: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
                         };
                         contextPolicy?: {
                             /** @default 16000 */

@@ -24,7 +24,14 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { date, type GatewayApi, gatewayApi, type Profile, type ProfileData } from '../lib/api';
+import {
+  date,
+  type GatewayApi,
+  gatewayApi,
+  type Profile,
+  type ProfileData,
+  type ProviderModelList,
+} from '../lib/api';
 import { Avatar } from './avatar-field';
 import { Channels } from './channels';
 import { NewProfileDialog, ProfileEditor } from './profile-editor';
@@ -374,7 +381,34 @@ async function profileData(api: GatewayApi, id: string): Promise<ProfileData> {
       api.modelDefaults(id),
     ]);
 
-  return { sessions, channels, memories, activities, deliveries, providers, modelDefaults };
+  // One request per live provider, and only on a refresh: the gateway caches the answer, so
+  // rendering the panel never costs a call to the provider.
+  const lists = await Promise.all(
+    providers
+      .filter((provider) => !provider.revokedAt)
+      .map(async (provider) =>
+        api.providerModels(id, provider.id).catch(
+          (error): ProviderModelList => ({
+            providerId: provider.id,
+            models: [],
+            fetchedAt: new Date().toISOString(),
+            stale: true,
+            reason: error instanceof Error ? error.message : 'Lista indisponível.',
+          }),
+        ),
+      ),
+  );
+
+  return {
+    sessions,
+    channels,
+    memories,
+    activities,
+    deliveries,
+    providers,
+    providerModels: Object.fromEntries(lists.map((list) => [list.providerId, list])),
+    modelDefaults,
+  };
 }
 
 function Workspace({

@@ -1,0 +1,69 @@
+import type { ModelConfig, ReasoningEffort } from '@jian/contracts';
+import type { JSONValue } from 'ai';
+
+/**
+ * How much of the run's output allowance each effort level may spend on thinking. Anthropic
+ * and Gemini take a token budget rather than a word, and that budget is drawn from the same
+ * output ceiling as the answer: a fixed number would either starve the reply or exceed
+ * `max_tokens` and be rejected by the provider.
+ */
+const share: Record<Exclude<ReasoningEffort, 'none'>, number> = {
+  minimal: 0.15,
+  low: 0.3,
+  medium: 0.5,
+  high: 0.8,
+};
+
+/** Anthropic rejects a thinking budget below 1024, and it must stay under `max_tokens`. */
+const minimumBudget = 1024;
+
+function budget(effort: ReasoningEffort, maxOutputTokens: number): number | null {
+  if (effort === 'none') return 0;
+
+  const ceiling = maxOutputTokens - 256;
+
+  if (ceiling < minimumBudget) return null;
+
+  return Math.min(ceiling, Math.max(minimumBudget, Math.floor(maxOutputTokens * share[effort])));
+}
+
+/**
+ * Translates the stored effort into each provider's own dialect. Returns undefined when there
+ * is nothing to say, so a model without reasoning is called exactly as before.
+ */
+export function reasoningProviderOptions(
+  config: ModelConfig,
+  maxOutputTokens: number,
+): Record<string, Record<string, JSONValue>> | undefined {
+  const effort = config.reasoningEffort;
+
+  if (!effort) return undefined;
+
+  switch (config.provider) {
+    case 'openai':
+    case 'openai-codex':
+      return { openai: { reasoningEffort: effort } };
+    case 'anthropic': {
+      const tokens = budget(effort, maxOutputTokens);
+
+      if (tokens === null) return undefined;
+
+      return {
+        anthropic: {
+          thinking: tokens === 0 ? { type: 'disabled' } : { type: 'enabled', budgetTokens: tokens },
+        },
+      };
+    }
+    case 'google': {
+      const tokens = budget(effort, maxOutputTokens);
+
+      if (tokens === null) return undefined;
+
+      return { google: { thinkingConfig: { thinkingBudget: tokens, includeThoughts: false } } };
+    }
+    default:
+      // A compatible endpoint is whatever the owner pointed it at; guessing its dialect would
+      // turn a supported model into a rejected request.
+      return undefined;
+  }
+}

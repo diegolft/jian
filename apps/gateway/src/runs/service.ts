@@ -11,7 +11,6 @@ import { assertFound, GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
 import type { Reader, Store } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
-import { environmentProvider, type ProviderKind, providerCatalog } from '../providers/catalog.js';
 import type { ProviderSelection } from '../providers/port.js';
 import type { SessionReader } from '../sessions/port.js';
 
@@ -92,24 +91,10 @@ export class Runs {
           selection = null;
         }
       }
+      // No list is invented here: which models a key can call is the provider's answer, so a
+      // run needs a model the owner actually chose for this activity.
       if (!chosen && !profile.model.apiKeyEnv && !profile.model.providerId) {
-        const stored = await tx.list('provider', { profileId, limit: 100 });
-        const configured = [
-          ...stored.filter((item) => !item.revokedAt),
-          ...(Object.keys(providerCatalog) as ProviderKind[])
-            .map((kind) => environmentProvider(profileId, kind))
-            .filter((item) => item !== null),
-        ];
-        const first =
-          configured.find((item) => item.kind === profile.model.provider) ?? configured[0];
-        if (first?.models[0]) {
-          selection = { providerId: first.id, modelId: first.models[0].id };
-          chosen = await this.providers.selectedModel(profileId, selection, tx);
-        }
-      }
-
-      if (!chosen && !profile.model.apiKeyEnv && !profile.model.providerId) {
-        throw new GatewayError(409, 'Configure a provider key before starting a run');
+        throw new GatewayError(409, 'Choose a default model before starting a run');
       }
 
       const queued = await tx.list('run', { profileId, where: { status: 'queued' }, limit: 33 });

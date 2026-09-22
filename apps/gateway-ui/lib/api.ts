@@ -13,7 +13,12 @@ export type Channel = JsonResponse<'listChannels', 200>[number];
 
 export type Provider = JsonResponse<'listProviders', 200>[number];
 export type ModelDefaults = JsonResponse<'getModelDefaults', 200>;
+export type ModelDefaultsInput =
+  operations['setModelDefaults']['requestBody']['content']['application/json'];
 export type ModelSelection = NonNullable<ModelDefaults['conversation']>;
+export type ReasoningEffort = NonNullable<ModelSelection['reasoningEffort']>;
+export type ProviderModelList = JsonResponse<'listProviderModels', 200>;
+export type ProviderModel = ProviderModelList['models'][number];
 
 export type Memory = JsonResponse<'listMemories', 200>[number];
 
@@ -52,10 +57,18 @@ async function result<T>(
       | undefined;
 
     if (response.status === 409) {
+      const conflicts: Record<string, string> = {
+        'Choose a default model before starting a run':
+          'Escolha um modelo padrão em Modelos padrão antes de conversar.',
+        'This model does not accept the selected reasoning effort':
+          'Este modelo não aceita o nível de esforço escolhido.',
+        'Reasoning effort is not catalogued for this model':
+          'O nível de esforço deste modelo não está catalogado no gateway.',
+      };
+
       const message =
-        detail?.error === 'Configure a provider key before starting a run'
-          ? 'Configure uma chave em Providers antes de conversar.'
-          : 'O estado mudou ou a sessão está ocupada. Atualize e tente novamente.';
+        conflicts[detail?.error ?? ''] ??
+        'O estado mudou ou a sessão está ocupada. Atualize e tente novamente.';
 
       throw new Error(message);
     }
@@ -126,6 +139,12 @@ export function gatewayApi() {
           body,
         }),
       ),
+    providerModels: (profileId: string, providerId: string) =>
+      result(
+        client.GET('/v1/profiles/{profileId}/providers/{providerId}/models', {
+          params: { path: { profileId, providerId } },
+        }),
+      ),
     revokeProvider: (profileId: string, providerId: string) =>
       result(
         client.DELETE('/v1/profiles/{profileId}/providers/{providerId}', {
@@ -134,7 +153,7 @@ export function gatewayApi() {
       ),
     modelDefaults: (profileId: string) =>
       result(client.GET('/v1/profiles/{profileId}/model-defaults', { params: profile(profileId) })),
-    setModelDefaults: (profileId: string, body: Pick<ModelDefaults, 'conversation' | 'channel'>) =>
+    setModelDefaults: (profileId: string, body: ModelDefaultsInput) =>
       result(
         client.PUT('/v1/profiles/{profileId}/model-defaults', {
           params: profile(profileId),
@@ -236,6 +255,8 @@ export type GatewayApi = ReturnType<typeof gatewayApi>;
 
 export type ProfileData = {
   providers: Provider[];
+  /** One entry per usable provider, keyed by provider id. Absent while a list never arrived. */
+  providerModels: Record<string, ProviderModelList>;
   modelDefaults: ModelDefaults;
   sessions: Session[];
   channels: Channel[];

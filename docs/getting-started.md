@@ -64,9 +64,13 @@ Every administrative call needs `Authorization: Bearer <JIAN_API_TOKEN>`, includ
    `OPENAI_API_KEY` in the gateway environment, or enter a key on the Providers screen.
    OpenAI also accepts a ChatGPT/Codex login there. No provider registration or model
    allowlist is required.
-3. Create a session and post to
+3. Read what that account can call with
+   `GET /v1/profiles/{profileId}/providers/{providerId}/models`, then pick a model per
+   role with `PUT /v1/profiles/{profileId}/model-defaults`. `conversation` is what a run
+   falls back to; the gateway never picks a model on its own.
+4. Create a session and post to
    `POST /v1/profiles/{profileId}/sessions/{sessionId}/messages` with `text` and a
-   `requestKey` per message. The configured provider is selected automatically.
+   `requestKey` per message, optionally overriding `model`.
 
 The host token is the only API credential and it opens the whole installation. Keep it on
 the host and on devices you trust; there are no scoped client keys.
@@ -76,6 +80,20 @@ The Providers screen has fixed Anthropic, Gemini and OpenAI settings. It detects
 from the gateway environment without exposing their values. OpenAI also supports
 ChatGPT/Codex device-code login. Existing profile records with `model`, `apiKeyEnv` or
 `openai-compatible` remain compatible. The context policy still bounds history and memory.
+
+Which models a connection offers comes from the provider: the gateway calls
+`/v1/models` (OpenAI), `/v1/models` (Anthropic) and `/v1beta/models` (Gemini) with the
+stored key, through the same guarded outbound client as every other provider call,
+and caches each answer for a minute. A provider that does not answer is reported with
+`stale: true` alongside the last list it did return — the saved providers and model
+defaults are never touched, and no list is ever substituted from this repository.
+
+What each model can do is not in those answers. Context window, output ceiling, accepted
+reasoning efforts and input modalities come from the versioned table in
+`apps/gateway/src/providers/capabilities.ts`, matched by model family prefix. A model the
+table does not know stays selectable with `known: false` and conservative limits (8192
+input, 4096 output, text only, no reasoning effort), and the panel labels it.
+ChatGPT/Codex publishes no model index, so its model id is typed by hand.
 
 Repeating a `requestKey` with the same text returns the existing run; different content
 returns `409`. A profile allows up to 32 active or queued runs, one per session, and each

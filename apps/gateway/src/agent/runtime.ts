@@ -3,6 +3,7 @@ import type { MCPClient } from '@ai-sdk/mcp';
 import { stepCountIs, ToolLoopAgent, type ToolSet } from 'ai';
 import { fitPrompt, tokenCounter } from '../context/budget.js';
 import type { ContextSource } from '../context/port.js';
+import { reasoningProviderOptions } from '../providers/effort.js';
 import { resolveModel } from '../providers/models.js';
 import { providerSecret } from '../providers/service.js';
 import { createSafeFetch } from '../security/outbound.js';
@@ -178,6 +179,8 @@ export class AgentRuntime {
       }
 
       const context = await this.services.contexts.context(run);
+      // The effort the owner picked next to the model, in the dialect this provider reads.
+      const reasoning = reasoningProviderOptions(config, policy.outputTokens);
       let usedTokens = 0;
       let preparedInputTokens = 0;
 
@@ -188,6 +191,7 @@ export class AgentRuntime {
         stopWhen: stepCountIs(policy.maxSteps),
         maxRetries: 0,
         maxOutputTokens: policy.outputTokens,
+        ...(reasoning ? { providerOptions: reasoning } : {}),
         prepareStep: async ({ messages }) => {
           if (externalUncertain) {
             throw new Error('External tool outcome is uncertain');

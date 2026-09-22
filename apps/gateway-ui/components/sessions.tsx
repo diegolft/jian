@@ -9,6 +9,7 @@ import {
   type Mutation,
   type Profile,
   type ProfileData,
+  type ReasoningEffort,
   type Run,
 } from '../lib/api';
 import { availableModels } from './provider-settings';
@@ -45,7 +46,11 @@ function Conversation({
     const defaultModel = data.modelDefaults.conversation;
     return defaultModel ? `${defaultModel.providerId}:${defaultModel.modelId}` : '';
   });
+  const [effort, setEffort] = useState(data.modelDefaults.conversation?.reasoningEffort ?? '');
   const models = availableModels(data);
+  const chosen = models.find(
+    (entry) => `${entry.provider.id}:${entry.model.id}` === selectedModel,
+  )?.model;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   // Retain the key after an uncertain HTTP result, so a retry cannot enqueue the same text twice.
@@ -210,6 +215,7 @@ function Conversation({
               ? {
                   providerId: selectedModel.split(':')[0],
                   modelId: selectedModel.split(':').slice(1).join(':'),
+                  ...(effort ? { reasoningEffort: effort as ReasoningEffort } : {}),
                 }
               : undefined;
             const submitted = await api.submit(
@@ -263,10 +269,29 @@ function Conversation({
               {models.map(({ provider, model }) => (
                 <option key={`${provider.id}:${model.id}`} value={`${provider.id}:${model.id}`}>
                   {provider.name} · {model.id}
+                  {model.known ? '' : ' · desconhecido'}
                 </option>
               ))}
             </select>
           </label>
+          {!!chosen?.reasoningEfforts.length && (
+            <label className="composer-model">
+              <span>Esforço</span>
+              <select
+                aria-label="Nível de esforço"
+                value={effort}
+                onChange={(event) => setEffort(event.target.value)}
+                disabled={busy || running(run)}
+              >
+                <option value="">Padrão do provider</option>
+                {chosen.reasoningEfforts.map((level) => (
+                  <option key={level} value={level}>
+                    {level}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <Button
             type="submit"
             aria-label="Enviar mensagem"

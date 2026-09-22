@@ -107,7 +107,6 @@ describe('public API contracts', () => {
           name: 'OpenAI',
           kind: 'openai',
           secret: 'synthetic-secret',
-          models: [{ id: 'sample', contextWindow: 16_000, maxOutputTokens: 2048 }],
         },
       });
 

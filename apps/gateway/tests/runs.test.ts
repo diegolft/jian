@@ -20,7 +20,7 @@ async function setup() {
   return { services, profile, session };
 }
 
-it('uses host provider credentials without manual registration or a model default', async () => {
+it('runs on a host provider credential without registering a provider by hand', async () => {
   vi.stubEnv('ANTHROPIC_API_TOKEN', 'synthetic-anthropic-token');
   const services = testServices();
   const profile = await services.profiles.createProfile({ name: 'Host', instructions: 'Help.' });
@@ -31,6 +31,20 @@ it('uses host provider credentials without manual registration or a model defaul
   expect(JSON.stringify(providers)).not.toContain('synthetic-anthropic-token');
 
   const session = await services.sessions.createSession(profile.id, { title: 'Test' });
+
+  // Which models that key can call is the provider's answer, so a run needs a chosen one.
+  await expect(
+    services.runs.submit(profile.id, session.id, { text: 'Hello', requestKey: 'unchosen' }),
+  ).rejects.toMatchObject({ statusCode: 409 });
+
+  await services.providers.setModelDefaults(profile.id, {
+    conversation: {
+      providerId: anthropic?.id ?? '',
+      modelId: 'claude-sonnet-4-5',
+      reasoningEffort: 'low',
+    },
+  });
+
   const run = await services.runs.submit(profile.id, session.id, {
     text: 'Hello',
     requestKey: 'host-provider',
@@ -39,10 +53,11 @@ it('uses host provider credentials without manual registration or a model defaul
   expect(run.model).toMatchObject({
     provider: 'anthropic',
     apiKeyEnv: 'ANTHROPIC_API_TOKEN',
+    reasoningEffort: 'low',
   });
 });
 
-it('replaces one provider key and ignores an obsolete model default', async () => {
+it('replaces one provider key and refuses the model default left behind', async () => {
   const services = testServices();
   const profile = await services.profiles.createProfile({ name: 'Replace', instructions: 'Help.' });
   const add = (name: string) =>
@@ -50,21 +65,30 @@ it('replaces one provider key and ignores an obsolete model default', async () =
       name,
       kind: 'openai',
       secret: `synthetic-${name}`,
-      models: [{ id: name, contextWindow: 16_000, maxOutputTokens: 2048 }],
     });
   const old = await add('old');
   await services.providers.setModelDefaults(profile.id, {
-    conversation: { providerId: old.id, modelId: 'old' },
-    channel: null,
+    conversation: { providerId: old.id, modelId: 'gpt-4.1' },
   });
   const current = await add('current');
   const session = await services.sessions.createSession(profile.id, { title: 'Test' });
+
+  // The replaced provider is revoked, so the default pointing at it must not start a run
+  // against a key the owner already took away.
+  await expect(
+    services.runs.submit(profile.id, session.id, { text: 'Hello', requestKey: 'stale' }),
+  ).rejects.toMatchObject({ statusCode: 409 });
+
+  await services.providers.setModelDefaults(profile.id, {
+    conversation: { providerId: current.id, modelId: 'gpt-4.1' },
+  });
+
   const run = await services.runs.submit(profile.id, session.id, {
     text: 'Hello',
     requestKey: 'new',
   });
 
-  expect(run.model?.modelId).toBe('current');
+  expect(run.model?.providerId).toBe(current.id);
   expect(
     (await services.providers.providers(profile.id)).find((item) => item.id === old.id)?.revokedAt,
   ).toBeDefined();
@@ -80,13 +104,11 @@ it('isolates providers and freezes the chosen model and its context budget per r
     name: 'Personal',
     kind: 'openai',
     secret: 'synthetic-api-key',
-    models: [
-      { id: 'small', contextWindow: 16_000, maxOutputTokens: 2048 },
-      { id: 'large', contextWindow: 64_000, maxOutputTokens: 8192 },
-    ],
   });
-  const large = { providerId: provider.id, modelId: 'large' };
-  const small = { providerId: provider.id, modelId: 'small' };
+  // Catalogued on the left, absent from the capability table on the right: the uncatalogued
+  // model stays selectable and is simply held to the conservative floor.
+  const large = { providerId: provider.id, modelId: 'gpt-4.1-mini' };
+  const small = { providerId: provider.id, modelId: 'internal-preview' };
 
   await services.providers.setModelDefaults(profile.id, { conversation: small, channel: large });
 
@@ -101,10 +123,10 @@ it('isolates providers and freezes the chosen model and its context budget per r
     requestKey: 'two',
   });
 
-  expect(chosen.model?.modelId).toBe('large');
-  expect(chosen.contextPolicy?.inputTokens).toBe(28_800);
-  expect(standard.model?.modelId).toBe('small');
-  expect(standard.contextPolicy?.inputTokens).toBe(7200);
+  expect(chosen.model?.modelId).toBe('gpt-4.1-mini');
+  expect(chosen.contextPolicy?.inputTokens).toBe(32_000);
+  expect(standard.model?.modelId).toBe('internal-preview');
+  expect(standard.contextPolicy?.inputTokens).toBe(4096);
   expect(JSON.stringify(chosen)).not.toContain('synthetic-api-key');
 
   await expect(
@@ -117,10 +139,7 @@ it('isolates providers and freezes the chosen model and its context budget per r
 
   const stranger = await services.profiles.createProfile({ name: 'Other', instructions: 'Help.' });
   await expect(
-    services.providers.setModelDefaults(stranger.id, {
-      conversation: large,
-      channel: null,
-    }),
+    services.providers.setModelDefaults(stranger.id, { conversation: large }),
   ).rejects.toMatchObject({ statusCode: 409 });
 
   await services.providers.revokeProvider(profile.id, provider.id);

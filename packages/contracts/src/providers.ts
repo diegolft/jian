@@ -1,10 +1,49 @@
 import { z } from 'zod';
 import { secretSchema } from './security.js';
 
-export const providerModelSchema = z.strictObject({
+/**
+ * One vocabulary for reasoning effort across providers: it maps onto OpenAI's
+ * `reasoning.effort`, Anthropic's thinking budget and Gemini's thinking budget. `none` asks
+ * for thinking to be off where the provider can disable it.
+ *
+ * Which of these a model accepts is not in any provider's model listing, so it comes from
+ * the gateway's capability table and never from the provider response.
+ */
+export const reasoningEffortSchema = z.enum(['none', 'minimal', 'low', 'medium', 'high']);
+
+/** Input modalities a model accepts. Also absent from the listings; also from the table. */
+export const modelModalitySchema = z.enum(['text', 'image', 'audio', 'video', 'pdf']);
+
+export const modelCapabilitiesSchema = z.strictObject({
+  contextWindow: z.number().int().min(4096).max(20_000_000),
+  maxOutputTokens: z.number().int().min(256).max(1_000_000),
+  reasoningEfforts: z.array(reasoningEffortSchema).max(5),
+  inputModalities: z.array(modelModalitySchema).min(1).max(5),
+  /**
+   * False when the capability table has no entry for this model: every number above is the
+   * gateway's conservative floor, not something the provider stated. The model stays
+   * selectable and the panel marks it, because a missing table row is our gap, not a reason
+   * to hide a model the account really has.
+   */
+  known: z.boolean(),
+});
+
+export const providerModelSchema = modelCapabilitiesSchema.extend({
   id: z.string().trim().min(1).max(160),
-  contextWindow: z.number().int().min(4096).max(1_000_000),
-  maxOutputTokens: z.number().int().min(256).max(128_000),
+  displayName: z.string().trim().min(1).max(200).optional(),
+});
+
+/**
+ * What a provider's models endpoint returned, joined with the capability table. `stale` says
+ * the provider could not be reached and these are the last models it did return — possibly
+ * none. A failed refresh never empties a saved selection and never yields a made-up list.
+ */
+export const providerModelListSchema = z.strictObject({
+  providerId: z.uuid(),
+  models: z.array(providerModelSchema).max(500),
+  fetchedAt: z.iso.datetime(),
+  stale: z.boolean(),
+  reason: z.string().max(300).optional(),
 });
 
 /** The key travels once, on the way in. `createdAt` is the only thing said about it afterwards. */
@@ -12,7 +51,6 @@ export const providerInputSchema = z.strictObject({
   name: z.string().trim().min(1).max(100),
   kind: z.enum(['openai', 'anthropic', 'google']),
   secret: secretSchema,
-  models: z.array(providerModelSchema).min(1).max(30),
 });
 
 export const providerRecordSchema = providerInputSchema.omit({ secret: true }).extend({
@@ -34,11 +72,39 @@ export const codexLoginSchema = z.strictObject({
 export const modelSelectionSchema = z.strictObject({
   providerId: z.uuid(),
   modelId: z.string().trim().min(1).max(160),
+  reasoningEffort: reasoningEffortSchema.optional(),
 });
 
+export const modelRoleSchema = z.enum([
+  'conversation',
+  'channel',
+  'compaction',
+  'image',
+  'audio',
+  'speech',
+  'transcription',
+]);
+
+/**
+ * The roles a run actually executes today. Every other role is stored, validated and inert on
+ * purpose: the configuration and the contract land first, the runtimes for context
+ * compaction, image, audio, speech and transcription land later. Anything reading a default
+ * for a role outside this list is reading a setting nothing has wired up yet.
+ */
+export const executedModelRoles = ['conversation', 'channel'] as const;
+
+// Absent stays absent: a PUT that omits a role clears it, and records written before a role
+// existed read back as empty instead of failing.
+const roleSelection = modelSelectionSchema.nullable().default(null);
+
 export const modelDefaultsInputSchema = z.strictObject({
-  conversation: modelSelectionSchema.nullable(),
-  channel: modelSelectionSchema.nullable(),
+  conversation: roleSelection,
+  channel: roleSelection,
+  compaction: roleSelection,
+  image: roleSelection,
+  audio: roleSelection,
+  speech: roleSelection,
+  transcription: roleSelection,
 });
 
 export const modelDefaultsRecordSchema = modelDefaultsInputSchema.extend({
@@ -48,5 +114,10 @@ export const modelDefaultsRecordSchema = modelDefaultsInputSchema.extend({
 });
 
 export type ProviderRecord = z.infer<typeof providerRecordSchema>;
+export type ProviderModel = z.infer<typeof providerModelSchema>;
+export type ProviderModelList = z.infer<typeof providerModelListSchema>;
+export type ModelCapabilities = z.infer<typeof modelCapabilitiesSchema>;
 export type ModelDefaultsRecord = z.infer<typeof modelDefaultsRecordSchema>;
+export type ModelRole = z.infer<typeof modelRoleSchema>;
 export type ModelSelection = z.infer<typeof modelSelectionSchema>;
+export type ReasoningEffort = z.infer<typeof reasoningEffortSchema>;

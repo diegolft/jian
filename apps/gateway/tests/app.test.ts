@@ -38,7 +38,6 @@ describe('HTTP services', () => {
       name: 'OpenAI',
       kind: 'openai',
       secret: 'synthetic-secret',
-      models: [{ id: 'sample', contextWindow: 16_000, maxOutputTokens: 2048 }],
     };
     const created = await app.inject({
       method: 'POST',
@@ -54,7 +53,7 @@ describe('HTTP services', () => {
 
     expect(listed.body).not.toContain('synthetic-secret');
 
-    const chosen = { providerId: created.json().id, modelId: 'sample' };
+    const chosen = { providerId: created.json().id, modelId: 'gpt-4.1-mini' };
     const configured = await app.inject({
       method: 'PUT',
       url: `${base}/model-defaults`,
@@ -72,7 +71,7 @@ describe('HTTP services', () => {
     });
 
     expect(response.statusCode).toBe(202);
-    expect(response.json().model.modelId).toBe('sample');
+    expect(response.json().model.modelId).toBe('gpt-4.1-mini');
     expect(response.body).not.toContain('synthetic-secret');
   });
 

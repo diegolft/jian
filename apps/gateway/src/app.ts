@@ -15,6 +15,7 @@ import { registerGatewayUi } from './http/ui.js';
 import { registerMemoryRoutes } from './memories/routes.js';
 import { registerProfileRoutes } from './profiles/routes.js';
 import type { CodexLogin } from './providers/codex/login.js';
+import type { ProviderModels } from './providers/discovery.js';
 import { registerProviderRoutes } from './providers/routes.js';
 import { registerRunRoutes } from './runs/routes.js';
 import { registerSecurityRoutes } from './security/routes.js';
@@ -27,6 +28,7 @@ export function createApp(
     token: string;
     logger?: boolean;
     codexLogin?: CodexLogin;
+    providerModels?: ProviderModels;
     channels?: Channels;
     whatsapp?: WhatsAppConnections;
     maxStreams?: number;

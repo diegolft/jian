@@ -30,6 +30,7 @@ import {
   modelDefaultsInputSchema,
   modelDefaultsRecordSchema,
   providerInputSchema,
+  providerModelListSchema,
   providerRecordSchema,
 } from './providers.js';
 import {
@@ -101,6 +102,13 @@ export const operations: Operation[] = [
     body: providerInputSchema,
     response: providerRecordSchema,
     status: 201,
+  },
+  {
+    method: 'GET',
+    path: `${profile}/providers/:providerId/models`,
+    operationId: 'listProviderModels',
+    access: 'admin',
+    response: providerModelListSchema,
   },
   {
     method: 'DELETE',

@@ -15,8 +15,10 @@ A aplicação usa uma página estática, com navegação por fragmentos (`/ui/#c
 1. Entre com o token administrativo `JIAN_API_TOKEN`.
 2. Crie um perfil com nome e instruções. Papel, tom e objetivos pertencem às instruções.
 3. Em **Providers**, configure a chave de Anthropic, Gemini ou OpenAI. `ANTHROPIC_API_KEY`, `ANTHROPIC_API_TOKEN`, `GEMINI_API_TOKEN` e `OPENAI_API_KEY` no ambiente são detectadas automaticamente. A OpenAI também aceita login ChatGPT por código de dispositivo.
-4. Uma chave configurada já permite conversar. Em **Modelos padrão**, você pode escolher outro modelo para conversas ou canais; essa escolha é opcional.
-5. Adicione Skills e servidores MCP, com ferramentas explicitamente permitidas. Crie uma conversa, escolha um modelo no Composer se quiser substituir o padrão e teste uma mensagem. O worker precisa estar em execução para processar a fila.
+4. Em **Modelos padrão**, escolha o modelo de cada papel. A lista vem da conta do provider, não de uma lista escrita no código, e o painel marca os modelos cujas capacidades o gateway não cataloga. O nível de esforço aparece onde o modelo aceita. **Conversas** é obrigatório para conversar; os demais podem ficar vazios.
+
+   Os papéis são: conversas, canais, compactação de contexto, geração de imagem, geração de áudio, fala a partir de texto e texto a partir de fala. Só conversas e canais têm runtime hoje — os outros cinco são salvos, validados e **não executados**, e o painel diz isso em cada um. Quando o provider não responde, o painel mostra a última lista lida com aviso; a configuração salva não muda. O login ChatGPT não publica lista de modelos: use **Informar ID…** para digitar o ID.
+5. Adicione Skills e servidores MCP, com ferramentas explicitamente permitidas. Crie uma conversa, escolha um modelo e um esforço no Composer se quiser substituir o padrão, e teste uma mensagem. O worker precisa estar em execução para processar a fila.
 6. Em **Canais**, vincule uma sessão e informe as listas de remetentes e conversas autorizados.
 
 O login ChatGPT usa o backend Codex com o mesmo ciclo de contexto, ferramentas e registro de uso do Jian. Tokens OAuth ficam criptografados no cofre e são renovados pelo gateway. Não cole tokens de login no campo de chave de API. Perfis antigos com `model` e `contextPolicy` continuam legíveis e funcionais.
