@@ -2,9 +2,9 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import type { ModelConfig } from '@elos/contracts';
 import type { LanguageModel } from 'ai';
 import { createCodexModel } from './codex-model.js';
-import type { ModelConfig } from './domain.js';
 import { providerEnvironment } from './provider-catalog.js';
 import { createSafeFetch } from './security/outbound.js';
 

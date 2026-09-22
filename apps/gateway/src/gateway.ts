@@ -1,27 +1,28 @@
 import { randomUUID } from 'node:crypto';
 import {
+  continuationSchema,
+  type Memory,
+  type Message,
   type ModelSelection,
+  memorySchema,
   modelDefaultsInputSchema,
   modelDefaultsRecordSchema,
+  type Profile,
   type ProviderRecord,
-  providerInputSchema,
-  providerRecordSchema,
-} from '@elos/contracts';
-import { buildContext } from './context/build.js';
-import type { Memory, Message, Profile, Run, Session } from './domain.js';
-import {
-  assertFound,
-  continuationSchema,
-  GatewayError,
-  memorySchema,
   profilePatchSchema,
   profileRecordSchema,
   profileSchema,
+  providerInputSchema,
+  providerRecordSchema,
+  type Run,
+  type Session,
   sessionSchema,
   submitSchema,
-} from './domain.js';
+} from '@elos/contracts';
+import { buildContext } from './context/build.js';
+import { assertFound, GatewayError } from './core/errors.js';
+import type { Reader, Store, Transaction } from './core/store.js';
 import { environmentProvider, type ProviderKind, providerCatalog } from './provider-catalog.js';
-import type { Reader, Store, Transaction } from './storage.js';
 
 const active = (run: Run) => run.status === 'running' || run.status === 'queued';
 

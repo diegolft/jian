@@ -1,5 +1,5 @@
 import { telegramUpdateSchema } from '@elos/contracts';
-import { GatewayError } from '../domain.js';
+import { GatewayError } from '../core/errors.js';
 import type {
   Channel,
   ChannelConfiguration,

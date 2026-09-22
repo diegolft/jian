@@ -1,7 +1,7 @@
+import { memorySchema, type Run, skillSchema } from '@elos/contracts';
 import { type ToolSet, tool } from 'ai';
 import { z } from 'zod';
-import type { Run } from './domain.js';
-import { GatewayError, memorySchema, skillSchema } from './domain.js';
+import { GatewayError } from './core/errors.js';
 import type { Gateway } from './gateway.js';
 import { Coordination } from './services/coordination.js';
 

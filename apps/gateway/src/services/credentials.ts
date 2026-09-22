@@ -7,7 +7,7 @@ import {
   type Scope,
 } from '@elos/contracts';
 import type { z } from 'zod';
-import { assertFound, GatewayError } from '../domain.js';
+import { assertFound, GatewayError } from '../core/errors.js';
 import type { Gateway } from '../gateway.js';
 import type { EncryptedSecret, SecretBox } from '../security/crypto.js';
 import { hashToken, issueToken } from '../security/tokens.js';

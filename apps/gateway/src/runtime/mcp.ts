@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { createMCPClient, type MCPClient } from '@ai-sdk/mcp';
+import type { Run } from '@elos/contracts';
 import { type ToolSet, tool } from 'ai';
 import { z } from 'zod';
-import type { Run } from '../domain.js';
 import type { RuntimeOptions } from './types.js';
 
 interface McpContext {

@@ -1,6 +1,6 @@
+import { modelSchema } from '@elos/contracts';
 import { generateText } from 'ai';
 import { describe, expect, it } from 'vitest';
-import { modelSchema } from '../src/domain.js';
 import { resolveModel } from '../src/providers.js';
 
 describe('providers', () => {

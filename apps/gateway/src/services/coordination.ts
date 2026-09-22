@@ -7,9 +7,10 @@ import {
   mailInputSchema,
   type mailSchema,
   pageQuerySchema,
+  type Run,
 } from '@elos/contracts';
 import { z } from 'zod';
-import { assertFound, GatewayError, type Run } from '../domain.js';
+import { assertFound, GatewayError } from '../core/errors.js';
 import type { Gateway } from '../gateway.js';
 
 export type ArtifactRecord = z.infer<typeof artifactSchema>;

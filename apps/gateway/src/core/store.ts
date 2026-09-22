@@ -1,4 +1,4 @@
-import type { GatewayEvent, Kind, Records } from './domain.js';
+import type { GatewayEvent, Kind, Records } from '../records.js';
 
 export type Selection = {
   profileId?: string;

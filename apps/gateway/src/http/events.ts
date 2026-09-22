@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { GatewayError } from '../domain.js';
+import { GatewayError } from '../core/errors.js';
 import type { Gateway } from '../gateway.js';
 import type { Credentials } from '../services/credentials.js';
 

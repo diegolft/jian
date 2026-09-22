@@ -1,5 +1,5 @@
-import type { GatewayEvent, Kind, Records } from '../../src/domain.js';
-import type { Selection, Store, Transaction } from '../../src/storage.js';
+import type { Selection, Store, Transaction } from '../../src/core/store.js';
+import type { GatewayEvent, Kind, Records } from '../../src/records.js';
 
 export class MemoryStore implements Store {
   private records = new Map<string, { kind: Kind; profileId: string; data: Records[Kind] }>();

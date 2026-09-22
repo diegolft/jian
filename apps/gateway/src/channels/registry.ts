@@ -1,4 +1,4 @@
-import { GatewayError } from '../domain.js';
+import { GatewayError } from '../core/errors.js';
 import type { Channel, ChannelType } from './channel.js';
 import { GenericChannel } from './generic.js';
 import { TelegramChannel } from './telegram.js';

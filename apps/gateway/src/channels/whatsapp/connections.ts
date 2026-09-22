@@ -1,8 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { assertFound, GatewayError } from '../../domain.js';
+import { assertFound, GatewayError } from '../../core/errors.js';
+import type { Transaction } from '../../core/store.js';
 import type { Gateway } from '../../gateway.js';
 import type { SecretBox } from '../../security/crypto.js';
-import type { Transaction } from '../../storage.js';
 import type { DeliveryOutcome, IncomingMessage, OutgoingMessage } from '../channel.js';
 import type { ConnectionRecord, DeviceFactory, DeviceSessionStore, LinkedDevice } from './types.js';
 import { DEVICE_SEND_TIMEOUT_MS } from './types.js';

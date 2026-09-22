@@ -1,5 +1,6 @@
 import type {
   Checkpoint,
+  GatewayEvent,
   Memory,
   Message,
   ModelDefaultsRecord,
@@ -14,8 +15,9 @@ import type { ChannelRecord, DeliveryRecord } from './services/channels.js';
 import type { ArtifactRecord, LeaseRecord, MailRecord } from './services/coordination.js';
 import type { AccessKeyRecord, CredentialRecord } from './services/credentials.js';
 
-export * from '@elos/contracts';
+export type { GatewayEvent };
 
+/** One entry per persisted record type. A new area is added here, and only here. */
 export type Records = {
   profile: Profile;
   provider: ProviderRecord;
@@ -39,20 +41,3 @@ export type Records = {
 };
 
 export type Kind = keyof Records;
-
-export class GatewayError extends Error {
-  constructor(
-    public statusCode: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
-export function assertFound<T>(value: T | null | undefined, label: string): T {
-  if (value == null) {
-    throw new GatewayError(404, `${label} not found`);
-  }
-
-  return value;
-}

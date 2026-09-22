@@ -4,7 +4,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { LogController } from 'fastify';
 import type { WhatsAppConnections } from './channels/whatsapp/connections.js';
-import { GatewayError } from './domain.js';
+import { GatewayError } from './core/errors.js';
 import type { Gateway } from './gateway.js';
 import { registerEventRoutes } from './http/events.js';
 import { closePanelSession, openPanelSession } from './http/panel-session.js';

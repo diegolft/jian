@@ -3,7 +3,7 @@ import { channelInputSchema, type channelSchema, type deliverySchema } from '@el
 import type { z } from 'zod';
 import type { ChannelRequest, DeliveryOutcome, IncomingMessage } from '../channels/channel.js';
 import { ChannelRegistry } from '../channels/registry.js';
-import { assertFound, GatewayError } from '../domain.js';
+import { assertFound, GatewayError } from '../core/errors.js';
 import type { Gateway } from '../gateway.js';
 import { issueToken, verifyToken } from '../security/tokens.js';
 import type { Credentials } from './credentials.js';

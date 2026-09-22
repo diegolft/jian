@@ -1,5 +1,5 @@
+import type { Run } from '@elos/contracts';
 import { tokenCounter } from '../context/budget.js';
-import type { Run } from '../domain.js';
 import type { RuntimeOptions } from './types.js';
 
 // Replace longer secrets first so an overlapping shorter value cannot leave a suffix exposed.
