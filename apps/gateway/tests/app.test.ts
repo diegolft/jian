@@ -30,6 +30,32 @@ afterEach(async () => {
 });
 
 describe('HTTP services', () => {
+  it('serves the built-in skills of a profile with their instructions', async () => {
+    const { app, services } = await setup();
+    const profile = await services.profiles.createProfile(input);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/v1/profiles/${profile.id}/built-in-skills`,
+      headers,
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const skills = response.json() as Array<{
+      name: string;
+      enabled: boolean;
+      instructions: string;
+    }>;
+    const trust = skills.find((skill) => skill.name === 'owner-and-contacts');
+
+    assert(trust);
+    expect(trust.enabled).toBe(true);
+    expect(trust.instructions).toContain('exactly one owner');
+    // Self-management is off, so the skill describing a tool it lacks is not offered.
+    expect(skills.map((skill) => skill.name)).not.toContain('writing-your-skills');
+  });
+
   it('registers a provider from a typed key, runs with it and never echoes the secret', async () => {
     const { app, services } = await setup();
 
