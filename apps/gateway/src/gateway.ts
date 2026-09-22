@@ -2,13 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   continuationSchema,
   type Message,
-  type ModelSelection,
-  modelDefaultsInputSchema,
-  modelDefaultsRecordSchema,
-  type ProviderRecord,
   profileRecordSchema,
-  providerInputSchema,
-  providerRecordSchema,
   type Run,
   submitSchema,
 } from '@elos/contracts';
@@ -18,6 +12,7 @@ import type { Reader, Store, Transaction } from './core/store.js';
 import { Memories } from './memories/service.js';
 import { Profiles } from './profiles/service.js';
 import { environmentProvider, type ProviderKind, providerCatalog } from './providers/catalog.js';
+import { Providers } from './providers/service.js';
 import { Sessions } from './sessions/service.js';
 
 const active = (run: Run) => run.status === 'running' || run.status === 'queued';
@@ -26,6 +21,7 @@ const active = (run: Run) => run.status === 'running' || run.status === 'queued'
 // proceeds, and it is deleted once the run, lifecycle and context services land.
 export class Gateway {
   private readonly profileService: Profiles;
+  private readonly providerService: Providers;
   private readonly sessionService: Sessions;
   private readonly memoryService: Memories;
 
@@ -34,6 +30,7 @@ export class Gateway {
     private readonly clock = Date.now,
   ) {
     this.profileService = new Profiles(store, clock);
+    this.providerService = new Providers(store, this.profileService, clock);
     this.sessionService = new Sessions(store, this.profileService, clock);
     this.memoryService = new Memories(store, this.profileService, this.sessionService, clock);
   }
@@ -96,207 +93,28 @@ export class Gateway {
     return this.memoryService.remember(profileId, input, sourceSessionId);
   }
 
-  async providers(profileId: string) {
-    await this.profile(profileId);
-
-    const stored = (await this.store.list('provider', { profileId, limit: 100 })).map((item) =>
-      providerRecordSchema.parse(item),
-    );
-    const credentials = await this.store.list('credential', { profileId, limit: 100 });
-    const environment = (Object.keys(providerCatalog) as ProviderKind[])
-      .map((kind) => environmentProvider(profileId, kind))
-      .filter((provider) => provider !== null)
-      .filter(
-        (provider) =>
-          !stored.some(
-            (item) =>
-              !item.revokedAt &&
-              item.kind === provider.kind &&
-              credentials.some(
-                (credential) => credential.id === item.credentialId && !credential.revokedAt,
-              ),
-          ),
-      );
-
-    return [...stored, ...environment];
+  providers(profileId: string) {
+    return this.providerService.providers(profileId);
   }
 
-  async createProvider(profileId: string, input: unknown) {
-    const data = providerInputSchema.parse(input);
-
-    if (new Set(data.models.map((model) => model.id)).size !== data.models.length) {
-      throw new GatewayError(400, 'Model IDs must be unique within a provider');
-    }
-
-    return this.store.transaction(profileId, async (tx) => {
-      await this.profile(profileId, tx);
-      const credential = await tx.get('credential', data.credentialId);
-
-      if (
-        !credential ||
-        credential.profileId !== profileId ||
-        credential.kind !== 'provider' ||
-        credential.revokedAt
-      ) {
-        throw new GatewayError(400, 'Provider credential is unavailable to this profile');
-      }
-
-      for (const item of await tx.list('provider', { profileId, limit: 100 })) {
-        if (item.kind === data.kind && !item.revokedAt) {
-          await tx.put('provider', item.id, profileId, { ...item, revokedAt: this.now() });
-        }
-      }
-
-      const provider: ProviderRecord = {
-        ...data,
-        id: randomUUID(),
-        profileId,
-        createdAt: this.now(),
-      };
-
-      await tx.put('provider', provider.id, profileId, provider);
-      await this.event(tx, profileId, 'provider.created', { id: provider.id, kind: provider.kind });
-
-      return provider;
-    });
+  createProvider(profileId: string, input: unknown) {
+    return this.providerService.createProvider(profileId, input);
   }
 
-  async configureCodexProvider(profileId: string, credentialId: string) {
-    return this.store.transaction(profileId, async (tx) => {
-      await this.profile(profileId, tx);
-      const credential = await tx.get('credential', credentialId);
-      if (
-        !credential ||
-        credential.profileId !== profileId ||
-        credential.kind !== 'provider' ||
-        credential.revokedAt
-      ) {
-        throw new GatewayError(400, 'Codex credential is unavailable to this profile');
-      }
-
-      const existing = await tx.list('provider', { profileId, limit: 100 });
-      for (const item of existing) {
-        if (item.kind === 'openai' && !item.revokedAt) {
-          await tx.put('provider', item.id, profileId, { ...item, revokedAt: this.now() });
-        }
-      }
-
-      const provider = providerRecordSchema.parse({
-        id: randomUUID(),
-        profileId,
-        name: 'OpenAI',
-        kind: 'openai',
-        authMode: 'codex',
-        credentialId,
-        models: [{ id: 'gpt-5.6-terra', contextWindow: 1_000_000, maxOutputTokens: 128_000 }],
-        createdAt: this.now(),
-      });
-      await tx.put('provider', provider.id, profileId, provider);
-      await this.event(tx, profileId, 'provider.created', { id: provider.id, kind: 'openai' });
-      return provider;
-    });
+  configureCodexProvider(profileId: string, credentialId: string) {
+    return this.providerService.configureCodexProvider(profileId, credentialId);
   }
 
-  async revokeProvider(profileId: string, providerId: string) {
-    return this.store.transaction(profileId, async (tx) => {
-      const provider = await tx.get('provider', providerId);
-
-      if (!provider || provider.profileId !== profileId) {
-        throw new GatewayError(404, 'Provider not found');
-      }
-
-      const revoked = { ...provider, revokedAt: provider.revokedAt ?? this.now() };
-
-      await tx.put('provider', providerId, profileId, revoked);
-      await this.event(tx, profileId, 'provider.revoked', { id: providerId });
-
-      return revoked;
-    });
+  revokeProvider(profileId: string, providerId: string) {
+    return this.providerService.revokeProvider(profileId, providerId);
   }
 
-  async modelDefaults(profileId: string) {
-    await this.profile(profileId);
-    const defaults = await this.store.get('modelDefault', profileId);
-
-    return (
-      defaults ?? {
-        id: profileId,
-        profileId,
-        conversation: null,
-        channel: null,
-        updatedAt: this.now(),
-      }
-    );
+  modelDefaults(profileId: string) {
+    return this.providerService.modelDefaults(profileId);
   }
 
-  async setModelDefaults(profileId: string, input: unknown) {
-    const data = modelDefaultsInputSchema.parse(input);
-
-    return this.store.transaction(profileId, async (tx) => {
-      await this.profile(profileId, tx);
-
-      for (const selection of [data.conversation, data.channel]) {
-        if (selection) {
-          await this.selectedModel(profileId, selection, tx);
-        }
-      }
-
-      const defaults = modelDefaultsRecordSchema.parse({
-        ...data,
-        id: profileId,
-        profileId,
-        updatedAt: this.now(),
-      });
-
-      await tx.put('modelDefault', profileId, profileId, defaults);
-      await this.event(tx, profileId, 'model-defaults.updated', data);
-
-      return defaults;
-    });
-  }
-
-  private async selectedModel(profileId: string, selection: ModelSelection, reader: Reader) {
-    const provider =
-      (await reader.get('provider', selection.providerId)) ??
-      (Object.keys(providerCatalog) as ProviderKind[])
-        .map((kind) => environmentProvider(profileId, kind))
-        .find((item) => item?.id === selection.providerId);
-    const model = provider?.models.find((item) => item.id === selection.modelId);
-    const credential =
-      provider?.credentialId && (await reader.get('credential', provider.credentialId));
-
-    if (
-      !provider ||
-      provider.profileId !== profileId ||
-      provider.revokedAt ||
-      !model ||
-      (!provider.apiKeyEnv &&
-        (!credential ||
-          credential.profileId !== profileId ||
-          credential.kind !== 'provider' ||
-          credential.revokedAt))
-    ) {
-      throw new GatewayError(409, 'Selected provider or model is unavailable');
-    }
-
-    // Ceilings, not targets: a large context window must not inflate routine memory/history.
-    return {
-      config: {
-        provider: provider.authMode === 'codex' ? ('openai-codex' as const) : provider.kind,
-        modelId: model.id,
-        ...(provider.credentialId ? { credentialId: provider.credentialId } : {}),
-        ...(provider.apiKeyEnv ? { apiKeyEnv: provider.apiKeyEnv } : {}),
-      },
-      policy: {
-        inputTokens: Math.min(32_000, Math.max(4096, Math.floor(model.contextWindow * 0.45))),
-        outputTokens: Math.min(4096, model.maxOutputTokens, Math.floor(model.contextWindow * 0.12)),
-        memoryTokens: Math.min(1500, Math.floor(model.contextWindow * 0.04)),
-        historyTokens: Math.min(6000, Math.floor(model.contextWindow * 0.12)),
-        toolResultTokens: Math.min(1500, Math.max(128, Math.floor(model.contextWindow * 0.04))),
-        maxSteps: 12,
-        maxRunTokens: 100_000,
-      },
-    };
+  setModelDefaults(profileId: string, input: unknown) {
+    return this.providerService.setModelDefaults(profileId, input);
   }
 
   async submit(
@@ -356,10 +174,10 @@ export class Gateway {
 
       const defaults = await tx.get('modelDefault', profileId);
       let selection = data.model ?? defaults?.[activity] ?? defaults?.conversation;
-      let chosen: Awaited<ReturnType<typeof this.selectedModel>> | null = null;
+      let chosen: Awaited<ReturnType<typeof this.providerService.selectedModel>> | null = null;
       if (selection) {
         try {
-          chosen = await this.selectedModel(profileId, selection, tx);
+          chosen = await this.providerService.selectedModel(profileId, selection, tx);
         } catch (error) {
           if (data.model) throw error;
           selection = null;
@@ -384,7 +202,7 @@ export class Gateway {
           configured.find((item) => item.kind === profile.model.provider) ?? configured[0];
         if (first?.models[0]) {
           selection = { providerId: first.id, modelId: first.models[0].id };
-          chosen = await this.selectedModel(profileId, selection, tx);
+          chosen = await this.providerService.selectedModel(profileId, selection, tx);
         }
       }
 
