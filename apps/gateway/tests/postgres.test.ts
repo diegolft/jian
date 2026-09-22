@@ -4,12 +4,16 @@ import { PgBoss } from 'pg-boss';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AgentRuntime } from '../src/agent/runtime.js';
 import { Channels } from '../src/channels/service.js';
+import { recordEvent } from '../src/core/events.js';
 import { Peers } from '../src/peers/service.js';
+import { updateProfileRow } from '../src/profiles/repository.js';
 import { RunQueue } from '../src/runs/queue.js';
 import { SecretBox } from '../src/security/crypto.js';
 import { Vault } from '../src/security/vault.js';
 import { buildServices } from '../src/services.js';
+import { pageMessages } from '../src/sessions/repository.js';
 import { PostgresStore } from '../src/storage/postgres.js';
+import { events, runRows } from './helpers/rows.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -72,21 +76,15 @@ describe('PostgreSQL durability', () => {
 
     await expect(
       store.transaction(profile.id, async (tx) => {
-        await tx.put('profile', profile.id, profile.id, { ...profile, name: 'Uncommitted' });
-
-        await tx.event({
-          profileId: profile.id,
-          type: 'uncommitted',
-          data: {},
-          createdAt: new Date().toISOString(),
-        });
+        await updateProfileRow(tx, { ...profile, name: 'Uncommitted' });
+        await recordEvent(tx, Date.now, profile.id, 'uncommitted', {});
 
         throw new Error('rollback');
       }),
     ).rejects.toThrow('rollback');
 
     expect((await services.profiles.profile(profile.id)).name).toBe('CI');
-    expect((await store.events(profile.id, 0)).map((e) => e.type)).toEqual(['profile.created']);
+    expect((await events(store, profile.id, 0)).map((e) => e.type)).toEqual(['profile.created']);
   });
 
   it('dispatches persisted queued work through pg-boss', async () => {
@@ -166,7 +164,7 @@ describe('PostgreSQL durability', () => {
         'Feito.',
       ]);
 
-      const answered = await store.list('run', { profileId: callee.id });
+      const answered = await runRows(store, callee.id);
 
       expect(answered).toHaveLength(1);
       expect(answered[0]?.call?.chain).toEqual([caller.id, callee.id]);
@@ -222,8 +220,8 @@ describe('PostgreSQL durability', () => {
     }
 
     // The room is one request per profile, and nothing runs before the owner decides.
-    expect(await store.list('run', { profileId: ada.id })).toEqual([]);
-    expect(await store.list('run', { profileId: bia.id })).toEqual([]);
+    expect(await runRows(store, ada.id)).toEqual([]);
+    expect(await runRows(store, bia.id)).toEqual([]);
 
     const [request] = (await channels.contacts(ada.id)).filter((item) => item.chatId === room);
 
@@ -243,8 +241,8 @@ describe('PostgreSQL durability', () => {
     ]);
 
     expect(new Set(results.map((result) => result.runId)).size).toBe(1);
-    expect(await store.list('run', { profileId: ada.id })).toHaveLength(1);
-    expect(await store.list('run', { profileId: bia.id })).toEqual([]);
+    expect(await runRows(store, ada.id)).toHaveLength(1);
+    expect(await runRows(store, bia.id)).toEqual([]);
 
     const room_ = (await channels.groups()).find((group) => group.chatId === room);
 
@@ -271,23 +269,21 @@ it('applies migrations repeatedly and searches old records through stable cursor
     await services.runs.cancel(profile.id, run.id);
   }
 
-  const first = await store.list('message', {
+  const first = await pageMessages(store.db, {
     profileId: profile.id,
-    search: 'deployment',
+    query: 'deployment',
     limit: 2,
-    descending: true,
   });
 
-  const next = await store.list('message', {
+  const next = await pageMessages(store.db, {
     profileId: profile.id,
-    search: 'deployment',
-    before: first.at(-1)?.id,
+    query: 'deployment',
+    before: first.items.at(-1)?.id,
     limit: 2,
-    descending: true,
   });
 
-  expect(first.map((message) => message.content)).toEqual(['deployment 3', 'deployment 2']);
-  expect(next.map((message) => message.content)).toEqual(['deployment 1', 'deployment 0']);
+  expect(first.items.map((message) => message.content)).toEqual(['deployment 3', 'deployment 2']);
+  expect(next.items.map((message) => message.content)).toEqual(['deployment 1', 'deployment 0']);
 
   await services.memories.remember(profile.id, {
     key: 'deployment',
@@ -295,7 +291,5 @@ it('applies migrations repeatedly and searches old records through stable cursor
     expectedVersion: 0,
   });
 
-  expect(
-    await store.list('memory', { profileId: profile.id, anyWords: ['deployment'] }),
-  ).toHaveLength(1);
+  expect(await services.memories.memories(profile.id)).toHaveLength(1);
 });

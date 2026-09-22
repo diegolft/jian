@@ -7,7 +7,6 @@ import type { Channels } from './channels/service.js';
 import type { WhatsAppConnections } from './channels/whatsapp/connections.js';
 import { registerCoordinationRoutes } from './coordination/routes.js';
 import { Coordination } from './coordination/service.js';
-import type { Store } from './core/store.js';
 import { registerEventRoutes } from './http/events.js';
 import { registerMetaRoutes } from './http/meta.js';
 import { configureSecurity } from './http/security.js';
@@ -23,6 +22,7 @@ import type { Services } from './services.js';
 import { registerSessionRoutes } from './sessions/routes.js';
 import { registerSkillRoutes } from './skills/routes.js';
 import type { Skills } from './skills/service.js';
+import type { Store } from './storage/database.js';
 
 export function createApp(
   options: Services & {

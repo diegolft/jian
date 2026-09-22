@@ -8,16 +8,32 @@ import {
 } from '@jian/contracts';
 import type { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
-import type { Reader, Store, Transaction } from '../core/store.js';
+import { recordEvent } from '../core/events.js';
 import type { ProfileReader } from '../profiles/port.js';
+import { isUniqueViolation } from '../providers/repository.js';
 import type { RunWriter } from '../runs/port.js';
 import { issueToken, verifyToken } from '../security/tokens.js';
 import type { Vault } from '../security/vault.js';
 import type { SessionWriter } from '../sessions/port.js';
+import type { Queryable, Store } from '../storage/database.js';
 import type { ChannelRequest, ChannelType, DeliveryOutcome, IncomingMessage } from './channel.js';
 import { type ContactRecord, Contacts, type Intake } from './contacts.js';
 import { type GroupDecision, Groups } from './groups.js';
 import { ChannelRegistry } from './registry.js';
+import {
+  findChannel,
+  findDelivery,
+  findLiveChannel,
+  insertChannel,
+  insertDelivery,
+  listChannels,
+  listDeliveries,
+  listDeliveriesByPhase,
+  listGroupContacts,
+  markChannelRevoked,
+  updateDelivery,
+} from './repository.js';
+import { findConnection, writeAuthChunks, writeConnection } from './whatsapp/repository.js';
 
 /**
  * `address` is what this connection speaks as on its protocol — the linked WhatsApp account or
@@ -61,7 +77,7 @@ export class Channels {
     private readonly fetcher: typeof fetch,
     private readonly registry = new ChannelRegistry(),
     private readonly people = new Contacts(services),
-    private readonly rooms = new Groups(),
+    private readonly rooms = new Groups(services.profiles),
   ) {}
 
   start() {
@@ -104,12 +120,6 @@ export class Channels {
     }
   }
 
-  private async active(profileId: string, type: ChannelType, reader: Reader = this.services.store) {
-    const channels = await reader.list('channel', { profileId, where: { type }, limit: 100 });
-
-    return channels.find((channel) => !channel.revokedAt);
-  }
-
   /** One channel of each type per profile: connecting is the whole configuration. */
   async connect(profileId: string, input: unknown) {
     const { botToken, ...data } = channelInputSchema.parse(input);
@@ -117,7 +127,7 @@ export class Channels {
     await this.services.profiles.profile(profileId);
     this.registry.get(data.type);
 
-    if (await this.active(profileId, data.type)) {
+    if (await findLiveChannel(this.services.store.db, profileId, data.type)) {
       throw new GatewayError(409, 'This channel type is already connected');
     }
 
@@ -134,22 +144,27 @@ export class Channels {
     };
 
     await this.services.store.transaction(profileId, async (tx) => {
-      if (await this.active(profileId, data.type, tx)) {
-        throw new GatewayError(409, 'This channel type is already connected');
-      }
-
       // The vault owns the bot token, addressed by this channel; revoking it takes the token.
       if (botToken) {
         await this.services.vault.put(profileId, channelSecret(record.id), botToken, tx);
       }
 
-      await tx.put('channel', record.id, profileId, record);
+      try {
+        await insertChannel(tx, record);
+      } catch (error) {
+        // The partial unique index has the last word on one live channel per type. Reaching it
+        // means another request connected this type first, which is a conflict for the owner
+        // rather than a gateway fault.
+        if (isUniqueViolation(error)) {
+          throw new GatewayError(409, 'This channel type is already connected');
+        }
 
-      await tx.event({
-        profileId,
-        type: 'channel.connected',
-        data: { id: record.id, type: record.type },
-        createdAt: record.createdAt,
+        throw error;
+      }
+
+      await recordEvent(tx, () => Date.parse(record.createdAt), profileId, 'channel.connected', {
+        id: record.id,
+        type: record.type,
       });
     });
 
@@ -159,32 +174,30 @@ export class Channels {
   async list(profileId: string) {
     await this.services.profiles.profile(profileId);
 
-    return (await this.services.store.list('channel', { profileId })).map((channel) =>
+    return (await listChannels(this.services.store.db, profileId)).map((channel) =>
       this.metadata(channel),
     );
   }
 
   async revoke(profileId: string, id: string) {
     const record = await this.services.store.transaction(profileId, async (tx) => {
-      const value = await tx.get('channel', id);
+      const value = await findChannel(tx, id);
       const channel = assertFound(value?.profileId === profileId ? value : null, 'Channel');
       const record = { ...channel, revokedAt: new Date().toISOString() };
 
-      await tx.put('channel', id, profileId, record);
+      await markChannelRevoked(tx, id, new Date(record.revokedAt));
       await this.services.vault.discard(profileId, channelSecret(id), tx);
 
-      await tx.event({
-        profileId,
-        type: 'channel.disconnected',
-        data: { id: record.id, type: record.type },
-        createdAt: record.revokedAt,
+      await recordEvent(tx, () => Date.parse(record.revokedAt), profileId, 'channel.disconnected', {
+        id: record.id,
+        type: record.type,
       });
 
-      const connection = await tx.get('channelConnection', id);
+      const connection = await findConnection(tx, id);
 
       if (connection) {
         // Revocation also invalidates linked-device callbacks and removes the recoverable session.
-        await tx.put('channelConnection', id, profileId, {
+        await writeConnection(tx, {
           id,
           profileId,
           desired: false,
@@ -192,7 +205,7 @@ export class Channels {
           status: 'disconnected',
           updatedAt: record.revokedAt,
         });
-        await tx.put('channelAuth', id, profileId, { id, profileId, chunks: [] });
+        await writeAuthChunks(tx, id, profileId, [], new Date(record.revokedAt));
       }
 
       return record;
@@ -216,7 +229,7 @@ export class Channels {
       return this.people.view(contact);
     }
 
-    const channel = await this.services.store.get('channel', contact.channelId);
+    const channel = await findChannel(this.services.store.db, contact.channelId);
 
     if (!channel || channel.revokedAt) {
       throw new GatewayError(409, 'The channel of this contact is disconnected');
@@ -238,7 +251,7 @@ export class Channels {
     }
 
     const token = request.headers[adapter.webhookHeader];
-    const channel = await this.services.store.get('channel', id);
+    const channel = await findChannel(this.services.store.db, id);
 
     if (
       !channel ||
@@ -265,10 +278,10 @@ export class Channels {
 
   /** Called only by the worker that owns an authenticated linked-device connection. */
   async receiveLinked(id: string, input: unknown, generation: number) {
-    const channel = assertFound(await this.services.store.get('channel', id), 'Channel');
+    const channel = assertFound(await findChannel(this.services.store.db, id), 'Channel');
     const adapter = this.registry.get(channel.type);
 
-    const connection = await this.services.store.get('channelConnection', id);
+    const connection = await findConnection(this.services.store.db, id);
 
     if (
       channel.revokedAt ||
@@ -372,13 +385,13 @@ export class Channels {
 
     if (this.registry.get(channel.type).send) {
       await this.services.store.transaction(channel.profileId, async (tx) => {
-        if (await tx.get('delivery', run.id)) {
+        if (await findDelivery(tx, run.id)) {
           return;
         }
 
         const now = new Date().toISOString();
 
-        await tx.put('delivery', run.id, channel.profileId, {
+        await insertDelivery(tx, {
           id: run.id,
           runId: run.id,
           profileId: channel.profileId,
@@ -397,7 +410,7 @@ export class Channels {
   }
 
   private async notify(
-    tx: Transaction,
+    tx: Queryable,
     channel: ChannelRecord,
     chatId: string,
     connectionGeneration?: number,
@@ -407,10 +420,9 @@ export class Channels {
     }
 
     const now = new Date().toISOString();
-    const id = randomUUID();
 
-    await tx.put('delivery', id, channel.profileId, {
-      id,
+    await insertDelivery(tx, {
+      id: randomUUID(),
       profileId: channel.profileId,
       channelId: channel.id,
       chatId,
@@ -428,17 +440,20 @@ export class Channels {
    * conversation several agents share, so the owner reads it whole instead of once per profile.
    */
   async groups(): Promise<Group[]> {
-    const contacts = await this.services.store.list('contact', {
-      where: { scope: 'group' },
-      limit: 500,
-    });
+    const contacts = await listGroupContacts(this.services.store.db);
+    const names = new Map<string, string | null>();
 
     const rooms = new Map<string, Group>();
 
     for (const contact of contacts) {
       const key = `${contact.type}\u0000${contact.chatId}`;
       const room = rooms.get(key) ?? { type: contact.type, chatId: contact.chatId, profiles: [] };
-      const profile = await this.services.store.get('profile', contact.profileId);
+
+      if (!names.has(contact.profileId)) {
+        const profile = await this.services.profiles.profile(contact.profileId).catch(() => null);
+
+        names.set(contact.profileId, profile?.name ?? null);
+      }
 
       if (contact.displayName && !room.name) {
         room.name = contact.displayName;
@@ -446,7 +461,7 @@ export class Channels {
 
       room.profiles.push({
         profileId: contact.profileId,
-        name: profile?.name ?? 'Perfil removido',
+        name: names.get(contact.profileId) ?? 'Perfil removido',
         contactId: contact.id,
         status: contact.status,
       });
@@ -463,16 +478,13 @@ export class Channels {
   async deliveries(profileId: string) {
     await this.services.profiles.profile(profileId);
 
-    return this.services.store.list('delivery', { profileId, limit: 100, descending: true });
+    return listDeliveries(this.services.store.db, profileId);
   }
 
   async dispatch() {
     await this.recoverUncertainDeliveries();
 
-    const deliveries = await this.services.store.list('delivery', {
-      where: { status: 'pending' },
-      limit: 20,
-    });
+    const deliveries = await listDeliveriesByPhase(this.services.store.db, 'pending', 20);
 
     for (const delivery of deliveries) {
       if (this.stopped) {
@@ -492,12 +504,12 @@ export class Channels {
           run.output ?? 'The agent could not complete this request. Check the gateway for details.';
       }
 
-      const channel = await this.services.store.get('channel', delivery.channelId);
+      const channel = await findChannel(this.services.store.db, delivery.channelId);
       const adapter = channel ? this.registry.get(channel.type) : undefined;
 
       const generationChanged =
         delivery.connectionGeneration !== undefined &&
-        (await this.services.store.get('channelConnection', delivery.channelId))?.generation !==
+        (await findConnection(this.services.store.db, delivery.channelId))?.generation !==
           delivery.connectionGeneration;
 
       // A linked device can only send from its owning worker. Offline deliveries stay pending.
@@ -518,9 +530,9 @@ export class Channels {
       const outcome = await this.deliver(delivery, text);
 
       await this.services.store.transaction(delivery.profileId, async (tx) => {
-        const current = assertFound(await tx.get('delivery', delivery.id), 'Delivery');
+        const current = assertFound(await findDelivery(tx, delivery.id), 'Delivery');
 
-        await tx.put('delivery', delivery.id, delivery.profileId, {
+        await updateDelivery(tx, {
           ...current,
           ...outcome,
           updatedAt: new Date().toISOString(),
@@ -531,14 +543,14 @@ export class Channels {
 
   private async claimDelivery(delivery: DeliveryRecord): Promise<boolean> {
     return this.services.store.transaction(delivery.profileId, async (tx) => {
-      const current = await tx.get('delivery', delivery.id);
+      const current = await findDelivery(tx, delivery.id);
 
       if (current?.status !== 'pending') {
         return false;
       }
 
       // Persist intent before network I/O so another worker cannot send the same delivery.
-      await tx.put('delivery', delivery.id, delivery.profileId, {
+      await updateDelivery(tx, {
         ...current,
         status: 'sending',
         updatedAt: new Date().toISOString(),
@@ -552,14 +564,14 @@ export class Channels {
     let attemptedSend = false;
 
     try {
-      const channel = await this.services.store.get('channel', delivery.channelId);
+      const channel = await findChannel(this.services.store.db, delivery.channelId);
 
       if (!channel || channel.revokedAt) {
         throw new Error('Channel unavailable');
       }
 
       if (delivery.connectionGeneration !== undefined) {
-        const connection = await this.services.store.get('channelConnection', delivery.channelId);
+        const connection = await findConnection(this.services.store.db, delivery.channelId);
 
         if (!connection?.desired || connection.generation !== delivery.connectionGeneration) {
           throw new Error('Delivery belongs to a disconnected device');
@@ -596,10 +608,7 @@ export class Channels {
   }
 
   private async recoverUncertainDeliveries(): Promise<void> {
-    const sending = await this.services.store.list('delivery', {
-      where: { status: 'sending' },
-      limit: 100,
-    });
+    const sending = await listDeliveriesByPhase(this.services.store.db, 'sending', 100);
 
     for (const delivery of sending) {
       if (Date.parse(delivery.updatedAt) > Date.now() - UNCERTAIN_DELIVERY_AFTER_MS) {
@@ -607,14 +616,14 @@ export class Channels {
       }
 
       await this.services.store.transaction(delivery.profileId, async (tx) => {
-        const current = await tx.get('delivery', delivery.id);
+        const current = await findDelivery(tx, delivery.id);
 
         // Recheck under the profile lock: another worker may have confirmed this delivery.
         if (
           current?.status === 'sending' &&
           Date.parse(current.updatedAt) <= Date.now() - UNCERTAIN_DELIVERY_AFTER_MS
         ) {
-          await tx.put('delivery', current.id, current.profileId, {
+          await updateDelivery(tx, {
             ...current,
             status: 'unknown',
             updatedAt: new Date().toISOString(),

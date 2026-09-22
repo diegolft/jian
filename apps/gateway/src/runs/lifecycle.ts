@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import type { Message, Run } from '@jian/contracts';
+import type { Checkpoint, Message, Run } from '@jian/contracts';
 import { type Clock, nowIso } from '../core/clock.js';
 import { GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
-import type { Store } from '../core/store.js';
+import { insertMessage } from '../sessions/repository.js';
+import type { Store } from '../storage/database.js';
 import type { RunReader } from './port.js';
+import { insertCheckpoint, listCheckpoints, listExpiredRuns, updateRun } from './repository.js';
 
 /** The lease is the right to apply external effects, so a stale owner must never write. */
 function assertOwned(run: Run, owner: string, clock: Clock): void {
@@ -36,7 +38,7 @@ export class RunLifecycle {
         updatedAt: nowIso(this.clock),
       };
 
-      await tx.put('run', run.id, profileId, claimed);
+      await updateRun(tx, claimed);
 
       await recordEvent(
         tx,
@@ -57,7 +59,7 @@ export class RunLifecycle {
 
       assertOwned(run, owner, this.clock);
 
-      await tx.put('run', run.id, profileId, {
+      await updateRun(tx, {
         ...run,
         leaseUntil: this.clock() + 60_000,
         updatedAt: nowIso(this.clock),
@@ -71,15 +73,15 @@ export class RunLifecycle {
 
       assertOwned(run, owner, this.clock);
 
-      const id = randomUUID();
-
-      await tx.put('checkpoint', id, profileId, {
-        id,
+      const checkpoint: Checkpoint = {
+        id: randomUUID(),
         profileId,
         runId,
         data,
         createdAt: nowIso(this.clock),
-      });
+      };
+
+      await insertCheckpoint(tx, checkpoint);
 
       await recordEvent(tx, this.clock, profileId, 'run.step', data, runId);
     });
@@ -88,12 +90,7 @@ export class RunLifecycle {
   async checkpoints(profileId: string, runId: string) {
     await this.runs.run(profileId, runId);
 
-    return this.store.list('checkpoint', {
-      profileId,
-      where: { runId },
-      descending: true,
-      limit: 100,
-    });
+    return listCheckpoints(this.store.db, profileId, runId, 100);
   }
 
   async recordUsage(
@@ -109,7 +106,7 @@ export class RunLifecycle {
 
       const previous = run.usage ?? { inputTokens: 0, outputTokens: 0, steps: 0 };
 
-      await tx.put('run', runId, profileId, {
+      await updateRun(tx, {
         ...run,
         usage: {
           inputTokens: previous.inputTokens + usage.inputTokens,
@@ -141,6 +138,8 @@ export class RunLifecycle {
         ...(status === 'completed' ? { output: content } : { error: content }),
       };
 
+      await updateRun(tx, final);
+
       if (status === 'completed') {
         const message: Message = {
           id: randomUUID(),
@@ -152,10 +151,8 @@ export class RunLifecycle {
           createdAt: nowIso(this.clock),
         };
 
-        await tx.put('message', message.id, profileId, message);
+        await insertMessage(tx, message);
       }
-
-      await tx.put('run', runId, profileId, final);
 
       await recordEvent(
         tx,
@@ -172,9 +169,9 @@ export class RunLifecycle {
 
   // Expired ownership interrupts a run: replaying it could repeat completed external effects.
   async recover() {
-    const runs = await this.store.list('run', { where: { status: 'running' }, limit: 1000 });
+    const expired = await listExpiredRuns(this.store.db, this.clock(), 1000);
 
-    for (const run of runs) {
+    for (const run of expired) {
       await this.store.transaction(run.profileId, async (tx) => {
         const current = await this.runs.run(run.profileId, run.id, tx);
 
@@ -184,7 +181,7 @@ export class RunLifecycle {
 
         const error = 'Worker lease expired. Inspect completed steps before starting another run.';
 
-        await tx.put('run', run.id, run.profileId, {
+        await updateRun(tx, {
           ...current,
           status: 'interrupted',
           error,

@@ -1,14 +1,16 @@
 import { agentCallSchema, memorySchema, type Run, skillSchema } from '@jian/contracts';
 import { type ToolSet, tool } from 'ai';
+import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { Coordination } from '../coordination/service.js';
-import { GatewayError } from '../core/errors.js';
-import type { Store } from '../core/store.js';
+import { assertFound, GatewayError } from '../core/errors.js';
 import type { MemoryWriter } from '../memories/port.js';
 import type { PeerAgents } from '../peers/port.js';
 import type { ProfileAdmin } from '../profiles/port.js';
 import type { RunExecution, RunReader } from '../runs/port.js';
 import type { SessionReader } from '../sessions/port.js';
+import type { Store } from '../storage/database.js';
+import { artifacts, checkpoints } from '../storage/schema.js';
 
 /** What the tool set reaches for on the profile's behalf during a run. */
 export type ToolServices = {
@@ -107,12 +109,21 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
         limit: z.number().int().min(1).max(4000).default(artifactPageChars),
       }),
       execute: async ({ artifactId, offset, limit }) => {
-        const page = await coordination.artifact(run.profileId, artifactId, {
-          offset,
-          limit: Math.min(limit, artifactPageChars),
-        });
+        // The profile in the where clause is the owner check: another profile's artifact is
+        // not found rather than read, whatever id the model guesses.
+        const [record] = await services.store.db
+          .select({ content: artifacts.content })
+          .from(artifacts)
+          .where(and(eq(artifacts.id, artifactId), eq(artifacts.profileId, run.profileId)))
+          .limit(1);
 
-        return { content: page.content, nextOffset: page.nextOffset };
+        const { content } = assertFound(record, 'Artifact');
+        const end = Math.min(offset + Math.min(limit, artifactPageChars), content.length);
+
+        return {
+          content: content.slice(offset, end),
+          nextOffset: end < content.length ? end : null,
+        };
       },
     }),
 
@@ -120,8 +131,23 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
       description:
         'Inspect saved results before continuing a run; unknown external effects require reconciliation.',
       inputSchema: z.object({ runId: z.string().uuid() }),
-      execute: async ({ runId }) =>
-        (await services.lifecycle.checkpoints(run.profileId, runId)).map((checkpoint) => {
+      execute: async ({ runId }) => {
+        // Reading the run first is the owner check: a run of another profile is not found, so
+        // its checkpoints are never selected.
+        await services.runs.run(run.profileId, runId);
+
+        const saved = await services.store.db
+          .select({
+            id: checkpoints.id,
+            data: checkpoints.data,
+            createdAt: checkpoints.createdAt,
+          })
+          .from(checkpoints)
+          .where(and(eq(checkpoints.profileId, run.profileId), eq(checkpoints.runId, runId)))
+          .orderBy(desc(checkpoints.createdAt))
+          .limit(100);
+
+        return saved.map((checkpoint) => {
           const data =
             checkpoint.data && typeof checkpoint.data === 'object'
               ? (checkpoint.data as Record<string, unknown>)
@@ -129,7 +155,7 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
 
           return {
             id: checkpoint.id,
-            createdAt: checkpoint.createdAt,
+            createdAt: checkpoint.createdAt.toISOString(),
             phase: data.phase,
             toolName: data.toolName,
             toolCallId: data.toolCallId,
@@ -149,7 +175,8 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
                 })
               : undefined,
           };
-        }),
+        });
+      },
     }),
 
     send_session_message: tool({

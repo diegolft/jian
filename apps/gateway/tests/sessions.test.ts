@@ -8,7 +8,7 @@ const profileInput = {
 };
 
 async function setup() {
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile(profileInput);
   const session = await services.sessions.createSession(profile.id, {
     title: 'Mac',

@@ -6,17 +6,19 @@ import {
   agentCallSchema,
   type Run,
 } from '@jian/contracts';
+import { ne } from 'drizzle-orm';
 import type { Clock } from '../core/clock.js';
 import { GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
-import type { Store } from '../core/store.js';
-import type { ProfileAdmin } from '../profiles/port.js';
+import type { ProfileReader } from '../profiles/port.js';
 import type { RunWriter } from '../runs/port.js';
 import type { PeerSessions } from '../sessions/port.js';
+import type { Store } from '../storage/database.js';
+import { profiles } from '../storage/schema.js';
 import type { PeerAgents } from './port.js';
 
 type PeerServices = {
-  profiles: ProfileAdmin;
+  profiles: ProfileReader;
   sessions: PeerSessions;
   runs: RunWriter;
   store: Store;
@@ -40,11 +42,18 @@ export class Peers implements PeerAgents {
     private readonly timing: PeerTiming = defaultTiming,
   ) {}
 
-  /** Name and summary: what an agent does, never how it was told to do it. */
+  /**
+   * Name and summary: what an agent does, never how it was told to do it. The select list is
+   * the wall itself — instructions, identity, skills, memories and history are not read here,
+   * so nothing to hide ever reaches this side.
+   */
   async agents(profileId: string): Promise<AgentCard[]> {
-    return (await this.services.profiles.profiles())
-      .filter((profile) => profile.id !== profileId)
-      .map(({ id, name, summary }) => ({ id, name, summary }));
+    return this.services.store.db
+      .select({ id: profiles.id, name: profiles.name, summary: profiles.summary })
+      .from(profiles)
+      .where(ne(profiles.id, profileId))
+      .orderBy(profiles.createdAt)
+      .limit(100);
   }
 
   async ask(run: Run, input: unknown, signal?: AbortSignal): Promise<AgentAnswer> {

@@ -7,7 +7,7 @@ afterEach(() => vi.useRealTimers());
 
 it('connects ChatGPT through device login without exposing tokens', async () => {
   vi.useFakeTimers();
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile({ name: 'OAuth', instructions: 'Help.' });
   const token = `a.${Buffer.from(JSON.stringify({ exp: 4_000_000_000 })).toString('base64url')}.b`;
   const fetcher = vi.fn<typeof fetch>(async (input) => {
@@ -47,7 +47,7 @@ it('connects ChatGPT through device login without exposing tokens', async () => 
 });
 
 it('renews a rotating OAuth token once for concurrent runs', async () => {
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile({ name: 'Refresh', instructions: 'Help.' });
   const expired = `a.${Buffer.from(JSON.stringify({ exp: 1 })).toString('base64url')}.b`;
   const fresh = `a.${Buffer.from(JSON.stringify({ exp: 4_000_000_000 })).toString('base64url')}.b`;

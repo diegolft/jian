@@ -12,34 +12,27 @@ import {
 import { type Clock, nowIso } from '../core/clock.js';
 import { GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
-import type { Reader, Store } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
 import type { Vault } from '../security/vault.js';
+import type { Queryable, Store } from '../storage/database.js';
 import { modelCapabilities } from './capabilities.js';
 import { environmentProvider, providerKinds } from './catalog.js';
+import {
+  findProvider,
+  insertProvider,
+  isUniqueViolation,
+  listProviders,
+  markProviderRevoked,
+  readModelDefaults,
+  revokeLiveProviders,
+  writeModelDefaults,
+} from './repository.js';
 
 /** Where a provider's key lives in the vault. Revoking the provider takes the key with it. */
 export const providerSecret = (providerId: string) => `provider:${providerId}`;
 
 /** The ceilings a run freezes; the run record keeps them optional for pre-selection runs. */
 export type ContextPolicy = NonNullable<Run['contextPolicy']>;
-
-/**
- * Providers registered before model discovery stored a hand-written model list, and before the
- * vault moved indoors they pointed at a credential by id. The record declares neither now and
- * the strict schema would reject both, so they are dropped on read. The key itself lives in the
- * vault under the provider's own id; a provider configured before that move has none and has to
- * be configured again.
- */
-function current(record: ProviderRecord): ProviderRecord {
-  const {
-    models: _models,
-    credentialId: _credential,
-    ...rest
-  } = record as ProviderRecord & { models?: unknown; credentialId?: unknown };
-
-  return rest;
-}
 
 export class Providers {
   constructor(
@@ -52,9 +45,7 @@ export class Providers {
   async providers(profileId: string) {
     await this.profiles.profile(profileId);
 
-    const stored = (await this.store.list('provider', { profileId, limit: 100 })).map((item) =>
-      providerRecordSchema.parse(current(item)),
-    );
+    const stored = await listProviders(this.store.db, profileId);
     // A configured provider hides the host environment's key for the same vendor.
     const environment = providerKinds
       .map((kind) => environmentProvider(profileId, kind))
@@ -94,15 +85,29 @@ export class Providers {
     return this.store.transaction(profileId, async (tx) => {
       await this.profiles.profile(profileId, tx);
 
-      for (const item of await tx.list('provider', { profileId, limit: 100 })) {
-        if (item.kind === provider.kind && !item.revokedAt) {
-          await tx.put('provider', item.id, profileId, { ...item, revokedAt: nowIso(this.clock) });
-          await this.vault.discard(profileId, providerSecret(item.id), tx);
-        }
+      const now = new Date(this.clock());
+
+      for (const revoked of await revokeLiveProviders(tx, profileId, provider.kind, now)) {
+        await this.vault.discard(profileId, providerSecret(revoked), tx);
       }
 
       await this.vault.put(profileId, providerSecret(provider.id), secret, tx);
-      await tx.put('provider', provider.id, profileId, provider);
+
+      try {
+        await insertProvider(tx, provider);
+      } catch (error) {
+        // The partial unique index has the last word on one live provider per vendor. Reaching
+        // it means another request configured this vendor first, which the owner has to see as
+        // a conflict rather than as a gateway fault.
+        if (isUniqueViolation(error)) {
+          throw new GatewayError(
+            409,
+            'Another provider for this vendor was configured; reload before retrying',
+          );
+        }
+
+        throw error;
+      }
 
       await recordEvent(tx, this.clock, profileId, 'provider.created', {
         id: provider.id,
@@ -115,7 +120,7 @@ export class Providers {
 
   async revokeProvider(profileId: string, providerId: string) {
     return this.store.transaction(profileId, async (tx) => {
-      const provider = await tx.get('provider', providerId);
+      const provider = await findProvider(tx, providerId);
 
       if (!provider || provider.profileId !== profileId) {
         throw new GatewayError(404, 'Provider not found');
@@ -123,7 +128,7 @@ export class Providers {
 
       const revoked = { ...provider, revokedAt: provider.revokedAt ?? nowIso(this.clock) };
 
-      await tx.put('provider', providerId, profileId, revoked);
+      await markProviderRevoked(tx, providerId, new Date(revoked.revokedAt));
       await this.vault.discard(profileId, providerSecret(providerId), tx);
       await recordEvent(tx, this.clock, profileId, 'provider.revoked', { id: providerId });
 
@@ -133,16 +138,10 @@ export class Providers {
 
   async modelDefaults(profileId: string) {
     await this.profiles.profile(profileId);
-    const defaults = await this.store.get('modelDefault', profileId);
 
-    // Parsed on the way out so a record written before a role existed reads back as empty
-    // for that role instead of leaving the field missing from the response.
-    return modelDefaultsRecordSchema.parse({
-      ...defaults,
-      id: profileId,
-      profileId,
-      updatedAt: defaults?.updatedAt ?? nowIso(this.clock),
-    });
+    // Assembled from one row per role, so a role that has no row — because it was never set, or
+    // because it did not exist when the others were — reads back as empty instead of missing.
+    return readModelDefaults(this.store.db, profileId, nowIso(this.clock));
   }
 
   async setModelDefaults(profileId: string, input: unknown) {
@@ -159,27 +158,22 @@ export class Providers {
         }
       }
 
-      const defaults = modelDefaultsRecordSchema.parse({
-        ...data,
-        id: profileId,
-        profileId,
-        updatedAt: nowIso(this.clock),
-      });
+      const updatedAt = nowIso(this.clock);
 
-      await tx.put('modelDefault', profileId, profileId, defaults);
+      await writeModelDefaults(tx, profileId, data, new Date(updatedAt));
       await recordEvent(tx, this.clock, profileId, 'model-defaults.updated', data);
 
-      return defaults;
+      return modelDefaultsRecordSchema.parse({ ...data, id: profileId, profileId, updatedAt });
     });
   }
 
   async selectedModel(
     profileId: string,
     selection: ModelSelection,
-    reader: Reader,
+    reader: Queryable,
   ): Promise<{ config: ModelConfig; policy: ContextPolicy }> {
     const provider =
-      (await reader.get('provider', selection.providerId)) ??
+      (await findProvider(reader, selection.providerId)) ??
       providerKinds
         .map((kind) => environmentProvider(profileId, kind))
         .find((item) => item?.id === selection.providerId);

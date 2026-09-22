@@ -9,7 +9,7 @@ const token = 'synthetic-admin-token-with-32-characters';
 const admin = { authorization: `Bearer ${token}` };
 
 async function setup() {
-  const services = testServices();
+  const services = await testServices();
 
   const channels = new Channels(services, async () => {
     throw new Error('Network forbidden in test');

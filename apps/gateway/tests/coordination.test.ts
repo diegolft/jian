@@ -3,7 +3,7 @@ import { Coordination } from '../src/coordination/service.js';
 import { testServices } from './helpers/services.js';
 
 async function setup() {
-  const services = testServices();
+  const services = await testServices();
 
   const profile = await services.profiles.createProfile({
     name: 'Test',

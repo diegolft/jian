@@ -2,9 +2,10 @@ import { type Memory, memoryKeySchema, memorySchema } from '@jian/contracts';
 import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound, GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
-import type { Store } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
 import type { SessionReader } from '../sessions/port.js';
+import type { Store } from '../storage/database.js';
+import { deleteMemory, findMemory, listMemories, memoryId, writeMemory } from './repository.js';
 
 export class Memories {
   constructor(
@@ -17,7 +18,7 @@ export class Memories {
   async memories(profileId: string) {
     await this.profiles.profile(profileId);
 
-    return this.store.list('memory', { profileId, descending: true, limit: 100 });
+    return listMemories(this.store.db, profileId);
   }
 
   async remember(profileId: string, input: unknown, sourceSessionId?: string) {
@@ -30,8 +31,7 @@ export class Memories {
         await this.sessions.session(profileId, sourceSessionId, tx);
       }
 
-      const id = `${profileId}:${data.key}`;
-      const old = await tx.get('memory', id);
+      const old = await findMemory(tx, profileId, data.key);
 
       if ((old?.version ?? 0) !== expectedVersion) {
         throw new GatewayError(409, 'Memory version changed; reload before editing');
@@ -39,14 +39,18 @@ export class Memories {
 
       const memory: Memory = {
         ...data,
-        id,
+        id: memoryId(profileId, data.key),
         profileId,
         version: expectedVersion + 1,
         sourceSessionId,
         updatedAt: nowIso(this.clock),
       };
 
-      await tx.put('memory', id, profileId, memory);
+      // The row can only have moved on under a writer outside this profile's lock; the guard
+      // is the table's, so the answer is the conflict either way.
+      if (!(await writeMemory(tx, memory, expectedVersion))) {
+        throw new GatewayError(409, 'Memory version changed; reload before editing');
+      }
 
       await recordEvent(tx, this.clock, profileId, 'memory.updated', {
         key: memory.key,
@@ -68,11 +72,9 @@ export class Memories {
     return this.store.transaction(profileId, async (tx) => {
       await this.profiles.profile(profileId, tx);
 
-      const id = `${profileId}:${memoryKey}`;
-      const stored = await tx.get('memory', id);
-      const memory = assertFound(stored?.profileId === profileId ? stored : null, 'Memory');
+      const memory = assertFound(await findMemory(tx, profileId, memoryKey), 'Memory');
 
-      await tx.remove('memory', id, profileId);
+      await deleteMemory(tx, profileId, memoryKey);
 
       await recordEvent(tx, this.clock, profileId, 'memory.forgotten', {
         key: memory.key,

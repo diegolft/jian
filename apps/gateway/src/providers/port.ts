@@ -1,5 +1,5 @@
 import type { ModelConfig, ModelSelection, ProviderRecord } from '@jian/contracts';
-import type { Reader } from '../core/store.js';
+import type { Queryable } from '../storage/database.js';
 import type { ContextPolicy } from './service.js';
 
 export interface ProviderAdmin {
@@ -11,6 +11,6 @@ export interface ProviderSelection {
   selectedModel(
     profileId: string,
     selection: ModelSelection,
-    reader: Reader,
+    reader: Queryable,
   ): Promise<{ config: ModelConfig; policy: ContextPolicy }>;
 }

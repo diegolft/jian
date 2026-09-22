@@ -1,8 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { GatewayError } from '../core/errors.js';
-import type { Store } from '../core/store.js';
+import { readEvents } from '../core/event-feed.js';
 import type { ProfileReader } from '../profiles/port.js';
+import type { Store } from '../storage/database.js';
 
 type ProfileParams = { profileId: string };
 
@@ -23,7 +24,8 @@ export function registerEventRoutes(app: FastifyInstance, options: EventOptions)
     async (request) => {
       await options.profiles.profile(request.params.profileId);
 
-      return options.store.events(
+      return readEvents(
+        options.store.db,
         request.params.profileId,
         cursorSchema.parse(request.query.after ?? 0),
       );
@@ -84,7 +86,7 @@ export function registerEventRoutes(app: FastifyInstance, options: EventOptions)
             return;
           }
 
-          const events = await options.store.events(profileId, cursor);
+          const events = await readEvents(options.store.db, profileId, cursor);
 
           for (const event of events) {
             if (closed) {

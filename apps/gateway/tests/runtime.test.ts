@@ -1,6 +1,7 @@
 import { MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it } from 'vitest';
 import { AgentRuntime } from '../src/agent/runtime.js';
+import { events } from './helpers/rows.js';
 import { testServices } from './helpers/services.js';
 
 const input = {
@@ -22,7 +23,7 @@ const answer = (text: string) => ({
 });
 
 async function fixture() {
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile(input);
   const session = await services.sessions.createSession(profile.id, { title: 'Mac' });
 
@@ -91,7 +92,7 @@ describe('agent runtime', () => {
     expect((await services.contexts.context(otherRun)).system).toContain('Deploy at 21:00');
 
     expect(
-      (await services.store.events(profile.id, 0)).filter(
+      (await events(services.store, profile.id, 0)).filter(
         (e) => e.type === 'run.step' && (e.data as { phase: string }).phase === 'step-completed',
       ),
     ).toHaveLength(2);
@@ -113,7 +114,7 @@ describe('agent runtime', () => {
     expect(result.status).toBe('failed');
     expect(JSON.stringify(result)).not.toContain('secret-api-key');
 
-    expect(JSON.stringify(await services.store.events(profile.id, 0))).not.toContain(
+    expect(JSON.stringify(await events(services.store, profile.id, 0))).not.toContain(
       'secret-api-key',
     );
   });
@@ -188,13 +189,13 @@ it('resolves a provider key from the profile vault and keeps it out of durable e
   expect(finished.status).toBe('completed');
   expect(finished.output).toBe('Hello [REDACTED]');
 
-  expect(JSON.stringify(await services.store.events(updated.id, 0))).not.toContain(
+  expect(JSON.stringify(await events(services.store, updated.id, 0))).not.toContain(
     JSON.stringify(vaultSecret).slice(1, -1),
   );
 });
 
 it('stops a run after its cumulative token cap without making another model call', async () => {
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile({
     ...input,
     contextPolicy: { maxRunTokens: 8192 },
@@ -242,7 +243,7 @@ it('stops a run after its cumulative token cap without making another model call
 });
 
 it('uses conservative estimates when a provider omits usage counters', async () => {
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile({
     ...input,
     contextPolicy: { maxRunTokens: 8192 },
@@ -297,7 +298,7 @@ it('uses conservative estimates when a provider omits usage counters', async () 
 });
 
 it('reports a safe context-budget error when required prompt content cannot fit', async () => {
-  const services = testServices();
+  const services = await testServices();
 
   const profile = await services.profiles.createProfile({
     ...input,
@@ -419,7 +420,7 @@ it('stores a large tool output and sends only a bounded reference to the model',
     '00000000-0000-4000-8000-000000000001',
   );
 
-  expect(JSON.stringify(await services.store.events(profile.id, 0))).not.toContain(
+  expect(JSON.stringify(await events(services.store, profile.id, 0))).not.toContain(
     'x'.repeat(3900),
   );
 });
@@ -481,7 +482,7 @@ it('redacts an escaped host credential from tool prompts, artifacts, checkpoints
     const durable = JSON.stringify({
       artifact,
       checkpoints: await services.lifecycle.checkpoints(profile.id, run.id),
-      events: await services.store.events(profile.id, 0),
+      events: await events(services.store, profile.id, 0),
       output: result.output,
     });
 
@@ -500,7 +501,7 @@ it('redacts an escaped host credential from tool prompts, artifacts, checkpoints
 });
 
 it('creates a child profile without inheriting provider access', async () => {
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile({ ...input, allowSelfManagement: true });
   const session = await services.sessions.createSession(profile.id, { title: 'Parent' });
 
@@ -578,7 +579,7 @@ it('does not report completion when the agent exhausts its tool budget', async (
 });
 
 it('versions self-managed skills without accepting new capability grants', async () => {
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile({ ...input, allowSelfManagement: true });
   const session = await services.sessions.createSession(profile.id, { title: 'Skills' });
 

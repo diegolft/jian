@@ -1,14 +1,21 @@
+import type { Queryable } from '../storage/database.js';
+import { events } from '../storage/schema.js';
 import type { Clock } from './clock.js';
-import { nowIso } from './clock.js';
-import type { Transaction } from './store.js';
 
+/** The durable feed every client follows. Written inside the caller's profile transaction. */
 export async function recordEvent(
-  tx: Transaction,
+  tx: Queryable,
   clock: Clock,
   profileId: string,
   type: string,
   data: unknown,
   runId?: string,
 ): Promise<void> {
-  await tx.event({ profileId, type, data, runId, createdAt: nowIso(clock) });
+  await tx.insert(events).values({
+    profileId,
+    runId: runId ?? null,
+    type,
+    data: data ?? null,
+    createdAt: new Date(clock()),
+  });
 }

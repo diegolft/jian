@@ -2,7 +2,6 @@ import { modelSchema } from '@jian/contracts';
 import { generateText } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { resolveModel } from '../src/providers/models.js';
-import { testServices } from './helpers/services.js';
 
 describe('providers', () => {
   it.each(['openai', 'anthropic', 'google', 'openai-compatible'] as const)(
@@ -79,33 +78,4 @@ it('sends ANTHROPIC_API_TOKEN as a bearer token', async () => {
   await expect(generateText({ model, prompt: 'Hi', maxRetries: 0 })).rejects.toThrow();
   expect(headers.get('authorization')).toBe('Bearer synthetic-token');
   expect(headers.has('x-api-key')).toBe(false);
-});
-
-it('reads a provider stored before the vault moved indoors', async () => {
-  const services = testServices();
-  const profile = await services.profiles.createProfile({
-    name: 'Atlas',
-    instructions: 'Help.',
-  });
-
-  // Written by an older version: a hand-written model list and a credential by id, both of
-  // which the record no longer declares. Listing must not answer 400 to the whole panel.
-  await services.store.transaction(profile.id, async (tx) => {
-    await tx.put('provider', 'e1957360-9a95-4651-a63c-5f313ebafaba', profile.id, {
-      id: 'e1957360-9a95-4651-a63c-5f313ebafaba',
-      profileId: profile.id,
-      name: 'OpenAI',
-      kind: 'openai',
-      authMode: 'codex',
-      createdAt: new Date().toISOString(),
-      models: [{ id: 'gpt-5.6-terra', contextWindow: 1_000_000, maxOutputTokens: 128_000 }],
-      credentialId: '3dc472c6-9111-41c8-873f-c7fe82265daa',
-    } as never);
-  });
-
-  const [stored] = await services.providers.providers(profile.id);
-
-  expect(stored).toMatchObject({ name: 'OpenAI', kind: 'openai', authMode: 'codex' });
-  expect(stored).not.toHaveProperty('credentialId');
-  expect(stored).not.toHaveProperty('models');
 });

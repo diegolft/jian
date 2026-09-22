@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import {
   artifactQuerySchema,
   type artifactSchema,
@@ -6,15 +6,27 @@ import {
   type leaseSchema,
   mailInputSchema,
   type mailSchema,
+  type Profile,
   pageQuerySchema,
   type Run,
+  type Session,
 } from '@jian/contracts';
 import { z } from 'zod';
+import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound, GatewayError } from '../core/errors.js';
-import type { Store } from '../core/store.js';
-import type { ProfileReader } from '../profiles/port.js';
-import type { RunReader } from '../runs/port.js';
-import type { SessionReader } from '../sessions/port.js';
+import { recordEvent } from '../core/events.js';
+import { pageMessages } from '../sessions/repository.js';
+import type { Queryable, Store } from '../storage/database.js';
+import {
+  acquireLease,
+  expireLease,
+  findArtifact,
+  findHistoryCursor,
+  findLease,
+  insertArtifact,
+  insertMail,
+  listInbox,
+} from './repository.js';
 
 export type ArtifactRecord = z.infer<typeof artifactSchema>;
 
@@ -26,17 +38,18 @@ const releaseSchema = leaseInputSchema
   .omit({ ttlSeconds: true })
   .extend({ fence: z.number().int().positive() });
 
+/** Every read here happens inside the profile transaction coordination opened, never beside it. */
 type CoordinationServices = {
-  profiles: ProfileReader;
-  sessions: SessionReader;
-  runs: RunReader;
+  profiles: { profile(id: string, reader?: Queryable): Promise<Profile> };
+  sessions: { session(profileId: string, sessionId: string, reader?: Queryable): Promise<Session> };
+  runs: { run(profileId: string, runId: string, reader?: Queryable): Promise<Run> };
   store: Store;
 };
 
 export class Coordination {
   constructor(
     private readonly services: CoordinationServices,
-    private readonly clock = Date.now,
+    private readonly clock: Clock = Date.now,
   ) {}
 
   async history(profileId: string, sessionId: string | undefined, input: unknown) {
@@ -50,29 +63,19 @@ export class Coordination {
 
     // A cursor is a record reference, so validate ownership before using it for pagination.
     if (query.before) {
-      const cursor = await this.services.store.get('message', query.before);
-
       assertFound(
-        cursor?.profileId === profileId && (!sessionId || cursor.sessionId === sessionId)
-          ? cursor
-          : null,
+        await findHistoryCursor(this.services.store.db, profileId, sessionId, query.before),
         'History cursor',
       );
     }
 
-    const items = await this.services.store.list('message', {
+    return pageMessages(this.services.store.db, {
       profileId,
-      ...(sessionId ? { where: { sessionId } } : {}),
+      sessionId,
       before: query.before,
-      search: query.q,
-      limit: query.limit + 1,
-      descending: true,
+      query: query.q,
+      limit: query.limit,
     });
-
-    const more = items.length > query.limit;
-    const page = items.slice(0, query.limit);
-
-    return { items: page, nextCursor: more ? (page.at(-1)?.id ?? null) : null };
   }
 
   async storeArtifact(run: Run, toolName: string, output: unknown) {
@@ -90,12 +93,12 @@ export class Coordination {
       toolName,
       content,
       bytes,
-      createdAt: new Date(this.clock()).toISOString(),
+      createdAt: nowIso(this.clock),
     };
 
     await this.services.store.transaction(run.profileId, async (tx) => {
       await this.services.runs.run(run.profileId, run.id, tx);
-      await tx.put('artifact', record.id, run.profileId, record);
+      await insertArtifact(tx, record);
     });
 
     return { artifactId: record.id, bytes };
@@ -103,8 +106,10 @@ export class Coordination {
 
   async artifact(profileId: string, id: string, input: unknown) {
     const { offset, limit } = artifactQuerySchema.parse(input);
-    const value = await this.services.store.get('artifact', id);
-    const record = assertFound(value?.profileId === profileId ? value : null, 'Artifact');
+    const record = assertFound(
+      await findArtifact(this.services.store.db, profileId, id),
+      'Artifact',
+    );
     const end = Math.min(offset + limit, record.content.length);
 
     return {
@@ -114,40 +119,24 @@ export class Coordination {
     };
   }
 
-  private leaseId(profileId: string, resource: string) {
-    return `${profileId}:${createHash('sha256').update(resource).digest('hex')}`;
-  }
-
   async acquire(profileId: string, input: unknown) {
     const { ttlSeconds, ...data } = leaseInputSchema.parse(input);
 
     return this.services.store.transaction(profileId, async (tx) => {
       await this.services.sessions.session(profileId, data.sessionId, tx);
 
-      const id = this.leaseId(profileId, data.resource);
-      const current = await tx.get('lease', id);
+      const record = await acquireLease(
+        tx,
+        { ...data, profileId, expiresAt: this.clock() + ttlSeconds * 1000 },
+        this.clock(),
+      );
 
-      if (current && current.expiresAt > this.clock() && current.sessionId !== data.sessionId) {
+      // No row means the resource is live and held elsewhere: nothing was written.
+      if (!record) {
         throw new GatewayError(409, 'Resource is held by another session');
       }
 
-      // Every acquisition gets a new fence, including renewal. External resources must honor it.
-      const record: LeaseRecord = {
-        ...data,
-        id,
-        profileId,
-        fence: (current?.fence ?? 0) + 1,
-        expiresAt: this.clock() + ttlSeconds * 1000,
-      };
-
-      await tx.put('lease', id, profileId, record);
-
-      await tx.event({
-        profileId,
-        type: 'resource.acquired',
-        data: record,
-        createdAt: new Date(this.clock()).toISOString(),
-      });
+      await recordEvent(tx, this.clock, profileId, 'resource.acquired', record);
 
       return record;
     });
@@ -157,10 +146,7 @@ export class Coordination {
     const data = releaseSchema.parse(input);
 
     return this.services.store.transaction(profileId, async (tx) => {
-      const record = assertFound(
-        await tx.get('lease', this.leaseId(profileId, data.resource)),
-        'Resource lease',
-      );
+      const record = assertFound(await findLease(tx, profileId, data.resource), 'Resource lease');
 
       if (
         record.sessionId !== data.sessionId ||
@@ -170,11 +156,11 @@ export class Coordination {
         throw new GatewayError(409, 'Resource lease is no longer valid');
       }
 
-      const released = { ...record, expiresAt: this.clock() };
+      const releasedAt = this.clock();
 
-      await tx.put('lease', record.id, profileId, released);
+      await expireLease(tx, profileId, data.resource, releasedAt);
 
-      return released;
+      return { ...record, expiresAt: releasedAt };
     });
   }
 
@@ -185,48 +171,35 @@ export class Coordination {
       await this.services.sessions.session(profileId, data.fromSessionId, tx);
       await this.services.sessions.session(profileId, data.toSessionId, tx);
 
-      const id = `${profileId}:${createHash('sha256')
-        .update(JSON.stringify([data.fromSessionId, data.requestKey]))
-        .digest('hex')}`;
-
-      const previous = await tx.get('mail', id);
-
-      if (previous) {
-        if (previous.text !== data.text || previous.toSessionId !== data.toSessionId) {
-          throw new GatewayError(409, 'Request key already used');
-        }
-
-        return previous;
-      }
-
-      const record: MailRecord = {
+      const stored = await insertMail(tx, {
         ...data,
-        id,
+        id: randomUUID(),
         profileId,
-        createdAt: new Date(this.clock()).toISOString(),
-      };
-
-      await tx.put('mail', id, profileId, record);
-
-      await tx.event({
-        profileId,
-        type: 'session.mail',
-        data: { id, toSessionId: data.toSessionId, fromSessionId: data.fromSessionId },
-        createdAt: record.createdAt,
+        createdAt: nowIso(this.clock),
       });
 
-      return record;
+      if (!stored) {
+        throw new GatewayError(409, 'Request key already used');
+      }
+
+      // A resend returns the message already stored, and announces nothing a second time.
+      if (!stored.created) {
+        return stored.record;
+      }
+
+      await recordEvent(tx, this.clock, profileId, 'session.mail', {
+        id: stored.record.id,
+        toSessionId: data.toSessionId,
+        fromSessionId: data.fromSessionId,
+      });
+
+      return stored.record;
     });
   }
 
   async inbox(profileId: string, sessionId: string) {
     await this.services.sessions.session(profileId, sessionId);
 
-    return this.services.store.list('mail', {
-      profileId,
-      where: { toSessionId: sessionId },
-      limit: 30,
-      descending: true,
-    });
+    return listInbox(this.services.store.db, profileId, sessionId, 30);
   }
 }

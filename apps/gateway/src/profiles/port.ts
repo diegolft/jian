@@ -1,9 +1,9 @@
 import type { Profile } from '@jian/contracts';
-import type { Reader } from '../core/store.js';
+import type { Queryable } from '../storage/database.js';
 
-/** Passing a reader keeps the lookup inside the caller's open transaction. */
+/** Passing the caller's transaction keeps the lookup inside it. */
 export interface ProfileReader {
-  profile(id: string, reader?: Reader): Promise<Profile>;
+  profile(id: string, reader?: Queryable): Promise<Profile>;
 }
 
 export interface ProfileAdmin extends ProfileReader {

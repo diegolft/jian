@@ -1,8 +1,8 @@
 CREATE TYPE "public"."channel_type" AS ENUM('api', 'telegram', 'whatsapp');--> statement-breakpoint
-CREATE TYPE "public"."connection_status" AS ENUM('disconnected', 'connecting', 'awaiting_scan', 'connected', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."connection_status" AS ENUM('disconnected', 'connecting', 'qr', 'connected', 'error');--> statement-breakpoint
 CREATE TYPE "public"."contact_scope" AS ENUM('direct', 'group');--> statement-breakpoint
 CREATE TYPE "public"."contact_status" AS ENUM('pending', 'approved', 'blocked');--> statement-breakpoint
-CREATE TYPE "public"."delivery_status" AS ENUM('pending', 'sent', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."delivery_status" AS ENUM('pending', 'sending', 'sent', 'failed', 'unknown');--> statement-breakpoint
 CREATE TYPE "public"."inbox_status" AS ENUM('pending', 'submitted', 'discarded');--> statement-breakpoint
 CREATE TYPE "public"."message_role" AS ENUM('user', 'assistant');--> statement-breakpoint
 CREATE TYPE "public"."provider_kind" AS ENUM('openai', 'anthropic', 'google');--> statement-breakpoint
@@ -57,7 +57,7 @@ CREATE TABLE "channels" (
 	"profile_id" uuid NOT NULL,
 	"type" "channel_type" NOT NULL,
 	"address" text,
-	"webhook_token_hash" text,
+	"webhook_token_hash" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"revoked_at" timestamp with time zone
 );
@@ -76,7 +76,7 @@ CREATE TABLE "contacts" (
 	"channel_id" uuid NOT NULL,
 	"scope" "contact_scope" NOT NULL,
 	"chat_id" text NOT NULL,
-	"actor_id" text,
+	"actor_id" text NOT NULL,
 	"title" text,
 	"status" "contact_status" NOT NULL,
 	"session_id" uuid,
@@ -94,10 +94,13 @@ CREATE TABLE "deliveries" (
 	"channel_id" uuid NOT NULL,
 	"run_id" uuid,
 	"chat_id" text NOT NULL,
-	"text" text,
+	"notice" text,
 	"status" "delivery_status" NOT NULL,
 	"error" text,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"remote_message_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"connection_generation" integer,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "events" (
@@ -151,8 +154,8 @@ CREATE TABLE "messages" (
 CREATE TABLE "model_defaults" (
 	"profile_id" uuid NOT NULL,
 	"role" text NOT NULL,
-	"provider_id" uuid NOT NULL,
-	"model_id" text NOT NULL,
+	"provider_id" uuid,
+	"model_id" text,
 	"reasoning_effort" text,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "model_defaults_profile_id_role_pk" PRIMARY KEY("profile_id","role")
@@ -279,8 +282,9 @@ CREATE INDEX "checkpoints_run" ON "checkpoints" USING btree ("run_id","created_a
 CREATE UNIQUE INDEX "contacts_identity" ON "contacts" USING btree ("channel_id","chat_id","actor_id");--> statement-breakpoint
 CREATE INDEX "contacts_pending" ON "contacts" USING btree ("profile_id","status");--> statement-breakpoint
 CREATE INDEX "deliveries_recent" ON "deliveries" USING btree ("profile_id","created_at" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "deliveries_phase" ON "deliveries" USING btree ("channel_id","status","created_at");--> statement-breakpoint
 CREATE INDEX "events_cursor" ON "events" USING btree ("profile_id","id");--> statement-breakpoint
-CREATE UNIQUE INDEX "mail_request_key" ON "mail" USING btree ("profile_id","request_key");--> statement-breakpoint
+CREATE UNIQUE INDEX "mail_request_key" ON "mail" USING btree ("profile_id","from_session_id","request_key");--> statement-breakpoint
 CREATE INDEX "mail_inbox" ON "mail" USING btree ("to_session_id","created_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "memories_recent" ON "memories" USING btree ("profile_id","updated_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "memories_search" ON "memories" USING gin (to_tsvector('simple', "key" || ' ' || "content"));--> statement-breakpoint
@@ -292,5 +296,7 @@ CREATE UNIQUE INDEX "providers_live_per_kind" ON "providers" USING btree ("profi
 CREATE UNIQUE INDEX "runs_request_key" ON "runs" USING btree ("profile_id","session_id","request_key");--> statement-breakpoint
 CREATE INDEX "runs_activity" ON "runs" USING btree ("profile_id","status","created_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "runs_running" ON "runs" USING btree ("status") WHERE "runs"."status" = 'running';--> statement-breakpoint
+CREATE INDEX "runs_queued" ON "runs" USING btree ("status") WHERE "runs"."status" = 'queued';--> statement-breakpoint
+CREATE INDEX "runs_session" ON "runs" USING btree ("profile_id","session_id","created_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "sessions_recent" ON "sessions" USING btree ("profile_id","created_at" DESC NULLS LAST);--> statement-breakpoint
 CREATE INDEX "sessions_peer" ON "sessions" USING btree ("profile_id","peer_profile_id");

@@ -1,16 +1,21 @@
 import { randomUUID } from 'node:crypto';
-import {
-  type Profile,
-  profilePatchSchema,
-  profileRecordSchema,
-  profileSchema,
-} from '@jian/contracts';
+import { type Profile, profilePatchSchema, profileSchema } from '@jian/contracts';
+import { and, eq, isNull } from 'drizzle-orm';
 import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound, GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
-import type { Reader, Store, Transaction } from '../core/store.js';
 import { environmentProvider, type ProviderKind, providerCatalog } from '../providers/catalog.js';
 import type { Vault } from '../security/vault.js';
+import type { Queryable, Store } from '../storage/database.js';
+import { providers } from '../storage/schema.js';
+import {
+  findProfile,
+  insertProfile,
+  insertRevision,
+  listProfiles,
+  listRevisions,
+  updateProfileRow,
+} from './repository.js';
 
 /** Where an MCP server's bearer token lives in the vault, addressed by the server's name. */
 export const mcpSecret = (name: string) => `mcp:${name}`;
@@ -22,14 +27,12 @@ export class Profiles {
     private readonly clock: Clock = Date.now,
   ) {}
 
-  async profile(id: string, reader: Reader = this.store) {
-    return profileRecordSchema.parse(assertFound(await reader.get('profile', id), 'Profile'));
+  async profile(id: string, reader: Queryable = this.store.db) {
+    return assertFound(await findProfile(reader, id), 'Profile');
   }
 
   async profiles() {
-    return (await this.store.list('profile', { limit: 100 })).map((profile) =>
-      profileRecordSchema.parse(profile),
-    );
+    return listProfiles(this.store.db);
   }
 
   async createProfile(input: unknown) {
@@ -47,14 +50,8 @@ export class Profiles {
       await this.validateReferences(profile, tx);
       const stored = await this.storeMcpTokens(profile, undefined, tx);
 
-      await tx.put('profile', stored.id, stored.id, stored);
-
-      await tx.put('revision', `${stored.id}:1`, stored.id, {
-        id: `${stored.id}:1`,
-        profileId: stored.id,
-        profile: stored,
-        createdAt: nowIso(this.clock),
-      });
+      await insertProfile(tx, stored);
+      await insertRevision(tx, stored);
 
       await recordEvent(tx, this.clock, stored.id, 'profile.created', {
         profileId: stored.id,
@@ -73,7 +70,7 @@ export class Profiles {
   private async storeMcpTokens(
     profile: Profile,
     previous: Profile | undefined,
-    tx: Transaction,
+    tx: Queryable,
   ): Promise<Profile> {
     const mcpServers = [];
 
@@ -97,7 +94,7 @@ export class Profiles {
   }
 
   /** A profile may only name its own live provider, and one capability per name. */
-  private async validateReferences(profile: Profile, reader: Reader) {
+  private async validateReferences(profile: Profile, reader: Queryable) {
     for (const names of [
       profile.skills.map((skill) => skill.name),
       profile.mcpServers.map((server) => server.name),
@@ -113,16 +110,27 @@ export class Profiles {
       return;
     }
 
-    const provider = await reader.get('provider', providerId);
-
     const fromEnvironment = (Object.keys(providerCatalog) as ProviderKind[]).some(
       (kind) => environmentProvider(profile.id, kind)?.id === providerId,
     );
 
-    if (
-      !fromEnvironment &&
-      (!provider || provider.profileId !== profile.id || provider.revokedAt)
-    ) {
+    if (fromEnvironment) {
+      return;
+    }
+
+    const [live] = await reader
+      .select({ id: providers.id })
+      .from(providers)
+      .where(
+        and(
+          eq(providers.id, providerId),
+          eq(providers.profileId, profile.id),
+          isNull(providers.revokedAt),
+        ),
+      )
+      .limit(1);
+
+    if (!live) {
       throw new GatewayError(400, 'Provider reference is not available to this profile');
     }
   }
@@ -147,16 +155,8 @@ export class Profiles {
       await this.validateReferences(patched, tx);
       const profile = await this.storeMcpTokens(patched, current, tx);
 
-      await tx.put('profile', id, id, profile);
-
-      const revision = {
-        id: `${id}:${profile.version}`,
-        profileId: id,
-        profile,
-        createdAt: nowIso(this.clock),
-      };
-
-      await tx.put('revision', revision.id, id, revision);
+      await updateProfileRow(tx, profile);
+      await insertRevision(tx, profile);
 
       await recordEvent(tx, this.clock, id, 'profile.updated', {
         profileId: id,
@@ -170,8 +170,6 @@ export class Profiles {
   async revisions(id: string) {
     await this.profile(id);
 
-    return (await this.store.list('revision', { profileId: id, descending: true, limit: 50 })).map(
-      (revision) => ({ ...revision, profile: profileRecordSchema.parse(revision.profile) }),
-    );
+    return listRevisions(this.store.db, id);
   }
 }

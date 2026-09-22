@@ -103,8 +103,9 @@ export const modelDefaults = pgTable(
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
     role: text('role').notNull(),
-    providerId: uuid('provider_id').notNull(),
-    modelId: text('model_id').notNull(),
+    // Null on both means the role is configured as empty, which is not the same as unset.
+    providerId: uuid('provider_id'),
+    modelId: text('model_id'),
     reasoningEffort: text('reasoning_effort').$type<ReasoningEffort>(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -174,6 +175,8 @@ export const runs = pgTable(
     index('runs_activity').on(table.profileId, table.status, table.createdAt.desc()),
     // Recovery sweeps every profile's running rows, so this one is not scoped by profile.
     index('runs_running').on(table.status).where(sql`${table.status} = 'running'`),
+    index('runs_queued').on(table.status).where(sql`${table.status} = 'queued'`),
+    index('runs_session').on(table.profileId, table.sessionId, table.createdAt.desc()),
   ],
 );
 
@@ -297,7 +300,7 @@ export const mail = pgTable(
     createdAt,
   },
   (table) => [
-    uniqueIndex('mail_request_key').on(table.profileId, table.requestKey),
+    uniqueIndex('mail_request_key').on(table.profileId, table.fromSessionId, table.requestKey),
     index('mail_inbox').on(table.toSessionId, table.createdAt.desc()),
   ],
 );
@@ -333,7 +336,7 @@ export const channels = pgTable(
     type: channelType('type').notNull(),
     // How this connection is addressed on its protocol; how an agent recognises a colleague.
     address: text('address'),
-    webhookTokenHash: text('webhook_token_hash'),
+    webhookTokenHash: text('webhook_token_hash').notNull(),
     createdAt,
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
   },
@@ -362,7 +365,7 @@ export const contacts = pgTable(
     scope: contactScope('scope').notNull(),
     // The chat this contact speaks in; for a group, the room itself.
     chatId: text('chat_id').notNull(),
-    actorId: text('actor_id'),
+    actorId: text('actor_id').notNull(),
     title: text('title'),
     status: contactStatus('status').notNull(),
     sessionId: uuid('session_id').references(() => sessions.id, { onDelete: 'set null' }),
@@ -380,7 +383,13 @@ export const contacts = pgTable(
   ],
 );
 
-export const deliveryStatus = pgEnum('delivery_status', ['pending', 'sent', 'failed']);
+export const deliveryStatus = pgEnum('delivery_status', [
+  'pending',
+  'sending',
+  'sent',
+  'failed',
+  'unknown',
+]);
 
 export const deliveries = pgTable(
   'deliveries',
@@ -395,20 +404,32 @@ export const deliveries = pgTable(
     // A notice to a stranger has no run behind it.
     runId: uuid('run_id').references(() => runs.id, { onDelete: 'cascade' }),
     chatId: text('chat_id').notNull(),
-    text: text('text'),
+    // Gateway-authored text sent without a run, such as the approval notice.
+    notice: text('notice'),
     status: deliveryStatus('status').notNull(),
     error: text('error'),
+    // What the protocol called the message it accepted, for a later receipt to match.
+    remoteMessageIds: jsonb('remote_message_ids')
+      .$type<Array<string | number>>()
+      .notNull()
+      .default([]),
+    // Which device generation sent it: a receipt from an older pairing is not this one's.
+    connectionGeneration: integer('connection_generation'),
     createdAt,
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index('deliveries_recent').on(table.profileId, table.createdAt.desc())],
+  (table) => [
+    index('deliveries_recent').on(table.profileId, table.createdAt.desc()),
+    index('deliveries_phase').on(table.channelId, table.status, table.createdAt),
+  ],
 );
 
 export const connectionStatus = pgEnum('connection_status', [
   'disconnected',
   'connecting',
-  'awaiting_scan',
+  'qr',
   'connected',
-  'failed',
+  'error',
 ]);
 
 /** The desired and observed state of one linked device, plus the lease its worker holds. */

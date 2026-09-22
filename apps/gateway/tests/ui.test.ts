@@ -17,7 +17,7 @@ it('serves the exported UI with hashed scripts without opening API or filesystem
   await writeFile(join(root, 'app.js'), 'console.log("jian");');
 
   const app = createApp({
-    ...testServices(),
+    ...(await testServices()),
     token,
     logger: false,
     uiRoot: root,

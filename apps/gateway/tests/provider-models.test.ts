@@ -17,7 +17,7 @@ const listing = (...ids: string[]) =>
 
 async function setup(respond: () => Promise<Response>) {
   let now = 1_700_000_000_000;
-  const services = testServices(() => now);
+  const services = await testServices(() => now);
   const profile = await services.profiles.createProfile({ name: 'Atlas', instructions: 'Help.' });
   const provider = await services.providers.createProvider(profile.id, {
     name: 'Anthropic',

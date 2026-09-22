@@ -38,7 +38,7 @@ function repository(files: Record<string, string>) {
 }
 
 async function profileWith(skills: Array<{ name: string; description: string }> = []) {
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile({
     name: 'Atlas',
     instructions: 'Help.',
@@ -154,7 +154,7 @@ describe('reading a catalog', () => {
 
 describe('a self-managing agent and the skills the owner imported', () => {
   it('writes its own and cannot drop one it did not write', async () => {
-    const services = testServices();
+    const services = await testServices();
     const profile = await services.profiles.createProfile({
       name: 'Atlas',
       instructions: 'Help.',

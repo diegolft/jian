@@ -2,18 +2,32 @@ import { randomUUID } from 'node:crypto';
 import {
   continuationSchema,
   type Message,
-  profileRecordSchema,
+  type ModelSelection,
   type Run,
   submitSchema,
 } from '@jian/contracts';
 import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound, GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
-import type { Reader, Store } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
 import type { ProviderSelection } from '../providers/port.js';
+import { readModelDefaults } from '../providers/repository.js';
 import type { SessionReader } from '../sessions/port.js';
+import { insertMessage } from '../sessions/repository.js';
+import type { Queryable, Store } from '../storage/database.js';
 import type { SubmitOptions } from './port.js';
+import {
+  countActiveRuns,
+  findActiveSessionRun,
+  findRun,
+  findRunByRequestKey,
+  insertRun,
+  listActiveRuns,
+  updateRun,
+} from './repository.js';
+
+/** The cap on what one profile may have waiting or in flight at once. */
+const ACTIVE_RUN_LIMIT = 32;
 
 const active = (run: Run) => run.status === 'running' || run.status === 'queued';
 
@@ -25,6 +39,21 @@ export class Runs {
     private readonly providers: ProviderSelection,
     private readonly clock: Clock = Date.now,
   ) {}
+
+  /**
+   * A request key promises the same request. Different content under a key that is already
+   * taken is a mistake on the caller's side, not a second run.
+   */
+  private sameRequest(run: Run, text: string, model?: ModelSelection): Run {
+    if (
+      run.input !== text ||
+      (model && JSON.stringify(run.modelSelection) !== JSON.stringify(model))
+    ) {
+      throw new GatewayError(409, 'Request key was already used for different content');
+    }
+
+    return run;
+  }
 
   async submit(profileId: string, sessionId: string, input: unknown, options: SubmitOptions = {}) {
     const { continuationOf, activity = 'conversation', call, group } = options;
@@ -46,38 +75,18 @@ export class Runs {
 
       await this.sessions.session(profileId, sessionId, tx);
 
-      const duplicate = (
-        await tx.list('run', {
-          profileId,
-          where: { sessionId, requestKey: data.requestKey },
-          limit: 1,
-        })
-      )[0];
+      const duplicate = await findRunByRequestKey(tx, profileId, sessionId, data.requestKey);
 
       if (duplicate) {
-        if (
-          duplicate.input !== data.text ||
-          (data.model && JSON.stringify(duplicate.modelSelection) !== JSON.stringify(data.model))
-        ) {
-          throw new GatewayError(409, 'Request key was already used for different content');
-        }
-
-        return duplicate;
+        return this.sameRequest(duplicate, data.text, data.model);
       }
 
-      const runs = await tx.list('run', {
-        profileId,
-        where: { sessionId },
-        descending: true,
-        limit: 1,
-      });
-
-      if (runs.some(active)) {
+      if (await findActiveSessionRun(tx, profileId, sessionId)) {
         throw new GatewayError(409, 'Session already has an active run');
       }
 
-      const defaults = await tx.get('modelDefault', profileId);
-      let selection = data.model ?? defaults?.[activity] ?? defaults?.conversation;
+      const defaults = await readModelDefaults(tx, profileId, nowIso(this.clock));
+      let selection = data.model ?? defaults[activity] ?? defaults.conversation;
       let chosen: Awaited<ReturnType<typeof this.providers.selectedModel>> | null = null;
       if (selection) {
         try {
@@ -93,14 +102,12 @@ export class Runs {
         throw new GatewayError(409, 'Choose a default model before starting a run');
       }
 
-      const queued = await tx.list('run', { profileId, where: { status: 'queued' }, limit: 33 });
-      const running = await tx.list('run', { profileId, where: { status: 'running' }, limit: 5 });
-
-      if (queued.length + running.length >= 32) {
+      if ((await countActiveRuns(tx, profileId)) >= ACTIVE_RUN_LIMIT) {
         throw new GatewayError(429, 'Profile run limit reached');
       }
 
-      // Freeze configuration for this run; later identity edits apply only to new runs.
+      // Freeze configuration for this run; later identity edits apply only to new runs. The
+      // profile is stored as the version it is, and read back from that version's revision.
       const run: Run = {
         id: randomUUID(),
         profileId,
@@ -118,6 +125,13 @@ export class Runs {
         updatedAt: nowIso(this.clock),
       };
 
+      const collided = await insertRun(tx, run);
+
+      if (collided) {
+        return this.sameRequest(collided, data.text, data.model);
+      }
+
+      // The message references the run, so it can only be written once the run exists.
       const message: Message = {
         id: randomUUID(),
         profileId,
@@ -128,8 +142,7 @@ export class Runs {
         createdAt: nowIso(this.clock),
       };
 
-      await tx.put('message', message.id, profileId, message);
-      await tx.put('run', run.id, profileId, run);
+      await insertMessage(tx, message);
 
       await recordEvent(
         tx,
@@ -144,29 +157,14 @@ export class Runs {
     });
   }
 
-  async run(profileId: string, runId: string, reader: Reader = this.store) {
-    const run = await reader.get('run', runId);
-    const owned = assertFound(run?.profileId === profileId ? run : null, 'Run');
-
-    return { ...owned, profile: profileRecordSchema.parse(owned.profile) };
+  async run(profileId: string, runId: string, reader: Queryable = this.store.db) {
+    return assertFound(await findRun(reader, profileId, runId), 'Run');
   }
 
   async activities(profileId: string) {
     await this.profiles.profile(profileId);
 
-    const queued = await this.store.list('run', {
-      profileId,
-      where: { status: 'queued' },
-      limit: 100,
-    });
-
-    const running = await this.store.list('run', {
-      profileId,
-      where: { status: 'running' },
-      limit: 100,
-    });
-
-    return [...queued, ...running].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return listActiveRuns(this.store.db, profileId, 200);
   }
 
   async continueRun(profileId: string, runId: string, input: unknown) {
@@ -204,7 +202,7 @@ export class Runs {
         leaseUntil: undefined,
       };
 
-      await tx.put('run', runId, profileId, final);
+      await updateRun(tx, final);
       await recordEvent(tx, this.clock, profileId, 'run.cancelled', {}, runId);
 
       return final;

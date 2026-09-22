@@ -1,30 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import { mcpSecret } from '../src/profiles/service.js';
 import { providerSecret } from '../src/providers/service.js';
+import { secrets } from '../src/storage/schema.js';
+import { secretRow } from './helpers/rows.js';
 import { testServices } from './helpers/services.js';
 
-const otherProfile = '00000000-0000-4000-8000-000000000001';
+const model = { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' };
 
 async function setup() {
-  const services = testServices();
+  const services = await testServices();
 
   const profile = await services.profiles.createProfile({
     name: 'Test',
     instructions: 'Help.',
-    model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
+    model,
   });
 
-  return { services, profile };
+  // A second profile that exists: a secret cannot be planted under one that does not.
+  const other = await services.profiles.createProfile({
+    name: 'Other',
+    instructions: 'Help.',
+    model,
+  });
+
+  return { services, profile, otherProfile: other.id };
 }
 
 describe('profile vault', () => {
   it('keeps the secret out of the record and refuses an envelope moved to another profile', async () => {
-    const { services, profile } = await setup();
+    const { services, profile, otherProfile } = await setup();
     const owner = providerSecret('11111111-1111-4111-8111-111111111111');
 
     await services.vault.put(profile.id, owner, 'synthetic-secret');
 
-    const stored = await services.store.get('secret', `${profile.id}:${owner}`);
+    const stored = await secretRow(services.store, profile.id, owner);
 
     if (!stored) {
       throw new Error('The vault must persist the secret it accepted');
@@ -36,9 +45,7 @@ describe('profile vault', () => {
 
     // A stolen envelope replanted under another profile must not decrypt.
     await services.store.transaction(otherProfile, async (tx) => {
-      const id = `${otherProfile}:${owner}`;
-
-      await tx.put('secret', id, otherProfile, { ...stored, id, profileId: otherProfile });
+      await tx.insert(secrets).values({ ...stored, profileId: otherProfile });
     });
 
     await expect(services.vault.read(otherProfile, owner)).rejects.toThrow();

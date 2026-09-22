@@ -91,7 +91,7 @@ it.each([false, true])(
 
     const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     const outbound = createSafeFetch({ allowPrivateOrigins: [origin] });
-    const services = testServices();
+    const services = await testServices();
 
     const usage = {
       inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
@@ -307,7 +307,7 @@ it.each(['disconnect', 'isError'])(
     const outbound = createSafeFetch({ allowPrivateOrigins: [origin] });
 
     try {
-      const services = testServices();
+      const services = await testServices();
 
       const profile = await services.profiles.createProfile({
         name: 'Effect test',

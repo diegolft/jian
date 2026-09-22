@@ -4,10 +4,17 @@ import type { z } from 'zod';
 import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
-import type { Reader, Store, Transaction } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
 import type { SessionWriter } from '../sessions/port.js';
+import type { Queryable, Store } from '../storage/database.js';
 import type { ChannelType, IncomingMessage } from './channel.js';
+import {
+  findContact,
+  findContactByIdentity,
+  insertContact,
+  listContacts,
+  updateContact,
+} from './repository.js';
 
 /**
  * `requestKey` stays out of the contract: it is the protocol's message ID, not owner-facing.
@@ -60,13 +67,13 @@ export class Contacts {
     return contact;
   }
 
-  async read(profileId: string, id: string, reader: Reader = this.services.store) {
-    const contact = await reader.get('contact', id);
+  async read(profileId: string, id: string, reader: Queryable = this.services.store.db) {
+    const contact = await findContact(reader, id);
 
     return assertFound(contact?.profileId === profileId ? contact : null, 'Contact');
   }
 
-  private async openSession(tx: Transaction, contact: ContactRecord) {
+  private async openSession(tx: Queryable, contact: ContactRecord) {
     const session = await this.services.sessions.createSession(
       contact.profileId,
       { title: this.title(contact), channel: contact.type },
@@ -78,27 +85,22 @@ export class Contacts {
 
   /**
    * Runs inside the channel transaction so that a burst from one stranger produces exactly one
-   * request: the second message finds the record the first one wrote. A group is one request
-   * for the whole room — the owner decides about the conversation, not about each participant.
+   * request: the second message finds the record the first one wrote, and the identity index
+   * has the last word if both reads came back empty. A group is one request for the whole room
+   * — the owner decides about the conversation, not about each participant.
    */
   async intake(
-    tx: Transaction,
+    tx: Queryable,
     channel: { id: string; profileId: string; type: ChannelType },
     message: IncomingMessage,
   ): Promise<Intake> {
     const profileId = channel.profileId;
     const now = nowIso(this.clock);
     const group = message.scope === 'group';
+    // The room is the identity of a group contact: whoever writes there is the same request.
+    const actorId = group ? message.chatId : message.actorId;
 
-    const existing = (
-      await tx.list('contact', {
-        profileId,
-        where: group
-          ? { channelId: channel.id, scope: 'group', chatId: message.chatId }
-          : { channelId: channel.id, scope: 'direct', actorId: message.actorId },
-        limit: 1,
-      })
-    )[0];
+    let existing = await findContactByIdentity(tx, channel.id, message.chatId, actorId);
 
     if (!existing) {
       const name = group ? message.groupName : message.displayName;
@@ -109,8 +111,7 @@ export class Contacts {
         channelId: channel.id,
         type: channel.type,
         scope: message.scope,
-        // The room is the identity of a group contact: whoever writes there is the same request.
-        actorId: group ? message.chatId : message.actorId,
+        actorId,
         chatId: message.chatId,
         ...(name ? { displayName: name } : {}),
         status: 'pending',
@@ -121,10 +122,16 @@ export class Contacts {
         updatedAt: now,
       };
 
-      await tx.put('contact', contact.id, profileId, contact);
-      await recordEvent(tx, this.clock, profileId, 'contact.requested', this.view(contact));
+      if (await insertContact(tx, contact)) {
+        await recordEvent(tx, this.clock, profileId, 'contact.requested', this.view(contact));
 
-      return { status: 'pending', announce: !group };
+        return { status: 'pending', announce: !group };
+      }
+
+      existing = assertFound(
+        await findContactByIdentity(tx, channel.id, message.chatId, actorId),
+        'Contact',
+      );
     }
 
     if (existing.status === 'blocked') {
@@ -138,11 +145,7 @@ export class Contacts {
       const held = existing.message ? `${existing.message}\n\n${message.text}` : message.text;
 
       if (!group && held !== existing.message && held.length <= MAX_HELD_CHARACTERS) {
-        await tx.put('contact', existing.id, profileId, {
-          ...existing,
-          message: held,
-          updatedAt: now,
-        });
+        await updateContact(tx, { ...existing, message: held, updatedAt: now });
       }
 
       return { status: 'pending', announce: false };
@@ -156,9 +159,11 @@ export class Contacts {
 
     const current = { ...existing, ...renamed };
 
-    if (current.sessionId && (await tx.get('session', current.sessionId))) {
+    // A session that is gone leaves `sessionId` null by itself, so holding one is knowing it
+    // is still there, and a conversation whose session was removed opens another one below.
+    if (current.sessionId) {
       if (Object.keys(renamed).length) {
-        await tx.put('contact', current.id, profileId, { ...current, updatedAt: now });
+        await updateContact(tx, { ...current, updatedAt: now });
       }
 
       return { status: 'approved', contact: current };
@@ -170,7 +175,7 @@ export class Contacts {
       updatedAt: now,
     };
 
-    await tx.put('contact', contact.id, profileId, contact);
+    await updateContact(tx, contact);
 
     return { status: 'approved', contact };
   }
@@ -179,11 +184,7 @@ export class Contacts {
     await this.services.profiles.profile(profileId);
 
     // Newest first, so a fresh request is never the one a full page leaves out.
-    const contacts = await this.services.store.list('contact', {
-      profileId,
-      limit: 200,
-      descending: true,
-    });
+    const contacts = await listContacts(this.services.store.db, profileId);
 
     return contacts
       .map((contact) => this.view(contact))
@@ -209,7 +210,7 @@ export class Contacts {
         updatedAt: nowIso(this.clock),
       };
 
-      await tx.put('contact', id, profileId, contact);
+      await updateContact(tx, contact);
       await recordEvent(tx, this.clock, profileId, 'contact.approved', this.view(contact));
 
       return contact;
@@ -228,7 +229,7 @@ export class Contacts {
         updatedAt: nowIso(this.clock),
       };
 
-      await tx.put('contact', id, profileId, contact);
+      await updateContact(tx, contact);
       await recordEvent(tx, this.clock, profileId, 'contact.blocked', this.view(contact));
 
       return this.view(contact);
@@ -246,7 +247,7 @@ export class Contacts {
         updatedAt: nowIso(this.clock),
       };
 
-      await tx.put('contact', id, profileId, contact);
+      await updateContact(tx, contact);
 
       return this.view(contact);
     });

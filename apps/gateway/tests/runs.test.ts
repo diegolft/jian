@@ -10,7 +10,7 @@ const profileInput = {
 afterEach(() => vi.unstubAllEnvs());
 
 async function setup() {
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile(profileInput);
   const session = await services.sessions.createSession(profile.id, {
     title: 'Mac',
@@ -22,7 +22,7 @@ async function setup() {
 
 it('runs on a host provider credential without registering a provider by hand', async () => {
   vi.stubEnv('ANTHROPIC_API_TOKEN', 'synthetic-anthropic-token');
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile({ name: 'Host', instructions: 'Help.' });
   const providers = await services.providers.providers(profile.id);
   const anthropic = providers.find((provider) => provider.kind === 'anthropic');
@@ -58,7 +58,7 @@ it('runs on a host provider credential without registering a provider by hand', 
 });
 
 it('replaces one provider key and refuses the model default left behind', async () => {
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile({ name: 'Replace', instructions: 'Help.' });
   const add = (name: string) =>
     services.providers.createProvider(profile.id, {
@@ -210,7 +210,7 @@ it('lets only one worker claim a run and rejects stale completion', async () => 
 
 it('marks expired leases interrupted without replaying uncertain work', async () => {
   let now = Date.now();
-  const services = testServices(() => now);
+  const services = await testServices(() => now);
   const profile = await services.profiles.createProfile(profileInput);
   const session = await services.sessions.createSession(profile.id, {
     title: 'Test',

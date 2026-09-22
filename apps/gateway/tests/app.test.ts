@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
+import { events } from './helpers/rows.js';
 import { testServices } from './helpers/services.js';
 
 const token = 'test-token-that-is-at-least-32-characters';
@@ -15,8 +16,8 @@ const input = {
 
 const apps: FastifyInstance[] = [];
 
-function setup() {
-  const services = testServices();
+async function setup() {
+  const services = await testServices();
   const app = createApp({ ...services, token, logger: false });
 
   apps.push(app);
@@ -30,7 +31,7 @@ afterEach(async () => {
 
 describe('HTTP services', () => {
   it('registers a provider from a typed key, runs with it and never echoes the secret', async () => {
-    const { app, services } = setup();
+    const { app, services } = await setup();
 
     const profile = await services.profiles.createProfile({ name: 'New', instructions: 'Help.' });
     const base = `/v1/profiles/${profile.id}`;
@@ -76,7 +77,7 @@ describe('HTTP services', () => {
   });
 
   it('lists what the agent remembered and forgets one entry on request', async () => {
-    const { app, services } = setup();
+    const { app, services } = await setup();
     const profile = await services.profiles.createProfile(input);
     const base = `/v1/profiles/${profile.id}`;
 
@@ -119,7 +120,7 @@ describe('HTTP services', () => {
     ).toBe(404);
   });
   it('protects profiles and events while exposing liveness', async () => {
-    const { app } = setup();
+    const { app } = await setup();
 
     expect((await app.inject('/health')).statusCode).toBe(200);
     expect((await app.inject('/v1/profiles')).statusCode).toBe(401);
@@ -128,7 +129,7 @@ describe('HTTP services', () => {
   });
 
   it('creates profiles and sessions, then queues idempotent runs', async () => {
-    const { app } = setup();
+    const { app } = await setup();
 
     const created = await app.inject({
       method: 'POST',
@@ -170,7 +171,7 @@ describe('HTTP services', () => {
   });
 
   it('rejects secret values and unknown settings without echoing payloads', async () => {
-    const { app } = setup();
+    const { app } = await setup();
 
     const response = await app.inject({
       method: 'POST',
@@ -184,7 +185,7 @@ describe('HTTP services', () => {
   });
 
   it('returns explicit conflicts and replayable event cursors', async () => {
-    const { app, services } = setup();
+    const { app, services } = await setup();
     const profile = await services.profiles.createProfile(input);
     const url = `/v1/profiles/${profile.id}`;
 
@@ -219,9 +220,9 @@ describe('HTTP services', () => {
 });
 
 it('streams committed events over HTTP and resumes after a cursor', async () => {
-  const { app, services } = setup();
+  const { app, services } = await setup();
   const profile = await services.profiles.createProfile(input);
-  const initial = (await services.store.events(profile.id, 0))[0];
+  const initial = (await events(services.store, profile.id, 0))[0];
 
   assert.ok(initial, 'Profile creation must emit an event');
   await services.profiles.updateProfile(profile.id, { expectedVersion: 1, name: 'Updated' });
@@ -279,7 +280,7 @@ describe('panel session', () => {
   }
 
   it('hands the browser an unreadable cookie that authorizes administration', async () => {
-    const { app } = setup();
+    const { app } = await setup();
     const { cookie, raw, response } = await signIn(app);
 
     expect(raw.httpOnly).toBe(true);
@@ -296,7 +297,7 @@ describe('panel session', () => {
   });
 
   it('refuses the wrong host token without issuing a cookie', async () => {
-    const { app } = setup();
+    const { app } = await setup();
     const response = await app.inject({
       method: 'POST',
       url: '/v1/panel/session',
@@ -308,7 +309,7 @@ describe('panel session', () => {
   });
 
   it('ignores a cookie sent without the panel header, tampered with, or expired', async () => {
-    const { app } = setup();
+    const { app } = await setup();
     const { cookie, raw } = await signIn(app);
 
     // A third-party site can send the cookie, but not a header that needs a preflight.
@@ -331,7 +332,7 @@ describe('panel session', () => {
   });
 
   it('clears the cookie on sign out', async () => {
-    const { app } = setup();
+    const { app } = await setup();
     const { cookie } = await signIn(app);
 
     const response = await app.inject({

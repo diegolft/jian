@@ -1,23 +1,34 @@
 import { randomUUID } from 'node:crypto';
-import { AGENT_SESSION_CHANNEL, type Session, sessionSchema } from '@jian/contracts';
+import { AGENT_SESSION_CHANNEL, type Profile, type Session, sessionSchema } from '@jian/contracts';
 import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
-import type { Reader, Store, Transaction } from '../core/store.js';
-import type { ProfileReader } from '../profiles/port.js';
+import type { Queryable, Store } from '../storage/database.js';
+import {
+  findPeerSession,
+  findSession,
+  insertSession,
+  listSessionMessages,
+  listSessions,
+} from './repository.js';
+
+/** The lookup a session needs from profiles, reading through whatever transaction it is given. */
+type ProfileLookup = {
+  profile(id: string, reader?: Queryable): Promise<Profile>;
+};
 
 export class Sessions {
   constructor(
     private readonly store: Store,
-    private readonly profiles: ProfileReader,
+    private readonly profiles: ProfileLookup,
     private readonly clock: Clock = Date.now,
   ) {}
 
   /** A caller already inside a profile transaction passes it in: this store never nests locks. */
-  async createSession(profileId: string, input: unknown, transaction?: Transaction) {
+  async createSession(profileId: string, input: unknown, transaction?: Queryable) {
     const data = sessionSchema.parse(input);
 
-    const write = async (tx: Transaction) => {
+    const write = async (tx: Queryable) => {
       await this.profiles.profile(profileId, tx);
 
       const session: Session = {
@@ -27,7 +38,7 @@ export class Sessions {
         createdAt: nowIso(this.clock),
       };
 
-      await tx.put('session', session.id, profileId, session);
+      await insertSession(tx, session);
       await recordEvent(tx, this.clock, profileId, 'session.created', session);
 
       return session;
@@ -46,16 +57,10 @@ export class Sessions {
     profileId: string,
     peerProfileId: string,
     title: string,
-    transaction?: Transaction,
+    transaction?: Queryable,
   ) {
-    const open = async (tx: Transaction) => {
-      const existing = (
-        await tx.list('session', {
-          profileId,
-          where: { channel: AGENT_SESSION_CHANNEL, peerProfileId },
-          limit: 1,
-        })
-      )[0];
+    const open = async (tx: Queryable) => {
+      const existing = await findPeerSession(tx, profileId, peerProfileId);
 
       if (existing) {
         return existing;
@@ -71,7 +76,7 @@ export class Sessions {
         createdAt: nowIso(this.clock),
       };
 
-      await tx.put('session', session.id, profileId, session);
+      await insertSession(tx, session);
       await recordEvent(tx, this.clock, profileId, 'session.created', session);
 
       return session;
@@ -80,23 +85,20 @@ export class Sessions {
     return transaction ? open(transaction) : this.store.transaction(profileId, open);
   }
 
-  async session(profileId: string, sessionId: string, reader: Reader = this.store) {
-    const session = await reader.get('session', sessionId);
-
-    return assertFound(session?.profileId === profileId ? session : null, 'Session');
+  /** Belonging to the profile is a condition of the read, so another profile's session is a 404. */
+  async session(profileId: string, sessionId: string, reader: Queryable = this.store.db) {
+    return assertFound(await findSession(reader, profileId, sessionId), 'Session');
   }
 
   async sessions(profileId: string) {
     await this.profiles.profile(profileId);
 
-    return this.store.list('session', { profileId, descending: true, limit: 100 });
+    return listSessions(this.store.db, profileId, 100);
   }
 
   async messages(profileId: string, sessionId: string, limit = 100) {
     await this.session(profileId, sessionId);
 
-    return (
-      await this.store.list('message', { profileId, where: { sessionId }, limit, descending: true })
-    ).reverse();
+    return listSessionMessages(this.store.db, sessionId, limit);
   }
 }

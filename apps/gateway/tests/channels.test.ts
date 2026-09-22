@@ -9,7 +9,7 @@ const token = 'synthetic-telegram-admin-token-32-chars';
 const admin = { authorization: `Bearer ${token}` };
 
 async function setup(fetcher: typeof fetch) {
-  const services = testServices();
+  const services = await testServices();
 
   const profile = await services.profiles.createProfile({
     name: 'P',

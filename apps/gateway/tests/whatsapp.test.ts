@@ -12,6 +12,7 @@ import type {
   DeviceSessionStore,
 } from '../src/channels/whatsapp/types.js';
 import { SecretBox } from '../src/security/crypto.js';
+import { authRow, connectionRow, pendingInbox } from './helpers/rows.js';
 import { testServices } from './helpers/services.js';
 
 const actorId = '5511999999999@c.us';
@@ -28,7 +29,7 @@ const message: IncomingMessage = {
 
 async function setup(send?: (chatId: string, text: string) => Promise<string>) {
   let now = Date.now();
-  const services = testServices();
+  const services = await testServices();
   const store = services.store;
   const box = new SecretBox({ activeKeyId: 'v1', keys: { v1: randomBytes(32) } });
   const devices: Array<{ callbacks: DeviceCallbacks; store: DeviceSessionStore }> = [];
@@ -106,7 +107,7 @@ describe('WhatsApp linked device', () => {
       await f.whatsapp.tick(f.receive);
       await f.devices[0]?.callbacks.qr('synthetic-sensitive-qr');
 
-      expect(JSON.stringify(await f.store.get('channelConnection', f.binding.id))).not.toContain(
+      expect(JSON.stringify(await connectionRow(f.store, f.binding.id))).not.toContain(
         'synthetic-sensitive-qr',
       );
       const qr = await f.app.inject({ url: `${f.base}/qr`, headers: admin });
@@ -144,7 +145,7 @@ describe('WhatsApp linked device', () => {
       if (!original) throw new Error('Device missing');
       const archive = Buffer.from('synthetic-device-secret:'.repeat(30_000));
       await original.store.save(archive);
-      expect(JSON.stringify(await f.store.get('channelAuth', f.binding.id))).not.toContain(
+      expect(JSON.stringify(await authRow(f.store, f.binding.id))).not.toContain(
         'synthetic-device-secret',
       );
 
@@ -160,7 +161,7 @@ describe('WhatsApp linked device', () => {
       await replacement.disconnect(f.profile.id, f.binding.id);
       await expect(restored.store.save(archive)).rejects.toThrow('Device ownership expired');
       await expect(restored.callbacks.qr('late-qr')).rejects.toThrow('Device ownership expired');
-      expect((await f.store.get('channelAuth', f.binding.id))?.chunks).toEqual([]);
+      expect((await authRow(f.store, f.binding.id))?.chunks).toEqual([]);
       expect((await replacement.status(f.profile.id, f.binding.id)).status).toBe('disconnected');
 
       await replacement.connect(f.profile.id, f.binding.id);
@@ -170,7 +171,7 @@ describe('WhatsApp linked device', () => {
       await latest.store.save(archive);
       await f.channels.revoke(f.profile.id, f.binding.id);
       await expect(latest.store.save(archive)).rejects.toThrow('Device ownership expired');
-      expect((await f.store.get('channelAuth', f.binding.id))?.chunks).toEqual([]);
+      expect((await authRow(f.store, f.binding.id))?.chunks).toEqual([]);
     } finally {
       await replacement.stop();
       await f.app.close();
@@ -231,7 +232,7 @@ describe('WhatsApp linked device', () => {
 
       await callbacks.message({ ...message, text: 'Later', requestKey: 'wa-message-three' });
       await f.whatsapp.tick(f.receive);
-      expect(await f.store.list('channelInbox', { where: { status: 'pending' } })).toHaveLength(0);
+      expect(await pendingInbox(f.store)).toHaveLength(0);
       const [second] = await f.services.runs.activities(f.profile.id);
       if (!second) throw new Error('Second run missing');
       expect(second.input).toBe('Later');

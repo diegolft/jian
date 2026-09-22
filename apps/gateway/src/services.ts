@@ -1,6 +1,5 @@
 import { Contexts } from './context/service.js';
 import type { Clock } from './core/clock.js';
-import type { Store } from './core/store.js';
 import { Memories } from './memories/service.js';
 import { Peers } from './peers/service.js';
 import { Profiles } from './profiles/service.js';
@@ -9,6 +8,7 @@ import { RunLifecycle } from './runs/lifecycle.js';
 import { Runs } from './runs/service.js';
 import type { Vault } from './security/vault.js';
 import { Sessions } from './sessions/service.js';
+import type { Store } from './storage/database.js';
 
 export type Services = {
   profiles: Profiles;

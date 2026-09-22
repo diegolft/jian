@@ -9,6 +9,7 @@ import { WhatsAppChannel } from '../src/channels/whatsapp/adapter.js';
 import { WhatsAppConnections } from '../src/channels/whatsapp/connections.js';
 import type { DeviceCallbacks, DeviceFactory } from '../src/channels/whatsapp/types.js';
 import { SecretBox } from '../src/security/crypto.js';
+import { runRows } from './helpers/rows.js';
 import { testServices } from './helpers/services.js';
 
 const room = '120363000000000000@g.us';
@@ -24,7 +25,7 @@ const guest = { address: '5511911111111@c.us', name: 'Marina' };
  * agent writes to the others.
  */
 async function setup() {
-  const services = testServices();
+  const services = await testServices();
   const store = services.store;
   const box = new SecretBox({ activeKeyId: 'v1', keys: { v1: randomBytes(32) } });
   const devices = new Map<string, DeviceCallbacks>();
@@ -112,7 +113,7 @@ async function setup() {
     sent,
     join,
     say,
-    runs: (profileId: string) => store.list('run', { profileId }),
+    runs: (profileId: string) => runRows(store, profileId),
     approve: async (profileId: string) => {
       const contact = (await channels.contacts(profileId)).find((item) => item.scope === 'group');
 

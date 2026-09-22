@@ -17,7 +17,7 @@ it.each([
 ] as const)('detects %s as %s without storing the secret', async (name, kind) => {
   if (name === 'ANTHROPIC_API_TOKEN') vi.stubEnv('ANTHROPIC_API_KEY', '');
   vi.stubEnv(name, `synthetic-${name}`);
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile({ name: 'Env', instructions: 'Help.' });
   const providers = await services.providers.providers(profile.id);
   expect(providers.find((provider) => provider.kind === kind)?.apiKeyEnv).toBe(name);
@@ -25,7 +25,7 @@ it.each([
 });
 
 async function setup() {
-  const services = testServices();
+  const services = await testServices();
   const profile = await services.profiles.createProfile(profileInput);
   const session = await services.sessions.createSession(profile.id, {
     title: 'Mac',
@@ -70,7 +70,7 @@ const avatar = `data:image/jpeg;base64,${Buffer.from('synthetic-image-bytes').to
 
 describe('profile configuration changes', () => {
   it('preserves skills, MCP configuration and permissions on a name-only edit', async () => {
-    const services = testServices();
+    const services = await testServices();
 
     const profile = await services.profiles.createProfile({
       ...profileInput,
@@ -92,7 +92,7 @@ describe('profile configuration changes', () => {
   });
 
   it('keeps, replaces and clears the picture, and keeps its bytes out of the model context', async () => {
-    const services = testServices();
+    const services = await testServices();
     const profile = await services.profiles.createProfile({ ...profileInput, avatar });
 
     expect(profile.avatar).toBe(avatar);
@@ -125,7 +125,7 @@ describe('profile configuration changes', () => {
   });
 
   it('rejects a picture that is not an inline image within the size limit', async () => {
-    const services = testServices();
+    const services = await testServices();
     const profile = await services.profiles.createProfile(profileInput);
 
     for (const rejected of [
@@ -140,27 +140,4 @@ describe('profile configuration changes', () => {
 
     expect((await services.profiles.profile(profile.id)).avatar).toBeNull();
   });
-});
-
-it('normalizes legacy profiles and queued snapshots without rewriting their historical version', async () => {
-  const { services, profile, session } = await setup();
-
-  const run = await services.runs.submit(profile.id, session.id, {
-    text: 'Hi',
-    requestKey: 'legacy',
-  });
-
-  const { identity: _identity, contextPolicy: _policy, ...legacy } = profile;
-
-  await services.store.transaction(profile.id, async (tx) => {
-    await tx.put('profile', profile.id, profile.id, legacy as typeof profile);
-    await tx.put('run', run.id, profile.id, { ...run, profile: legacy as typeof profile });
-  });
-
-  expect((await services.profiles.profile(profile.id)).contextPolicy.inputTokens).toBe(16000);
-
-  const claimed = await services.lifecycle.claim(run.id, profile.id, 'worker');
-
-  expect(claimed?.profile.identity.goals).toEqual([]);
-  expect(claimed?.profile.version).toBe(1);
 });

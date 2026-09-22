@@ -5,9 +5,11 @@ import { describe, expect, it } from 'vitest';
 import { profileTools } from '../src/agent/tools.js';
 import { Coordination } from '../src/coordination/service.js';
 import { Peers } from '../src/peers/service.js';
+import { findRun } from '../src/runs/repository.js';
+import { events, queuedRun as readQueuedRun, runRows } from './helpers/rows.js';
 import { testServices } from './helpers/services.js';
 
-type Services = ReturnType<typeof testServices>;
+type Services = Awaited<ReturnType<typeof testServices>>;
 
 const model = { provider: 'openai' as const, modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' };
 
@@ -32,11 +34,7 @@ async function ownerRun(services: Services, profile: Profile, text: string): Pro
 
 async function queuedRun(services: Services, profileId: string): Promise<Run> {
   for (let attempt = 0; attempt < 400; attempt++) {
-    const [run] = await services.store.list('run', {
-      profileId,
-      where: { status: 'queued' },
-      limit: 1,
-    });
+    const run = await readQueuedRun(services.store, profileId);
 
     if (run) {
       return run;
@@ -71,11 +69,7 @@ function answering(services: Services, profileIds: string[]) {
   const loop = (async () => {
     while (running) {
       for (const profileId of profileIds) {
-        const [queued] = await services.store.list('run', {
-          profileId,
-          where: { status: 'queued' },
-          limit: 1,
-        });
+        const queued = await readQueuedRun(services.store, profileId);
 
         if (queued) {
           const owner = randomUUID();
@@ -106,7 +100,7 @@ async function invoke(tools: ToolSet, name: string, input: unknown) {
 }
 
 async function pair(summary = 'Cuida das entregas e sabe o estado de cada uma.') {
-  const services = testServices();
+  const services = await testServices();
   const caller = await agent(services, 'Orquestrador', 'Distribui o trabalho da equipe.');
   const callee = await agent(services, 'Operário', summary);
   const peers = new Peers(services, Date.now, timing);
@@ -271,12 +265,12 @@ describe('conversation between profiles', () => {
       { fromProfileId: callee.id, fromName: 'Operário', text: 'Pronto.' },
     ]);
 
-    expect(await services.store.list('run', { profileId: callee.id })).toHaveLength(1);
+    expect(await runRows(services.store, callee.id)).toHaveLength(1);
     expect(await services.sessions.sessions(callee.id)).toHaveLength(1);
   });
 
   it('carries the spent budget down the chain and stops when it runs out', async () => {
-    const services = testServices();
+    const services = await testServices();
     const peers = new Peers(services, Date.now, timing);
 
     const team = [];
@@ -302,11 +296,11 @@ describe('conversation between profiles', () => {
           requestKey: `passo-${next.id}`,
         });
 
-        const [answered] = await services.store.list('run', { profileId: next.id, limit: 1 });
+        const [answered] = await runRows(services.store, next.id);
 
         expect(answered?.call?.fromProfileId).toBe(caller.profileId);
         depths.push(answered?.call?.depth ?? 0);
-        caller = answered as Run;
+        caller = (await findRun(services.store.db, next.id, answered?.id ?? '')) as Run;
       }
 
       expect(depths).toEqual([1, 2, 3]);
@@ -321,7 +315,7 @@ describe('conversation between profiles', () => {
         }),
       ).rejects.toThrow(/budget spent/);
 
-      expect(await services.store.list('run', { profileId: last?.id ?? '' })).toEqual([]);
+      expect(await runRows(services.store, last?.id ?? '')).toEqual([]);
     } finally {
       await stop();
     }
@@ -349,7 +343,7 @@ describe('conversation between profiles', () => {
       peers.ask(run, { toProfileId: caller.id, text: 'Eu mesmo', requestKey: 'eu' }),
     ).rejects.toThrow(/cannot call itself/);
 
-    expect(await services.store.list('run', { profileId: caller.id })).toHaveLength(1);
+    expect(await runRows(services.store, caller.id)).toHaveLength(1);
   });
 
   it('reports a colleague that failed or does not exist instead of staying silent', async () => {
@@ -389,11 +383,11 @@ describe('conversation between profiles', () => {
 
     await asked;
 
-    const sent = (await services.store.events(caller.id, 0)).filter(
+    const sent = (await events(services.store, caller.id, 0)).filter(
       (event) => event.type === 'agent.call.sent',
     );
 
-    const received = (await services.store.events(callee.id, 0)).filter(
+    const received = (await events(services.store, callee.id, 0)).filter(
       (event) => event.type === 'agent.call.received',
     );
 

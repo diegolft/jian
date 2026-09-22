@@ -1,7 +1,9 @@
 import { GROUP_AGENT_TURN_LIMIT, type GroupTurn } from '@jian/contracts';
-import type { Transaction } from '../core/store.js';
+import type { ProfileReader } from '../profiles/port.js';
+import type { Queryable } from '../storage/database.js';
 import type { IncomingMessage } from './channel.js';
 import type { ContactRecord } from './contacts.js';
+import { listGroupContacts, listLiveChannelsOfType, updateContact } from './repository.js';
 import type { ChannelRecord } from './service.js';
 
 /**
@@ -31,6 +33,8 @@ const fold = (value: string) =>
  * consecutive turns, so a conversation between them ends without a person having to stop it.
  */
 export class Groups {
+  constructor(private readonly profiles: ProfileReader) {}
+
   /**
    * Addressed by the protocol's own mention of this connection, or by name in the text. The
    * first word of a composed name counts, because that is how people write in a group.
@@ -51,30 +55,24 @@ export class Groups {
   }
 
   /** The other profiles of this installation, recognised by the address their channel speaks as. */
-  private async fromAgent(tx: Transaction, channel: ChannelRecord, actorId: string) {
-    const channels = await tx.list('channel', { where: { type: channel.type }, limit: 200 });
+  private async fromAgent(tx: Queryable, channel: ChannelRecord, actorId: string) {
+    const channels = await listLiveChannelsOfType(tx, channel.type);
 
-    return channels.some(
-      (item) => item.id !== channel.id && !item.revokedAt && item.address === actorId,
-    );
+    return channels.some((item) => item.id !== channel.id && item.address === actorId);
   }
 
   /** Who of this installation answers in this room: an approved group contact is membership. */
-  async participants(tx: Transaction, contact: ContactRecord): Promise<Participant[]> {
-    const contacts = await tx.list('contact', {
-      where: {
-        scope: 'group',
-        type: contact.type,
-        chatId: contact.chatId,
-        status: 'approved',
-      },
-      limit: 100,
+  async participants(tx: Queryable, contact: ContactRecord): Promise<Participant[]> {
+    const contacts = await listGroupContacts(tx, {
+      type: contact.type,
+      chatId: contact.chatId,
+      status: 'approved',
     });
 
     const participants: Participant[] = [];
 
     for (const item of contacts) {
-      const profile = await tx.get('profile', item.profileId);
+      const profile = await this.profiles.profile(item.profileId, tx).catch(() => null);
 
       if (profile) {
         participants.push({ profileId: profile.id, name: profile.name });
@@ -91,7 +89,7 @@ export class Groups {
    * changes nothing — a protocol redelivery is the same turn, not a new one.
    */
   async observe(
-    tx: Transaction,
+    tx: Queryable,
     channel: ChannelRecord,
     contact: ContactRecord,
     message: IncomingMessage,
@@ -111,7 +109,7 @@ export class Groups {
         return;
       }
 
-      await tx.put('contact', contact.id, contact.profileId, {
+      await updateContact(tx, {
         ...contact,
         agentTurns: turns,
         seen: [...seen, message.requestKey].slice(-OBSERVED_KEYS),

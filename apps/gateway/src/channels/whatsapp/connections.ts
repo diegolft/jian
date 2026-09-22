@@ -1,14 +1,33 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { assertFound, GatewayError } from '../../core/errors.js';
-import type { Store, Transaction } from '../../core/store.js';
 import type { SecretBox } from '../../security/crypto.js';
+import type { Queryable, Store } from '../../storage/database.js';
 import type { DeliveryOutcome, IncomingMessage, OutgoingMessage } from '../channel.js';
+import { findChannel, setChannelAddress } from '../repository.js';
+import {
+  claimConnection,
+  countPendingInbox,
+  findConnection,
+  findInboxItem,
+  insertInboxItem,
+  listConnections,
+  listConnectionsOwnedBy,
+  listPendingInbox,
+  readAuthChunks,
+  readOwned,
+  releaseConnection,
+  settleInboxItem,
+  updateOwned,
+  writeAuthChunks,
+  writeConnection,
+} from './repository.js';
 import type { ConnectionRecord, DeviceFactory, DeviceSessionStore, LinkedDevice } from './types.js';
 import { DEVICE_SEND_TIMEOUT_MS } from './types.js';
 
 const LEASE_MS = 30_000;
 const QR_LIFETIME_MS = 45_000;
 const AUTH_CHUNK_BYTES = 512 * 1024;
+const INBOX_CAPACITY = 1000;
 export const MAX_DEVICE_SESSION_BYTES = 64 * 1024 * 1024;
 
 type Receiver = (id: string, input: IncomingMessage, generation: number) => Promise<unknown>;
@@ -33,8 +52,8 @@ export class WhatsAppConnections {
     return new Date(this.clock()).toISOString();
   }
 
-  private async binding(profileId: string, id: string, tx = this.store) {
-    const value = await tx.get('channel', id);
+  private async binding(profileId: string, id: string, reader: Queryable = this.store.db) {
+    const value = await findChannel(reader, id);
     const channel = assertFound(value?.profileId === profileId ? value : null, 'Channel');
 
     if (channel.type !== 'whatsapp' || channel.revokedAt) {
@@ -48,13 +67,13 @@ export class WhatsAppConnections {
     await this.binding(profileId, id);
 
     await this.store.transaction(profileId, async (tx) => {
-      const current = await tx.get('channelConnection', id);
+      const current = await findConnection(tx, id);
 
       if (current?.desired) {
         return;
       }
 
-      await tx.put('channelConnection', id, profileId, {
+      await writeConnection(tx, {
         id,
         profileId,
         desired: true,
@@ -74,10 +93,10 @@ export class WhatsAppConnections {
     await this.binding(profileId, id);
 
     await this.store.transaction(profileId, async (tx) => {
-      const current = await tx.get('channelConnection', id);
+      const current = await findConnection(tx, id);
 
       // Incrementing the generation fences every callback and backup from the old device.
-      await tx.put('channelConnection', id, profileId, {
+      await writeConnection(tx, {
         id,
         profileId,
         desired: false,
@@ -85,7 +104,7 @@ export class WhatsAppConnections {
         status: 'disconnected',
         updatedAt: this.now(),
       });
-      await tx.put('channelAuth', id, profileId, { id, profileId, chunks: [] });
+      await writeAuthChunks(tx, id, profileId, [], new Date(this.clock()));
     });
 
     return this.status(profileId, id);
@@ -93,7 +112,7 @@ export class WhatsAppConnections {
 
   async status(profileId: string, id: string) {
     await this.binding(profileId, id);
-    const current = await this.store.get('channelConnection', id);
+    const current = await findConnection(this.store.db, id);
     const stale = current?.desired && (current.leaseUntil ?? 0) <= this.clock();
 
     return {
@@ -108,7 +127,7 @@ export class WhatsAppConnections {
 
   async qr(profileId: string, id: string) {
     await this.binding(profileId, id);
-    const current = await this.store.get('channelConnection', id);
+    const current = await findConnection(this.store.db, id);
 
     if (
       !current?.desired ||
@@ -126,33 +145,21 @@ export class WhatsAppConnections {
     };
   }
 
-  private async owned(tx: Transaction, record: ConnectionRecord) {
-    const current = await tx.get('channelConnection', record.id);
-    const channel = await tx.get('channel', record.id);
+  /** Reading before a write that has no ownership predicate of its own. */
+  private async owned(tx: Queryable, record: ConnectionRecord) {
+    const current = await readOwned(tx, record, this.owner, this.clock());
 
-    if (
-      !current?.desired ||
-      current.owner !== this.owner ||
-      current.generation !== record.generation ||
-      current.fence !== record.fence ||
-      (current.leaseUntil ?? 0) <= this.clock() ||
-      !channel ||
-      channel.revokedAt
-    ) {
-      throw new GatewayError(409, 'Device ownership expired');
-    }
-
-    return current;
+    return assertOwned(current);
   }
 
   private async update(record: ConnectionRecord, patch: Partial<ConnectionRecord>) {
     await this.store.transaction(record.profileId, async (tx) => {
-      const current = await this.owned(tx, record);
-      await tx.put('channelConnection', record.id, record.profileId, {
-        ...current,
-        ...patch,
-        updatedAt: this.now(),
-      });
+      assertOwned(
+        await updateOwned(tx, record, this.owner, this.clock(), {
+          ...patch,
+          updatedAt: this.now(),
+        }),
+      );
     });
   }
 
@@ -164,15 +171,15 @@ export class WhatsAppConnections {
       load: () =>
         this.store.transaction(record.profileId, async (tx) => {
           await this.owned(tx, record);
-          const auth = await tx.get('channelAuth', record.id);
+          const chunks = await readAuthChunks(tx, record.id);
 
-          if (!auth?.chunks.length) {
+          if (!chunks?.length) {
             return undefined;
           }
 
           return Buffer.concat(
-            auth.chunks.map((chunk, index) =>
-              Buffer.from(this.box.decrypt(chunk, aad(index, auth.chunks.length)), 'base64'),
+            chunks.map((chunk, index) =>
+              Buffer.from(this.box.decrypt(chunk, aad(index, chunks.length)), 'base64'),
             ),
           );
         }),
@@ -193,26 +200,20 @@ export class WhatsAppConnections {
 
         await this.store.transaction(record.profileId, async (tx) => {
           const current = await this.owned(tx, record);
-          await tx.put('channelAuth', record.id, record.profileId, {
-            id: record.id,
-            profileId: record.profileId,
-            chunks,
-          });
-          await tx.put('channelConnection', record.id, record.profileId, {
-            ...current,
-            sessionSavedAt: this.now(),
-            updatedAt: this.now(),
-          });
+
+          await writeAuthChunks(tx, record.id, record.profileId, chunks, new Date(this.clock()));
+          assertOwned(
+            await updateOwned(tx, current, this.owner, this.clock(), {
+              sessionSavedAt: this.now(),
+              updatedAt: this.now(),
+            }),
+          );
         });
       },
       clear: () =>
         this.store.transaction(record.profileId, async (tx) => {
           await this.owned(tx, record);
-          await tx.put('channelAuth', record.id, record.profileId, {
-            id: record.id,
-            profileId: record.profileId,
-            chunks: [],
-          });
+          await writeAuthChunks(tx, record.id, record.profileId, [], new Date(this.clock()));
         }),
     };
   }
@@ -221,27 +222,21 @@ export class WhatsAppConnections {
     await this.store.transaction(record.profileId, async (tx) => {
       await this.owned(tx, record);
       // Who may be answered is decided by contact approval, after the message is durable.
-      assertFound(await tx.get('channel', record.id), 'Channel');
+      assertFound(await findChannel(tx, record.id), 'Channel');
 
       const id = createHash('sha256')
         .update(JSON.stringify([record.id, message.requestKey]))
         .digest('hex');
 
-      if (await tx.get('channelInbox', id)) {
+      if (await findInboxItem(tx, id)) {
         return;
       }
 
-      const pending = await tx.list('channelInbox', {
-        profileId: record.profileId,
-        where: { channelId: record.id, status: 'pending' },
-        limit: 1000,
-      });
-
-      if (pending.length >= 1000) {
+      if ((await countPendingInbox(tx, record.id)) >= INBOX_CAPACITY) {
         throw new Error('WhatsApp inbox capacity reached');
       }
 
-      await tx.put('channelInbox', id, record.profileId, {
+      await insertInboxItem(tx, {
         id,
         profileId: record.profileId,
         channelId: record.id,
@@ -270,25 +265,23 @@ export class WhatsAppConnections {
             throw new GatewayError(409, 'Disconnect before linking a different WhatsApp account');
           }
 
-          await tx.put('channelConnection', record.id, record.profileId, {
-            ...current,
-            status: 'connected',
-            accountId,
-            qr: undefined,
-            qrExpiresAt: undefined,
-            error: undefined,
-            updatedAt: this.now(),
-          });
+          assertOwned(
+            await updateOwned(tx, current, this.owner, this.clock(), {
+              status: 'connected',
+              accountId,
+              qr: undefined,
+              qrExpiresAt: undefined,
+              error: undefined,
+              updatedAt: this.now(),
+            }),
+          );
 
           // The paired account is also the address this profile speaks as in a room, which is
           // how the other agents of this installation recognise its messages as an agent's.
-          const channel = await tx.get('channel', record.id);
+          const channel = await findChannel(tx, record.id);
 
           if (channel && channel.address !== accountId) {
-            await tx.put('channel', record.id, record.profileId, {
-              ...channel,
-              address: accountId,
-            });
+            await setChannelAddress(tx, record.id, accountId);
           }
         });
       },
@@ -339,10 +332,10 @@ export class WhatsAppConnections {
   }
 
   async tick(receive: Receiver) {
-    const records = await this.store.list('channelConnection', { limit: 1000 });
+    const records = await listConnections(this.store.db, 1000);
 
     for (const record of records) {
-      const channel = await this.store.get('channel', record.id);
+      const channel = await findChannel(this.store.db, record.id);
       const local = this.devices.get(record.id);
       const lostOwnership = record.owner !== this.owner || (record.leaseUntil ?? 0) <= this.clock();
 
@@ -370,29 +363,18 @@ export class WhatsAppConnections {
         continue;
       }
 
-      const claimed = await this.store.transaction(record.profileId, async (tx) => {
-        const current = assertFound(await tx.get('channelConnection', record.id), 'Connection');
-
-        if (
-          !current.desired ||
-          (current.owner !== this.owner && (current.leaseUntil ?? 0) > this.clock())
-        ) {
-          return null;
-        }
-
-        const active = this.devices.has(record.id);
-        const next = {
-          ...current,
-          status: active ? current.status : ('connecting' as const),
-          qr: active ? current.qr : undefined,
-          qrExpiresAt: active ? current.qrExpiresAt : undefined,
-          owner: this.owner,
-          leaseUntil: this.clock() + LEASE_MS,
-          fence: this.devices.has(record.id) ? current.fence : (current.fence ?? 0) + 1,
-        };
-        await tx.put('channelConnection', record.id, record.profileId, next);
-        return next;
-      });
+      // One statement decides and takes the device: the reservation is granted when it is
+      // already this worker's or has run out, so nothing can be read, judged and written over.
+      const claimed = await this.store.transaction(record.profileId, (tx) =>
+        claimConnection(
+          tx,
+          record.id,
+          this.owner,
+          this.clock(),
+          LEASE_MS,
+          this.devices.has(record.id),
+        ),
+      );
 
       if (!claimed) {
         continue;
@@ -408,13 +390,7 @@ export class WhatsAppConnections {
         });
       }
 
-      const inbox = await this.store.list('channelInbox', {
-        profileId: record.profileId,
-        where: { channelId: record.id, status: 'pending' },
-        limit: 20,
-      });
-
-      for (const item of inbox) {
+      for (const item of await listPendingInbox(this.store.db, record.id, 20)) {
         let status: 'submitted' | 'discarded' = 'submitted';
 
         try {
@@ -436,18 +412,14 @@ export class WhatsAppConnections {
 
         await this.store.transaction(record.profileId, async (tx) => {
           await this.owned(tx, claimed);
-          await tx.put('channelInbox', item.id, record.profileId, {
-            ...item,
-            status,
-            message: { ...item.message, text: '' },
-          });
+          await settleInboxItem(tx, item, status);
         });
       }
     }
   }
 
   async canSend(id: string, generation?: number) {
-    const current = await this.store.get('channelConnection', id);
+    const current = await findConnection(this.store.db, id);
     const local = this.devices.get(id);
 
     return !!(
@@ -521,24 +493,21 @@ export class WhatsAppConnections {
     await Promise.allSettled([...this.devices.values()].map((local) => local.device.stop(false)));
     this.devices.clear();
 
-    const records = await this.store.list('channelConnection', {
-      where: { owner: this.owner },
-      limit: 1000,
-    });
-    for (const record of records) {
-      await this.store.transaction(record.profileId, async (tx) => {
-        const current = await tx.get('channelConnection', record.id);
-        if (current?.owner !== this.owner) return;
+    const records = await listConnectionsOwnedBy(this.store.db, this.owner, 1000);
 
-        await tx.put('channelConnection', record.id, record.profileId, {
-          ...current,
-          owner: undefined,
-          leaseUntil: 0,
-          qr: undefined,
-          qrExpiresAt: undefined,
-          status: current.desired ? 'connecting' : current.status,
-        });
-      });
+    for (const record of records) {
+      await this.store.transaction(record.profileId, (tx) =>
+        releaseConnection(tx, record.id, this.owner, record.desired ? 'connecting' : record.status),
+      );
     }
   }
+}
+
+/** Losing the device mid-write is the same answer everywhere: the write does not land. */
+function assertOwned(record: ConnectionRecord | null): ConnectionRecord {
+  if (!record) {
+    throw new GatewayError(409, 'Device ownership expired');
+  }
+
+  return record;
 }

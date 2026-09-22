@@ -1,0 +1,160 @@
+import { AGENT_SESSION_CHANNEL, type Message, type Session } from '@jian/contracts';
+import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
+import type { Queryable } from '../storage/database.js';
+import { messages, sessions } from '../storage/schema.js';
+
+type SessionRow = typeof sessions.$inferSelect;
+type MessageRow = typeof messages.$inferSelect;
+
+export function toSession(row: SessionRow): Session {
+  return {
+    id: row.id,
+    profileId: row.profileId,
+    title: row.title,
+    channel: row.channel,
+    ...(row.peerProfileId ? { peerProfileId: row.peerProfileId } : {}),
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export function toMessage(row: MessageRow): Message {
+  return {
+    id: row.id,
+    profileId: row.profileId,
+    sessionId: row.sessionId,
+    runId: row.runId,
+    role: row.role,
+    content: row.content,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export async function insertSession(db: Queryable, session: Session): Promise<void> {
+  await db.insert(sessions).values({
+    ...session,
+    peerProfileId: session.peerProfileId ?? null,
+    createdAt: new Date(session.createdAt),
+  });
+}
+
+/** Ownership is part of the lookup, so another profile's session comes back as nothing at all. */
+export async function findSession(
+  db: Queryable,
+  profileId: string,
+  sessionId: string,
+): Promise<Session | null> {
+  const [row] = await db
+    .select()
+    .from(sessions)
+    .where(and(eq(sessions.id, sessionId), eq(sessions.profileId, profileId)))
+    .limit(1);
+
+  return row ? toSession(row) : null;
+}
+
+export async function listSessions(
+  db: Queryable,
+  profileId: string,
+  limit: number,
+): Promise<Session[]> {
+  const rows = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.profileId, profileId))
+    .orderBy(desc(sessions.createdAt), desc(sessions.id))
+    .limit(limit);
+
+  return rows.map(toSession);
+}
+
+/** The one session this profile keeps for a peer: a column and an index, never a scan. */
+export async function findPeerSession(
+  db: Queryable,
+  profileId: string,
+  peerProfileId: string,
+): Promise<Session | null> {
+  const [row] = await db
+    .select()
+    .from(sessions)
+    .where(
+      and(
+        eq(sessions.profileId, profileId),
+        eq(sessions.peerProfileId, peerProfileId),
+        eq(sessions.channel, AGENT_SESSION_CHANNEL),
+      ),
+    )
+    .limit(1);
+
+  return row ? toSession(row) : null;
+}
+
+export async function insertMessage(db: Queryable, message: Message): Promise<void> {
+  await db.insert(messages).values({ ...message, createdAt: new Date(message.createdAt) });
+}
+
+export async function listSessionMessages(
+  db: Queryable,
+  sessionId: string,
+  limit: number,
+): Promise<Message[]> {
+  const rows = await db
+    .select()
+    .from(messages)
+    .where(eq(messages.sessionId, sessionId))
+    .orderBy(desc(messages.createdAt), desc(messages.id))
+    .limit(limit);
+
+  return rows.map(toMessage).reverse();
+}
+
+/**
+ * History pages backwards from a message, and searches by word when asked. The cursor is a
+ * message id: its timestamp and id order the page, so a new message cannot shift a page seen.
+ */
+export async function pageMessages(
+  db: Queryable,
+  where: { profileId: string; sessionId?: string; before?: string; query?: string; limit: number },
+): Promise<{ items: Message[]; nextCursor: string | null }> {
+  const conditions = [eq(messages.profileId, where.profileId)];
+
+  if (where.sessionId) {
+    conditions.push(eq(messages.sessionId, where.sessionId));
+  }
+
+  if (where.query) {
+    conditions.push(
+      sql`to_tsvector('simple', ${messages.content}) @@ plainto_tsquery('simple', ${where.query})`,
+    );
+  }
+
+  if (where.before) {
+    const [cursor] = await db
+      .select({ createdAt: messages.createdAt, id: messages.id })
+      .from(messages)
+      .where(and(eq(messages.profileId, where.profileId), eq(messages.id, where.before)))
+      .limit(1);
+
+    if (cursor) {
+      conditions.push(
+        or(
+          lt(messages.createdAt, cursor.createdAt),
+          and(eq(messages.createdAt, cursor.createdAt), lt(messages.id, cursor.id)),
+        ) as ReturnType<typeof eq>,
+      );
+    }
+  }
+
+  const rows = await db
+    .select()
+    .from(messages)
+    .where(and(...conditions))
+    .orderBy(desc(messages.createdAt), desc(messages.id))
+    .limit(where.limit + 1);
+
+  const page = rows.slice(0, where.limit);
+
+  return {
+    items: page.map(toMessage),
+    nextCursor: rows.length > where.limit ? (page.at(-1)?.id ?? null) : null,
+  };
+}

@@ -6,7 +6,7 @@ import { buildContext } from '../src/context/build.js';
 import { testServices } from './helpers/services.js';
 
 async function fixture() {
-  const services = testServices();
+  const services = await testServices();
 
   const profile = await services.profiles.createProfile({
     name: 'Atlas',
@@ -35,7 +35,7 @@ async function fixture() {
 
 describe('context', () => {
   it('retains a Unicode current turn when the older-history budget is zero', async () => {
-    const services = testServices();
+    const services = await testServices();
 
     const profile = await services.profiles.createProfile({
       name: 'Zero history',

@@ -1,7 +1,8 @@
 import type { PgBoss } from 'pg-boss';
 import type { AgentRuntime } from '../agent/runtime.js';
-import type { Store } from '../core/store.js';
+import type { Store } from '../storage/database.js';
 import type { RunRecovery } from './port.js';
+import { listQueuedRuns } from './repository.js';
 
 const queueName = 'jian-agent-runs';
 
@@ -44,10 +45,7 @@ export class RunQueue {
   private async dispatch() {
     await this.services.lifecycle.recover();
 
-    const queued = await this.services.store.list('run', {
-      where: { status: 'queued' },
-      limit: 1000,
-    });
+    const queued = await listQueuedRuns(this.services.store.db, 1000);
 
     for (const run of queued) {
       if (this.stopped) {

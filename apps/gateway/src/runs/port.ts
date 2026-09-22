@@ -1,5 +1,5 @@
 import type { AgentCallOrigin, Checkpoint, GroupTurn, Run } from '@jian/contracts';
-import type { Reader } from '../core/store.js';
+import type { Queryable } from '../storage/database.js';
 
 /** What decides a run beyond its text: where it continues from, who asked, what it may cost. */
 export type SubmitOptions = {
@@ -10,7 +10,7 @@ export type SubmitOptions = {
 };
 
 export interface RunReader {
-  run(profileId: string, runId: string, reader?: Reader): Promise<Run>;
+  run(profileId: string, runId: string, reader?: Queryable): Promise<Run>;
   activities(profileId: string): Promise<Run[]>;
 }
 

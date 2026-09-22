@@ -1,15 +1,8 @@
-import { type Clock, nowIso } from '../core/clock.js';
-import type { Reader, Store, Transaction } from '../core/store.js';
+import { and, eq } from 'drizzle-orm';
+import type { Clock } from '../core/clock.js';
+import type { Queryable, Store } from '../storage/database.js';
+import { secrets } from '../storage/schema.js';
 import type { EncryptedSecret, SecretBox } from './crypto.js';
-
-export type SecretRecord = {
-  id: string;
-  profileId: string;
-  owner: string;
-  envelope: EncryptedSecret;
-  createdAt: string;
-  updatedAt: string;
-};
 
 /**
  * Encrypted storage for the secrets typed elsewhere in the panel: a provider key, an MCP
@@ -27,46 +20,47 @@ export class Vault {
     private readonly clock: Clock = Date.now,
   ) {}
 
-  private key(profileId: string, owner: string) {
-    return `${profileId}:${owner}`;
-  }
-
   private aad(profileId: string, owner: string) {
     return `jian:secret:${profileId}:${owner}`;
   }
 
-  async put(profileId: string, owner: string, secret: string, tx?: Transaction): Promise<void> {
-    const write = async (transaction: Transaction) => {
-      const id = this.key(profileId, owner);
-      const current = await transaction.get('secret', id);
-      const now = nowIso(this.clock);
+  async put(profileId: string, owner: string, secret: string, tx?: Queryable): Promise<void> {
+    const write = async (transaction: Queryable) => {
+      const envelope = this.box.encrypt(secret, this.aad(profileId, owner));
+      const now = new Date(this.clock());
 
-      await transaction.put('secret', id, profileId, {
-        id,
-        profileId,
-        owner,
-        envelope: this.box.encrypt(secret, this.aad(profileId, owner)),
-        createdAt: current?.createdAt ?? now,
-        updatedAt: now,
-      });
+      await transaction
+        .insert(secrets)
+        .values({ profileId, name: owner, envelope, createdAt: now, updatedAt: now })
+        .onConflictDoUpdate({
+          target: [secrets.profileId, secrets.name],
+          set: { envelope, updatedAt: now },
+        });
     };
 
     await (tx ? write(tx) : this.store.transaction(profileId, write));
   }
 
-  async read(profileId: string, owner: string, reader: Reader = this.store) {
-    const record = await reader.get('secret', this.key(profileId, owner));
+  async read(profileId: string, owner: string, reader: Queryable = this.store.db) {
+    const [row] = await reader
+      .select({ envelope: secrets.envelope })
+      .from(secrets)
+      .where(and(eq(secrets.profileId, profileId), eq(secrets.name, owner)))
+      .limit(1);
 
-    if (!record || record.profileId !== profileId) {
+    if (!row) {
       return undefined;
     }
 
-    return this.box.decrypt(record.envelope, this.aad(profileId, owner));
+    return this.box.decrypt(row.envelope as EncryptedSecret, this.aad(profileId, owner));
   }
 
-  async discard(profileId: string, owner: string, tx?: Transaction): Promise<void> {
-    const remove = async (transaction: Transaction) =>
-      transaction.remove('secret', this.key(profileId, owner), profileId);
+  async discard(profileId: string, owner: string, tx?: Queryable): Promise<void> {
+    const remove = async (transaction: Queryable) => {
+      await transaction
+        .delete(secrets)
+        .where(and(eq(secrets.profileId, profileId), eq(secrets.name, owner)));
+    };
 
     await (tx ? remove(tx) : this.store.transaction(profileId, remove));
   }
