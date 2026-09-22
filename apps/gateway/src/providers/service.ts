@@ -25,11 +25,18 @@ export const providerSecret = (providerId: string) => `provider:${providerId}`;
 export type ContextPolicy = NonNullable<Run['contextPolicy']>;
 
 /**
- * Providers registered before model discovery stored a hand-written model list. The record no
- * longer declares one and the strict schema would reject it, so it is dropped on read.
+ * Providers registered before model discovery stored a hand-written model list, and before the
+ * vault moved indoors they pointed at a credential by id. The record declares neither now and
+ * the strict schema would reject both, so they are dropped on read. The key itself lives in the
+ * vault under the provider's own id; a provider configured before that move has none and has to
+ * be configured again.
  */
 function current(record: ProviderRecord): ProviderRecord {
-  const { models: _legacy, ...rest } = record as ProviderRecord & { models?: unknown };
+  const {
+    models: _models,
+    credentialId: _credential,
+    ...rest
+  } = record as ProviderRecord & { models?: unknown; credentialId?: unknown };
 
   return rest;
 }
