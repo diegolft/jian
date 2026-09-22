@@ -17,9 +17,16 @@ import { issueToken, verifyToken } from '../security/tokens.js';
 import type { Vault } from '../security/vault.js';
 import type { SessionWriter } from '../sessions/port.js';
 import type { Queryable, Store } from '../storage/database.js';
-import type { ChannelRequest, ChannelType, DeliveryOutcome, IncomingMessage } from './channel.js';
+import type {
+  Channel,
+  ChannelRequest,
+  ChannelType,
+  DeliveryOutcome,
+  IncomingMessage,
+} from './channel.js';
 import { type ContactRecord, Contacts, type Intake } from './contacts.js';
 import { type GroupDecision, Groups } from './groups.js';
+import { plainText } from './plain.js';
 import { ChannelRegistry } from './registry.js';
 import {
   findChannel,
@@ -59,6 +66,11 @@ const UNCERTAIN_DELIVERY_AFTER_MS = 10 * 60_000;
 /** Sent once to a sender the owner has not decided on yet. It must never depend on a run. */
 const APPROVAL_NOTICE =
   'This gateway does not know you yet. Its owner was asked to approve this conversation, and your message is waiting for that decision.';
+
+/** The answer as this protocol's bubble will actually show it. */
+function bubbleText(adapter: Channel, text: string): string {
+  return adapter.rendersMarkdown ? text.trim() : plainText(text);
+}
 
 /** Owns access checks and durable delivery state, independently of each protocol adapter. */
 type ChannelServices = {
@@ -577,7 +589,7 @@ export class Channels {
 
     await adapter.typing?.(delivery.chatId, context).catch(() => undefined);
 
-    const preview = run.progress?.text?.trim() ?? '';
+    const preview = bubbleText(adapter, run.progress?.text ?? '');
 
     // Below this a preview is a fragment of a sentence, and the edit costs more than it says.
     if (!adapter.edit || preview.length < PREVIEW_MIN_CHARS || preview === delivery.preview) {
@@ -664,13 +676,14 @@ export class Channels {
 
       attemptedSend = true;
 
+      const body = bubbleText(adapter, text);
       const shown = delivery.remoteMessageIds[0];
 
       // The answer is already on screen as a preview: finish it in place rather than sending a
       // second copy of the same reply.
       if (shown && adapter.edit) {
         return await adapter.edit(
-          { chatId: delivery.chatId, text, remoteMessageId: shown },
+          { chatId: delivery.chatId, text: body, remoteMessageId: shown },
           {
             channelId: delivery.channelId,
             connectionGeneration: delivery.connectionGeneration,
@@ -682,7 +695,7 @@ export class Channels {
       }
 
       return await adapter.send(
-        { chatId: delivery.chatId, text },
+        { chatId: delivery.chatId, text: body },
         {
           channelId: delivery.channelId,
           connectionGeneration: delivery.connectionGeneration,

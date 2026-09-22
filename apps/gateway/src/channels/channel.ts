@@ -39,6 +39,13 @@ export interface Channel {
   readonly type: ChannelType;
   readonly webhookHeader?: string;
 
+  /**
+   * Whether this protocol draws Markdown. Absent means it does not, which is the safe default:
+   * a chat bubble shows the marks instead of the formatting, so the gateway sends plain text
+   * unless an adapter says otherwise.
+   */
+  readonly rendersMarkdown?: boolean;
+
   receive(payload: unknown): IncomingMessage | null;
 
   /**

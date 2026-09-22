@@ -478,3 +478,51 @@ describe('when Telegram refuses for flood control', () => {
     }
   });
 });
+
+describe('markdown in a bubble that cannot draw it', () => {
+  it('reaches Telegram as plain text, table included', async () => {
+    const sends: string[] = [];
+
+    const f = await setup(async (url, options) => {
+      const path = String(url).split('/').pop() ?? '';
+
+      if (path === 'sendMessage') {
+        sends.push(String(JSON.parse(String(options?.body ?? '{}')).text));
+      }
+
+      return Response.json({ ok: true, result: { message_id: 3 } });
+    });
+
+    try {
+      await f.channels.receive(f.channel.id, webhook(f.channel.webhookToken));
+
+      const [pending] = await f.channels.contacts(f.profile.id);
+      if (!pending) throw new Error('Contact request missing');
+
+      await f.channels.approveContact(f.profile.id, pending.id);
+
+      const [run] = await f.services.runs.activities(f.profile.id);
+      if (!run) throw new Error('Run missing');
+
+      await f.services.lifecycle.claim(run.id, f.profile.id, 'worker');
+      await f.services.lifecycle.finish(
+        f.profile.id,
+        run.id,
+        'worker',
+        'completed',
+        '## Planos\n\n| Plano | Preco |\n| --- | --- |\n| Pro | R$ 90 |\n\nO **Pro** vale mais.',
+      );
+      await f.channels.dispatch();
+
+      const answer = sends.at(-1) ?? '';
+
+      expect(answer).toContain('Pro\nPreco: R$ 90');
+      expect(answer).toContain('O Pro vale mais.');
+      expect(answer).not.toContain('|');
+      expect(answer).not.toContain('**');
+      expect(answer).not.toContain('##');
+    } finally {
+      await f.app.close();
+    }
+  });
+});
