@@ -36,6 +36,17 @@ export interface Channel {
 
   receive(payload: unknown): IncomingMessage | null;
 
+  /**
+   * What this connection speaks as on its protocol, asked once when the channel is connected.
+   * A protocol that cannot answer leaves the connection unidentified, and the messages of the
+   * installation's other agents are then read as anyone else's.
+   */
+  identify?(
+    credential: string,
+    fetch: typeof globalThis.fetch,
+    signal: AbortSignal,
+  ): Promise<string | undefined>;
+
   canSend?(channelId: string): Promise<boolean>;
   // An absent sender describes an ingress-only channel; it is not a fake successful delivery.
   send?(message: OutgoingMessage, context: DeliveryContext): Promise<DeliveryOutcome>;

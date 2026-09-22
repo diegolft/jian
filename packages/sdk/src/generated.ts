@@ -225,6 +225,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Required permission: admin. */
+        get: operations["listGroups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/profiles/{profileId}/deliveries": {
         parameters: {
             query?: never;
@@ -2307,6 +2324,15 @@ export interface operations {
                             depth: number;
                             chain: string[];
                         };
+                        group?: {
+                            chatId: string;
+                            name?: string;
+                            fromName: string;
+                            fromAgent: boolean;
+                            turns: number;
+                            /** @default [] */
+                            agents: string[];
+                        };
                     };
                 };
             };
@@ -2843,6 +2869,11 @@ export interface operations {
                         channelId: string;
                         /** @enum {string} */
                         type: "whatsapp" | "telegram" | "api";
+                        /**
+                         * @default direct
+                         * @enum {string}
+                         */
+                        scope: "direct" | "group";
                         actorId: string;
                         chatId: string;
                         displayName?: string;
@@ -2987,6 +3018,11 @@ export interface operations {
                         channelId: string;
                         /** @enum {string} */
                         type: "whatsapp" | "telegram" | "api";
+                        /**
+                         * @default direct
+                         * @enum {string}
+                         */
+                        scope: "direct" | "group";
                         actorId: string;
                         chatId: string;
                         displayName?: string;
@@ -3131,6 +3167,11 @@ export interface operations {
                         channelId: string;
                         /** @enum {string} */
                         type: "whatsapp" | "telegram" | "api";
+                        /**
+                         * @default direct
+                         * @enum {string}
+                         */
+                        scope: "direct" | "group";
                         actorId: string;
                         chatId: string;
                         displayName?: string;
@@ -3145,6 +3186,139 @@ export interface operations {
                         /** Format: date-time */
                         updatedAt: string;
                     };
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+        };
+    };
+    listGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        type: "whatsapp" | "telegram" | "api";
+                        chatId: string;
+                        name?: string;
+                        profiles: {
+                            /** Format: uuid */
+                            profileId: string;
+                            name: string;
+                            /** Format: uuid */
+                            contactId: string;
+                            /** @enum {string} */
+                            status: "pending" | "approved" | "blocked";
+                        }[];
+                    }[];
                 };
             };
             /** @description Error */
@@ -3932,6 +4106,14 @@ export interface operations {
                     text: string;
                     requestKey: string;
                     displayName?: string;
+                    /**
+                     * @default direct
+                     * @enum {string}
+                     */
+                    scope?: "direct" | "group";
+                    groupName?: string;
+                    /** @default [] */
+                    mentions?: string[];
                 };
             };
         };
@@ -3951,6 +4133,11 @@ export interface operations {
                          * @enum {string}
                          */
                         contact?: "approved" | "pending" | "blocked";
+                        /**
+                         * @description Why an approved group message produced no run.
+                         * @enum {string}
+                         */
+                        silence?: "unaddressed" | "budget";
                     };
                 };
             };
@@ -4076,8 +4263,16 @@ export interface operations {
                         };
                         chat: {
                             id: number;
+                            type?: string;
+                            title?: string;
                         };
                         text: string;
+                        entities?: {
+                            type: string;
+                            user?: {
+                                id: number;
+                            };
+                        }[];
                     };
                 };
             };
@@ -4098,6 +4293,11 @@ export interface operations {
                          * @enum {string}
                          */
                         contact?: "approved" | "pending" | "blocked";
+                        /**
+                         * @description Why an approved group message produced no run.
+                         * @enum {string}
+                         */
+                        silence?: "unaddressed" | "budget";
                     };
                 };
             };
@@ -7298,6 +7498,15 @@ export interface operations {
                             depth: number;
                             chain: string[];
                         };
+                        group?: {
+                            chatId: string;
+                            name?: string;
+                            fromName: string;
+                            fromAgent: boolean;
+                            turns: number;
+                            /** @default [] */
+                            agents: string[];
+                        };
                     };
                 };
             };
@@ -7752,6 +7961,15 @@ export interface operations {
                             depth: number;
                             chain: string[];
                         };
+                        group?: {
+                            chatId: string;
+                            name?: string;
+                            fromName: string;
+                            fromAgent: boolean;
+                            turns: number;
+                            /** @default [] */
+                            agents: string[];
+                        };
                     }[];
                 };
             };
@@ -7942,6 +8160,15 @@ export interface operations {
                             depth: number;
                             chain: string[];
                         };
+                        group?: {
+                            chatId: string;
+                            name?: string;
+                            fromName: string;
+                            fromAgent: boolean;
+                            turns: number;
+                            /** @default [] */
+                            agents: string[];
+                        };
                     };
                 };
             };
@@ -8131,6 +8358,15 @@ export interface operations {
                             fromRunId: string;
                             depth: number;
                             chain: string[];
+                        };
+                        group?: {
+                            chatId: string;
+                            name?: string;
+                            fromName: string;
+                            fromAgent: boolean;
+                            turns: number;
+                            /** @default [] */
+                            agents: string[];
                         };
                     };
                 };

@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
+import type { IncomingMessage } from '../src/channels/channel.js';
 import { ChannelRegistry } from '../src/channels/registry.js';
 import { Channels } from '../src/channels/service.js';
 import { WhatsAppChannel } from '../src/channels/whatsapp/adapter.js';
@@ -16,7 +17,14 @@ import { testServices } from './helpers/services.js';
 const actorId = '5511999999999@c.us';
 const token = 'synthetic-whatsapp-admin-token-32-characters';
 const admin = { authorization: `Bearer ${token}` };
-const message = { actorId, chatId: actorId, text: 'Hello', requestKey: 'wa-message-one' };
+const message: IncomingMessage = {
+  actorId,
+  chatId: actorId,
+  text: 'Hello',
+  requestKey: 'wa-message-one',
+  scope: 'direct',
+  mentions: [],
+};
 
 async function setup(send?: (chatId: string, text: string) => Promise<string>) {
   let now = Date.now();

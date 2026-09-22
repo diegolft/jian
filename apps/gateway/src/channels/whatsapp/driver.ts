@@ -23,6 +23,9 @@ const QR_REFRESH_MS = 30_000;
 
 const CONTACT_JID = /^\d+@(c\.us|lid)$/;
 
+/** A room is addressed by the group's own JID; its participants keep their personal ones. */
+const GROUP_JID = /^[\d-]{1,80}@g\.us$/;
+
 /** Servers the protocol uses for a single person, mapped onto the JIDs the channel contract takes. */
 const CONTACT_SERVERS: Record<string, 'c.us' | 'lid' | undefined> = {
   'c.us': 'c.us',
@@ -62,11 +65,24 @@ const toContactJid = (jid: string | null | undefined) => {
   return CONTACT_JID.test(contact) ? contact : undefined;
 };
 
-const toDeviceJid = (chatId: string) =>
-  CONTACT_JID.test(chatId) ? chatId.replace(/@c\.us$/, '@s.whatsapp.net') : undefined;
+const toDeviceJid = (chatId: string) => {
+  if (GROUP_JID.test(chatId)) {
+    return chatId;
+  }
+
+  return CONTACT_JID.test(chatId) ? chatId.replace(/@c\.us$/, '@s.whatsapp.net') : undefined;
+};
 
 const textOf = (message: WAMessage) =>
   message.message?.conversation ?? message.message?.extendedTextMessage?.text ?? undefined;
+
+/** Who the message itself marks as addressed, which is how a room mention reaches the gateway. */
+const mentionsOf = (message: WAMessage) =>
+  (message.message?.extendedTextMessage?.contextInfo?.mentionedJid ?? []).flatMap((jid) => {
+    const contact = toContactJid(jid);
+
+    return contact ? [contact] : [];
+  });
 
 /** The close reason travels as a Boom payload; read it structurally rather than depend on Boom. */
 const statusCodeOf = (error: unknown) =>
@@ -87,6 +103,7 @@ export function createWhatsAppDeviceFactory(): DeviceFactory {
     }
 
     let socket: WASocket | undefined;
+    const subjects = new Map<string, string | undefined>();
     let closed = false;
     let dirty = false;
     let writing: Promise<void> = Promise.resolve();
@@ -230,6 +247,22 @@ export function createWhatsAppDeviceFactory(): DeviceFactory {
       await callbacks.disconnected(loggedOut);
     };
 
+    /** Asked once per room and kept in memory: a subject is a label, never an authorization. */
+    const subjectOf = async (jid: string) => {
+      if (subjects.has(jid)) {
+        return subjects.get(jid);
+      }
+
+      const subject = await socket
+        ?.groupMetadata(jid)
+        .then((data) => data.subject?.slice(0, 100))
+        .catch(() => undefined);
+
+      subjects.set(jid, subject);
+
+      return subject;
+    };
+
     const deliver = async (message: WAMessage) => {
       const text = textOf(message);
       const requestKey = message.key.id;
@@ -238,10 +271,39 @@ export function createWhatsAppDeviceFactory(): DeviceFactory {
         return;
       }
 
+      const remote = message.key.remoteJid ?? '';
+
+      // In a room the conversation is the group and the sender is the participant, so the two
+      // identifiers part ways: approval is decided about the room, delivery goes back to it.
+      if (GROUP_JID.test(remote)) {
+        const author = message.key.participantAlt ?? message.key.participant;
+        const from =
+          toContactJid(author) ??
+          (author?.endsWith('@lid')
+            ? toContactJid(await socket?.signalRepository.lidMapping.getPNForLID(author))
+            : undefined);
+
+        if (!from) return;
+
+        const subject = await subjectOf(remote);
+
+        await callbacks.message({
+          actorId: from,
+          chatId: remote,
+          text,
+          requestKey,
+          scope: 'group',
+          ...(subject ? { groupName: subject } : {}),
+          ...(message.pushName ? { displayName: message.pushName.slice(0, 100) } : {}),
+          mentions: mentionsOf(message),
+        });
+
+        return;
+      }
+
       // WhatsApp may address a contact by LID. Resolve its authenticated phone mapping so an
       // existing phone allowlist still works after WhatsApp switches identifier formats.
-      const remote = message.key.remoteJid;
-      const phone = remote?.endsWith('@lid')
+      const phone = remote.endsWith('@lid')
         ? (message.key.remoteJidAlt ??
           (await socket?.signalRepository.lidMapping.getPNForLID(remote)))
         : undefined;
@@ -250,7 +312,14 @@ export function createWhatsAppDeviceFactory(): DeviceFactory {
       if (!sender) return;
 
       // Use the authenticated message's sender, never an actor ID supplied inside its text.
-      await callbacks.message({ actorId: sender, chatId: sender, text, requestKey });
+      await callbacks.message({
+        actorId: sender,
+        chatId: sender,
+        text,
+        requestKey,
+        scope: 'direct',
+        mentions: [],
+      });
     };
 
     return {

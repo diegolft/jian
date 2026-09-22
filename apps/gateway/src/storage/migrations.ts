@@ -141,4 +141,14 @@ export const migrations = [
           ) ranked WHERE position > 1);
 `,
   },
+  {
+    // Conversations gained a scope: a contact is one person writing privately, or a room the
+    // owner approves once for everyone in it. Every contact written before this is a private
+    // conversation, and the code reads the field rather than guessing at its absence.
+    version: 8,
+    sql: `
+        UPDATE jian_records SET data = data || jsonb_build_object('scope', 'direct')
+        WHERE kind = 'contact' AND NOT data ? 'scope';
+`,
+  },
 ];

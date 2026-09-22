@@ -1,5 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { channelInputSchema, type channelSchema, type deliverySchema } from '@jian/contracts';
+import {
+  channelInputSchema,
+  type channelSchema,
+  type deliverySchema,
+  type Group,
+  type GroupTurn,
+} from '@jian/contracts';
 import type { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
 import type { Reader, Store, Transaction } from '../core/store.js';
@@ -9,10 +15,19 @@ import { issueToken, verifyToken } from '../security/tokens.js';
 import type { Vault } from '../security/vault.js';
 import type { SessionWriter } from '../sessions/port.js';
 import type { ChannelRequest, ChannelType, DeliveryOutcome, IncomingMessage } from './channel.js';
-import { type ContactRecord, Contacts } from './contacts.js';
+import { type ContactRecord, Contacts, type Intake } from './contacts.js';
+import { type GroupDecision, Groups } from './groups.js';
 import { ChannelRegistry } from './registry.js';
 
-export type ChannelRecord = z.infer<typeof channelSchema> & { tokenHash: string };
+/**
+ * `address` is what this connection speaks as on its protocol — the linked WhatsApp account or
+ * the bot's own id. It is how a message from another profile of this installation is
+ * recognised as an agent's instead of a person's, and it never reaches the owner-facing shape.
+ */
+export type ChannelRecord = z.infer<typeof channelSchema> & {
+  tokenHash: string;
+  address?: string;
+};
 
 /** Where a channel's bot token lives in the vault. Revoking the channel takes it with it. */
 export const channelSecret = (channelId: string) => `channel:${channelId}`;
@@ -46,6 +61,7 @@ export class Channels {
     private readonly fetcher: typeof fetch,
     private readonly registry = new ChannelRegistry(),
     private readonly people = new Contacts(services),
+    private readonly rooms = new Groups(),
   ) {}
 
   start() {
@@ -73,8 +89,19 @@ export class Channels {
     await this.pending;
   }
 
-  private metadata({ tokenHash: _hash, ...channel }: ChannelRecord) {
+  private metadata({ tokenHash: _hash, address: _address, ...channel }: ChannelRecord) {
     return channel;
+  }
+
+  /** Asked once, when the channel is connected: a protocol that cannot say stays unidentified. */
+  private async identify(type: ChannelType, credential: string) {
+    const adapter = this.registry.get(type);
+
+    try {
+      return await adapter.identify?.(credential, this.fetcher, this.abort.signal);
+    } catch {
+      return undefined;
+    }
   }
 
   private async active(profileId: string, type: ChannelType, reader: Reader = this.services.store) {
@@ -95,12 +122,14 @@ export class Channels {
     }
 
     const issued = issueToken();
+    const address = botToken ? await this.identify(data.type, botToken) : undefined;
 
     const record: ChannelRecord = {
       id: randomUUID(),
       profileId,
       type: data.type,
       tokenHash: issued.hash,
+      ...(address ? { address } : {}),
       createdAt: new Date().toISOString(),
     };
 
@@ -264,26 +293,55 @@ export class Channels {
     data: IncomingMessage,
     connectionGeneration?: number,
   ) {
-    const intake = await this.services.store.transaction(channel.profileId, async (tx) => {
-      const outcome = await this.people.intake(tx, channel, data);
+    // A message this connection wrote itself is not a turn someone took in the conversation.
+    if (channel.address && data.actorId === channel.address) {
+      return { accepted: false };
+    }
 
-      if (outcome.status === 'pending' && outcome.announce) {
-        await this.notify(tx, channel, data.chatId, connectionGeneration);
-      }
+    const intake = await this.services.store.transaction(
+      channel.profileId,
+      async (tx): Promise<Intake & { decision?: GroupDecision }> => {
+        const outcome = await this.people.intake(tx, channel, data);
 
-      return outcome;
-    });
+        if (outcome.status === 'pending' && outcome.announce) {
+          await this.notify(tx, channel, data.chatId, connectionGeneration);
+        }
+
+        if (outcome.status !== 'approved' || data.scope !== 'group') {
+          return outcome;
+        }
+
+        // Deciding under the profile lock is what keeps the room's budget honest when several
+        // messages of the same burst are read at once.
+        const profile = await this.services.profiles.profile(channel.profileId, tx);
+
+        return {
+          ...outcome,
+          decision: await this.rooms.observe(tx, channel, outcome.contact, data, profile.name),
+        };
+      },
+    );
 
     if (intake.status !== 'approved') {
       return { accepted: false, contact: intake.status };
     }
 
+    if (intake.decision && !intake.decision.speak) {
+      return { accepted: false, contact: 'approved' as const, silence: intake.decision.reason };
+    }
+
+    // In a room the author is part of the message: an agent answers people and colleagues by
+    // name, and it can only do that if it reads who wrote what.
+    const text =
+      data.scope === 'group' ? `${data.displayName ?? data.actorId}: ${data.text}` : data.text;
+
     const run = await this.submit(
       channel,
       intake.contact,
-      data.text,
+      text,
       data.requestKey,
       connectionGeneration,
+      intake.decision?.turn,
     );
 
     return { accepted: true, runId: run.id, contact: 'approved' as const };
@@ -296,6 +354,7 @@ export class Channels {
     text: string,
     requestKey: string,
     connectionGeneration?: number,
+    group?: GroupTurn,
   ) {
     const sessionId = assertFound(contact.sessionId ?? null, 'Session');
 
@@ -308,7 +367,7 @@ export class Channels {
           .update(JSON.stringify([channel.id, contact.chatId, contact.actorId, requestKey]))
           .digest('hex'),
       },
-      { activity: 'channel' },
+      { activity: 'channel', ...(group ? { group } : {}) },
     );
 
     if (this.registry.get(channel.type).send) {
@@ -362,6 +421,43 @@ export class Channels {
       remoteMessageIds: [],
       connectionGeneration,
     });
+  }
+
+  /**
+   * The rooms this installation is in, with the profiles that sit in each one. A group is a
+   * conversation several agents share, so the owner reads it whole instead of once per profile.
+   */
+  async groups(): Promise<Group[]> {
+    const contacts = await this.services.store.list('contact', {
+      where: { scope: 'group' },
+      limit: 500,
+    });
+
+    const rooms = new Map<string, Group>();
+
+    for (const contact of contacts) {
+      const key = `${contact.type}\u0000${contact.chatId}`;
+      const room = rooms.get(key) ?? { type: contact.type, chatId: contact.chatId, profiles: [] };
+      const profile = await this.services.store.get('profile', contact.profileId);
+
+      if (contact.displayName && !room.name) {
+        room.name = contact.displayName;
+      }
+
+      room.profiles.push({
+        profileId: contact.profileId,
+        name: profile?.name ?? 'Perfil removido',
+        contactId: contact.id,
+        status: contact.status,
+      });
+
+      rooms.set(key, room);
+    }
+
+    return [...rooms.values()].map((room) => ({
+      ...room,
+      profiles: room.profiles.sort((a, b) => a.name.localeCompare(b.name)),
+    }));
   }
 
   async deliveries(profileId: string) {

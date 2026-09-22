@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { groupTurnSchema } from './channels.js';
 import { agentCallOriginSchema } from './peers.js';
 import { contextPolicySchema, modelSchema, profileSchema, sessionSchema } from './profile.js';
 import { modelSelectionSchema } from './providers.js';
@@ -66,6 +67,8 @@ export const runRecordSchema = z.strictObject({
   contextPolicy: contextPolicySchema.optional(),
   // Present when another profile asked for this run; it carries the chain's spent budget.
   call: agentCallOriginSchema.optional(),
+  // Present when a group message started this run; it carries the room's spent budget.
+  group: groupTurnSchema.optional(),
 });
 
 export const revisionRecordSchema = z.strictObject({

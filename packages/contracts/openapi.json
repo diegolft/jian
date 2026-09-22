@@ -3572,6 +3572,49 @@
                         "chain"
                       ],
                       "additionalProperties": false
+                    },
+                    "group": {
+                      "type": "object",
+                      "properties": {
+                        "chatId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "name": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "fromName": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "fromAgent": {
+                          "type": "boolean"
+                        },
+                        "turns": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 3
+                        },
+                        "agents": {
+                          "default": [],
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 100
+                          }
+                        }
+                      },
+                      "required": [
+                        "chatId",
+                        "fromName",
+                        "fromAgent",
+                        "turns",
+                        "agents"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -4591,6 +4634,14 @@
                           "api"
                         ]
                       },
+                      "scope": {
+                        "default": "direct",
+                        "type": "string",
+                        "enum": [
+                          "direct",
+                          "group"
+                        ]
+                      },
                       "actorId": {
                         "type": "string",
                         "minLength": 1,
@@ -4639,6 +4690,7 @@
                       "profileId",
                       "channelId",
                       "type",
+                      "scope",
                       "actorId",
                       "chatId",
                       "status",
@@ -4887,6 +4939,14 @@
                         "api"
                       ]
                     },
+                    "scope": {
+                      "default": "direct",
+                      "type": "string",
+                      "enum": [
+                        "direct",
+                        "group"
+                      ]
+                    },
                     "actorId": {
                       "type": "string",
                       "minLength": 1,
@@ -4935,6 +4995,7 @@
                     "profileId",
                     "channelId",
                     "type",
+                    "scope",
                     "actorId",
                     "chatId",
                     "status",
@@ -5182,6 +5243,14 @@
                         "api"
                       ]
                     },
+                    "scope": {
+                      "default": "direct",
+                      "type": "string",
+                      "enum": [
+                        "direct",
+                        "group"
+                      ]
+                    },
                     "actorId": {
                       "type": "string",
                       "minLength": 1,
@@ -5230,6 +5299,7 @@
                     "profileId",
                     "channelId",
                     "type",
+                    "scope",
                     "actorId",
                     "chatId",
                     "status",
@@ -5237,6 +5307,262 @@
                     "updatedAt"
                   ],
                   "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/groups": {
+      "get": {
+        "operationId": "listGroups",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required permission: admin.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "whatsapp",
+                          "telegram",
+                          "api"
+                        ]
+                      },
+                      "chatId": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "profiles": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "profileId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "contactId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "pending",
+                                "approved",
+                                "blocked"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "profileId",
+                            "name",
+                            "contactId",
+                            "status"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "chatId",
+                      "profiles"
+                    ],
+                    "additionalProperties": false
+                  }
                 }
               }
             }
@@ -6744,6 +7070,29 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 100
+                  },
+                  "scope": {
+                    "default": "direct",
+                    "type": "string",
+                    "enum": [
+                      "direct",
+                      "group"
+                    ]
+                  },
+                  "groupName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "mentions": {
+                    "default": [],
+                    "maxItems": 32,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
                   }
                 },
                 "required": [
@@ -6780,6 +7129,14 @@
                         "approved",
                         "pending",
                         "blocked"
+                      ]
+                    },
+                    "silence": {
+                      "description": "Why an approved group message produced no run.",
+                      "type": "string",
+                      "enum": [
+                        "unaddressed",
+                        "budget"
                       ]
                     }
                   },
@@ -7029,6 +7386,14 @@
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991
+                          },
+                          "type": {
+                            "type": "string",
+                            "maxLength": 40
+                          },
+                          "title": {
+                            "type": "string",
+                            "maxLength": 200
                           }
                         },
                         "required": [
@@ -7039,6 +7404,35 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 8000
+                      },
+                      "entities": {
+                        "maxItems": 64,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "maxLength": 40
+                            },
+                            "user": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "id"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ]
+                        }
                       }
                     },
                     "required": [
@@ -7078,6 +7472,14 @@
                         "approved",
                         "pending",
                         "blocked"
+                      ]
+                    },
+                    "silence": {
+                      "description": "Why an approved group message produced no run.",
+                      "type": "string",
+                      "enum": [
+                        "unaddressed",
+                        "budget"
                       ]
                     }
                   },
@@ -14106,6 +14508,49 @@
                         "chain"
                       ],
                       "additionalProperties": false
+                    },
+                    "group": {
+                      "type": "object",
+                      "properties": {
+                        "chatId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "name": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "fromName": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "fromAgent": {
+                          "type": "boolean"
+                        },
+                        "turns": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 3
+                        },
+                        "agents": {
+                          "default": [],
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 100
+                          }
+                        }
+                      },
+                      "required": [
+                        "chatId",
+                        "fromName",
+                        "fromAgent",
+                        "turns",
+                        "agents"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -15085,6 +15530,49 @@
                           "chain"
                         ],
                         "additionalProperties": false
+                      },
+                      "group": {
+                        "type": "object",
+                        "properties": {
+                          "chatId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 100
+                          },
+                          "name": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "fromName": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "fromAgent": {
+                            "type": "boolean"
+                          },
+                          "turns": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 3
+                          },
+                          "agents": {
+                            "default": [],
+                            "maxItems": 20,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "maxLength": 100
+                            }
+                          }
+                        },
+                        "required": [
+                          "chatId",
+                          "fromName",
+                          "fromAgent",
+                          "turns",
+                          "agents"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": [
@@ -15569,6 +16057,49 @@
                         "chain"
                       ],
                       "additionalProperties": false
+                    },
+                    "group": {
+                      "type": "object",
+                      "properties": {
+                        "chatId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "name": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "fromName": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "fromAgent": {
+                          "type": "boolean"
+                        },
+                        "turns": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 3
+                        },
+                        "agents": {
+                          "default": [],
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 100
+                          }
+                        }
+                      },
+                      "required": [
+                        "chatId",
+                        "fromName",
+                        "fromAgent",
+                        "turns",
+                        "agents"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -16050,6 +16581,49 @@
                         "fromRunId",
                         "depth",
                         "chain"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "group": {
+                      "type": "object",
+                      "properties": {
+                        "chatId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "name": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "fromName": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "fromAgent": {
+                          "type": "boolean"
+                        },
+                        "turns": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 3
+                        },
+                        "agents": {
+                          "default": [],
+                          "maxItems": 20,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "maxLength": 100
+                          }
+                        }
+                      },
+                      "required": [
+                        "chatId",
+                        "fromName",
+                        "fromAgent",
+                        "turns",
+                        "agents"
                       ],
                       "additionalProperties": false
                     }

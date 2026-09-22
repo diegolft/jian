@@ -39,6 +39,8 @@ export function registerChannelRoutes(app: FastifyInstance, deps: ChannelRouteSe
     async (request) => channels().revoke(request.params.profileId, request.params.channelId),
   );
 
+  app.get('/v1/groups', async () => channels().groups());
+
   app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/deliveries', async (request) =>
     channels().deliveries(request.params.profileId),
   );

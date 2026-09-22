@@ -6,6 +6,7 @@ import {
   channelSchema,
   contactSchema,
   deliverySchema,
+  groupSchema,
   ingressResultSchema,
   ingressSchema,
   telegramUpdateSchema,
@@ -199,6 +200,15 @@ export const operations: Operation[] = [
     operationId: 'blockContact',
     access: 'admin',
     response: contactSchema,
+  },
+  {
+    // Rooms cross profiles by nature: one group holds several agents of this installation, and
+    // the owner decides about the room, not about one profile's view of it.
+    method: 'GET',
+    path: '/v1/groups',
+    operationId: 'listGroups',
+    access: 'admin',
+    response: z.array(groupSchema),
   },
   {
     method: 'GET',

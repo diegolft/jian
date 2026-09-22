@@ -15,6 +15,8 @@ export type ChannelType = Channel['type'];
 
 export type Contact = JsonResponse<'listContacts', 200>[number];
 
+export type Group = JsonResponse<'listGroups', 200>[number];
+
 export type Provider = JsonResponse<'listProviders', 200>[number];
 export type ModelDefaults = JsonResponse<'getModelDefaults', 200>;
 export type ModelDefaultsInput =
@@ -230,6 +232,8 @@ export function gatewayApi() {
       result(client.GET('/v1/profiles/{profileId}/deliveries', { params: profile(profileId) })),
     contacts: (profileId: string) =>
       result(client.GET('/v1/profiles/{profileId}/contacts', { params: profile(profileId) })),
+    // A room belongs to the installation, not to one profile: several agents sit in the same one.
+    groups: () => result(client.GET('/v1/groups')),
     approveContact: (profileId: string, contactId: string) =>
       result(
         client.POST('/v1/profiles/{profileId}/contacts/{contactId}/approve', {
@@ -336,6 +340,7 @@ export type ProfileData = {
   activities: Run[];
   deliveries: Delivery[];
   contacts: Contact[];
+  groups: Group[];
 };
 
 export type Mutation = (action: () => Promise<unknown>, message?: string) => Promise<boolean>;

@@ -27,7 +27,7 @@ export class Runs {
   ) {}
 
   async submit(profileId: string, sessionId: string, input: unknown, options: SubmitOptions = {}) {
-    const { continuationOf, activity = 'conversation', call } = options;
+    const { continuationOf, activity = 'conversation', call, group } = options;
     const data = submitSchema.parse(input);
 
     return this.store.transaction(profileId, async (tx) => {
@@ -111,6 +111,7 @@ export class Runs {
         ...(chosen ? { model: chosen.config, contextPolicy: chosen.policy } : {}),
         ...(selection ? { modelSelection: selection } : {}),
         ...(call ? { call } : {}),
+        ...(group ? { group } : {}),
         status: 'queued',
         ...(continuationOf ? { continuationOf } : {}),
         createdAt: nowIso(this.clock),
@@ -173,12 +174,17 @@ export class Runs {
     const parent = await this.run(profileId, runId);
     const text = `${data.text}\n\nContinuation of run ${runId}. Previously completed external effects must not be repeated. Operator reconciliation (data): ${JSON.stringify(data.reconciliation)}. Use read_run_checkpoints to inspect saved results before acting.`;
 
-    // A continuation stays in the chain that started the run: its budget was already spent.
+    // A continuation stays in the chain, and in the room, that started the run: both budgets
+    // were already spent by the run being continued.
     return this.submit(
       profileId,
       parent.sessionId,
       { text, requestKey: data.requestKey },
-      { continuationOf: runId, ...(parent.call ? { call: parent.call } : {}) },
+      {
+        continuationOf: runId,
+        ...(parent.call ? { call: parent.call } : {}),
+        ...(parent.group ? { group: parent.group } : {}),
+      },
     );
   }
 

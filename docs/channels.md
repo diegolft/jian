@@ -1,6 +1,6 @@
 # Canais
 
-Um perfil tem três canais possíveis — WhatsApp, Telegram e API Server — e no máximo um de cada. Conectar é toda a configuração: não existe nome, sessão escolhida nem lista de remetentes. Quem pode falar com o agente é decidido depois, contato por contato.
+Um perfil tem três canais possíveis — WhatsApp, Telegram e API Server — e no máximo um de cada. Conectar é toda a configuração: não existe nome, sessão escolhida nem lista de remetentes. Quem pode falar com o agente é decidido depois: contato por contato nas conversas privadas, e uma vez por sala nos grupos.
 
 `POST /v1/profiles/{profileId}/channels` conecta um tipo e retorna o `webhookToken` uma única vez; o banco guarda apenas o hash. Um segundo canal do mesmo tipo responde `409`. `DELETE /v1/profiles/{profileId}/channels/{channelId}` desconecta, apaga o segredo do canal no cofre e libera o tipo para uma nova conexão. Contatos aprovados e suas conversas continuam salvos.
 
@@ -28,11 +28,57 @@ O aviso automático só existe em canais que sabem responder. O API Server apena
 
 ## Sessões por conversa
 
-Cada conversa é uma sessão do perfil, criada na aprovação e intitulada com o canal e o remetente — `WhatsApp · 5511999999999@c.us`. Nada é configurado para isso. As sessões aparecem em **Conversas** no painel, compartilham identidade, ferramentas e memórias do perfil, e mantêm o histórico separado por pessoa.
+Cada conversa é uma sessão do perfil, criada na aprovação e intitulada com o canal e o remetente — `WhatsApp · 5511999999999@c.us`, `WhatsApp · Grupo Equipe`. Nada é configurado para isso. As sessões aparecem em **Conversas** no painel, compartilham identidade, ferramentas e memórias do perfil, e mantêm o histórico separado por conversa. A sessão de um grupo é separada das conversas privadas das mesmas pessoas.
+
+## Grupos
+
+Um grupo é uma conversa onde várias pessoas e vários agentes escrevem. Cada agente entra com a própria conexão — o próprio número no WhatsApp, o próprio bot no Telegram —, então o isolamento por perfil continua inteiro: cada perfil enxerga o grupo pela sua conexão, e o que os outros agentes escrevem chega a ele como mensagem de outro participante, pelo próprio protocolo. Não existe sala compartilhada nem transcrição comum dentro do Gateway.
+
+O canal marca a conversa: `scope: "group"`. No WhatsApp é o JID `@g.us`, com o participante como remetente e o grupo como conversa; no Telegram são os chats `group` e `supergroup`. Uma mensagem de grupo vira uma sessão do perfil identificada pelo grupo, e a execução recebe o autor junto do texto — `Lucas: Ada, você consegue olhar o relatório?` —, porque num grupo o agente precisa saber quem falou para responder a quem.
+
+### Aprovação por grupo
+
+O dono aprova o grupo uma vez, não cada participante. A solicitação registra a conversa, e quem escrever ali depois entra pela mesma decisão.
+
+- Grupo pendente não gera execução, não gera entrega e não recebe aviso automático: o Gateway não escreve dentro de uma sala que o dono não aprovou, nem para explicar que está esperando aprovação.
+- Nada fica retido. Numa conversa privada a primeira mensagem espera a aprovação e é liberada depois; num grupo ela não é guardada, porque liberá-la faria o agente responder uma mensagem que não chamou ninguém.
+- Cada perfil vê o grupo pela própria conexão, então cada um tem a própria solicitação e a própria sessão. Aprovar para um perfil não aprova para os outros.
+- Renomear o grupo não reabre a solicitação; o nome novo atualiza o título.
+
+### Só responde quem foi chamado
+
+Num grupo em que mais de um agente da instalação está aprovado, o agente fica calado por padrão e só responde quando é endereçado. Sem isso, três agentes respondem a mesma mensagem e o grupo vira ruído. O agente reconhece que foi chamado de duas formas:
+
+- Menção do protocolo ao endereço da própria conexão, quando o protocolo carrega isso — `mentionedJid` no WhatsApp, `text_mention` no Telegram.
+- O nome do perfil escrito na mensagem, comparado sem diferenciar maiúsculas nem acentos e respeitando limites de palavra. Um nome composto também responde ao primeiro nome, com três letras ou mais.
+
+Mensagem de outro agente sempre exige ser endereçada. Mensagem de pessoa exige o nome quando há mais de um agente aprovado no grupo; com um agente só não há ninguém para atropelar, e ele responde como numa conversa privada.
+
+### O laço entre agentes termina
+
+Um agente pode chamar outro dentro do grupo, e isso precisa parar: cada agente gasta dinheiro de verdade a cada turno. O limite é `GROUP_AGENT_TURN_LIMIT`, hoje 3, e vale para a sala, não para cada agente — a mesma ideia de orçamento da conversa entre perfis, contada pelo que todos escreveram em vez de reiniciar em cada um.
+
+Cada perfil conta, no contato do grupo, os turnos de agente desde a última mensagem de gente: soma as mensagens que vê dos outros agentes e as respostas que ele mesmo envia. Ao estourar o limite, o agente silencia; como todos contam o mesmo tráfego, todos silenciam. Uma mensagem de pessoa zera a contagem e devolve o orçamento à sala. Um turno nunca é cobrado duas vezes: o contato guarda os identificadores das últimas mensagens vistas, então uma reentrega do protocolo é o mesmo turno, recupera a mesma execução e não produz uma segunda resposta.
+
+### Quem é agente
+
+O Gateway reconhece um participante como outro perfil da instalação pelo endereço da conexão dele: o canal guarda em `address` o que aquela conexão fala — a conta pareada no WhatsApp, gravada quando o dispositivo conecta, e o ID do bot no Telegram, perguntado uma vez ao `getMe` ao conectar o canal. O endereço não aparece em nenhuma resposta da API.
+
+Uma conexão que o protocolo não sabe identificar fica sem endereço, e as mensagens dela contam como as de qualquer pessoa: o agente continua respondendo só quando chamado, mas aquele tráfego não gasta o orçamento da sala. Mensagem do próprio endereço é eco e é descartada antes de virar execução.
+
+### O que o dono vê
+
+`GET /v1/groups` lista os grupos conhecidos pela instalação, cada um com os perfis que participam dele, o estado de cada solicitação e o nome do grupo. É a única rota que cruza perfis, porque o grupo é de todos eles; exige o token de administrador, como todo o resto do painel.
+
+### Limites
+
+- No Telegram, um bot não recebe mensagens de outro bot, e o modo de privacidade padrão esconde dele as mensagens que não o mencionam. Ou seja: pessoas falam com os agentes num grupo do Telegram, mas conversa entre agentes só acontece de fato no WhatsApp. A regra do Gateway é a mesma nos dois.
+- O assunto do grupo no WhatsApp é consultado uma vez por sala e mantido em memória pelo worker; um grupo renomeado só muda de nome no painel depois que o worker reinicia.
+- A resposta vai para o grupo inteiro: não existe resposta privada a um participante dentro da sala.
 
 ## API Server
 
-Envie `actorId`, `chatId`, `text`, `requestKey` e, se tiver, `displayName` a `POST /v1/ingress/{channelId}`, usando `X-Jian-Channel-Token`. O adapter que chama essa rota deve autenticar a identidade externa antes de preencher os IDs; quem possui o token pode representar qualquer remetente, e cada remetente novo vira uma solicitação de contato. O retorno traz `accepted`, o ID do run quando houver, e o estado do contato. Consulte resultados pela API administrativa.
+Envie `actorId`, `chatId`, `text`, `requestKey` e, se tiver, `displayName` a `POST /v1/ingress/{channelId}`, usando `X-Jian-Channel-Token`. Para uma conversa em grupo, mande `scope: "group"` com o `chatId` do grupo, o `actorId` de quem escreveu e, se tiver, `groupName` e `mentions`. O adapter que chama essa rota deve autenticar a identidade externa antes de preencher os IDs; quem possui o token pode representar qualquer remetente, e cada remetente novo vira uma solicitação de contato. O retorno traz `accepted`, o ID do run quando houver, e o estado do contato. Consulte resultados pela API administrativa.
 
 Este canal não envia respostas a um serviço externo. A ideia de transformá-lo em um endpoint compatível com OpenAI é uma tarefa própria; o comportamento de entrada aqui descrito é o atual.
 
@@ -43,7 +89,7 @@ Este canal não envia respostas a um serviço externo. A ideia de transformá-lo
 
 O Gateway valida `X-Telegram-Bot-Api-Secret-Token` e o contato antes de aceitar mensagens. Reentregas de um mesmo update recuperam o mesmo run. A resposta final é enviada em partes de até 4.000 caracteres, sem modo de interpretação HTML/Markdown. As configurações seguem a [API oficial do Telegram](https://core.telegram.org/bots/api#setwebhook).
 
-Esta implementação atende mensagens de texto de usuários com `from`, `chat` e `text`; mídias, edições, callbacks e tópicos separados não estão implementados. `first_name` ou `username` viram o nome exibido na solicitação de contato.
+Esta implementação atende mensagens de texto de usuários com `from`, `chat` e `text`, em conversas privadas e em grupos; mídias, edições, callbacks e tópicos separados não estão implementados. `first_name` ou `username` viram o nome exibido na solicitação de contato. Em grupo, `chat.title` vira o nome da sala e as entidades `text_mention` viram menções. Para um bot enxergar as mensagens do grupo que não o mencionam, desligue o modo de privacidade no BotFather.
 
 O worker processa entregas após a conclusão do run. `GET /v1/profiles/{profileId}/deliveries` mostra `pending`, `sending`, `sent`, `failed` ou `unknown`. Falhas incertas não são repetidas automaticamente; consulte os IDs de mensagens confirmadas antes de uma ação manual.
 
@@ -58,6 +104,8 @@ A interface define o cabeçalho opcional de autenticação do webhook, a normali
 O serviço comum mantém as garantias compartilhadas: autenticação do token, decisão de contato, vínculo com perfil/sessão, deduplicação, registro da entrega e recuperação de estados incertos. Os adaptadores não escolhem permissões nem acessam o banco. Antes de enviar, o serviço grava `sending` em uma transação; se perder a confirmação, marca `unknown` em vez de repetir um possível efeito externo.
 
 `Contacts`, em `apps/gateway/src/channels/contacts.ts`, decide quem é atendido. O registro do contato é escrito dentro da mesma transação que recebe a mensagem, com trava por perfil: é isso que garante uma solicitação — e um aviso — mesmo quando várias mensagens chegam juntas.
+
+`Groups`, em `apps/gateway/src/channels/groups.ts`, decide se o perfil fala numa sala já aprovada: reconhece o autor, mede quem foi endereçado e escreve o orçamento da sala. Roda dentro da mesma transação, pela mesma razão — a trava por perfil é o que impede que uma rajada gaste o orçamento duas vezes.
 
 Uma entrega pode existir sem run: o aviso de aprovação carrega o próprio texto em `notice`. O worker envia esse texto direto, sem esperar execução alguma.
 
@@ -88,7 +136,7 @@ As sessões e o QR são criptografados com o mesmo keyring AES-256-GCM do Gatewa
 
 Uma lease no banco atribui a conexão a um worker. A geração e o contador de posse impedem que callbacks ou backups antigos restabeleçam uma sessão desconectada. Desconectar o canal também apaga suas credenciais recuperáveis. O logout remoto é tentado pelo worker; se ele estiver indisponível, remova o dispositivo no próprio telefone para revogar também no WhatsApp.
 
-Mensagens de texto diretas são persistidas em uma caixa de entrada, deduplicadas e submetidas quando a sessão deixa de estar ocupada. A caixa de entrada aceita mensagens de qualquer remetente direto, porque a decisão de atender vem depois, na aprovação do contato; há limite de 1.000 mensagens pendentes por canal e atingir esse limite interrompe a conexão com erro. Mensagens próprias, grupos, status, mídia e chamadas são ignorados pelo driver. O WhatsApp não fornece um nome de exibição barato nessa rota, então a solicitação de contato mostra o número.
+Mensagens de texto diretas e de grupo são persistidas em uma caixa de entrada, deduplicadas e submetidas quando a sessão deixa de estar ocupada. A caixa de entrada aceita mensagens de qualquer remetente, porque a decisão de atender vem depois, na aprovação do contato ou do grupo; há limite de 1.000 mensagens pendentes por canal e atingir esse limite interrompe a conexão com erro. Numa sala, o remetente é o participante e a conversa é o JID `@g.us`; a menção do protocolo chega junto. Mensagens próprias, status, mídia e chamadas são ignorados pelo driver. O WhatsApp não fornece um nome de exibição barato nessa rota, então a solicitação de contato mostra o número.
 
 Respostas usam a fila de entregas comum. `sent` significa que a biblioteca confirmou o envio, não que o destinatário leu a mensagem. Confirmações perdidas viram `unknown` e não provocam reenvio automático. Os IDs remotos são strings no WhatsApp e continuam numéricos no Telegram.
 

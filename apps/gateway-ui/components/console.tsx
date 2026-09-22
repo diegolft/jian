@@ -370,17 +370,27 @@ function Overview({
 }
 
 async function profileData(api: GatewayApi, id: string): Promise<ProfileData> {
-  const [sessions, channels, contacts, memories, activities, deliveries, providers, modelDefaults] =
-    await Promise.all([
-      api.sessions(id),
-      api.channels(id),
-      api.contacts(id),
-      api.memories(id),
-      api.activities(id),
-      api.deliveries(id),
-      api.providers(id),
-      api.modelDefaults(id),
-    ]);
+  const [
+    sessions,
+    channels,
+    contacts,
+    groups,
+    memories,
+    activities,
+    deliveries,
+    providers,
+    modelDefaults,
+  ] = await Promise.all([
+    api.sessions(id),
+    api.channels(id),
+    api.contacts(id),
+    api.groups(),
+    api.memories(id),
+    api.activities(id),
+    api.deliveries(id),
+    api.providers(id),
+    api.modelDefaults(id),
+  ]);
 
   // One request per live provider, and only on a refresh: the gateway caches the answer, so
   // rendering the panel never costs a call to the provider.
@@ -404,6 +414,7 @@ async function profileData(api: GatewayApi, id: string): Promise<ProfileData> {
     sessions,
     channels,
     contacts,
+    groups,
     memories,
     activities,
     deliveries,

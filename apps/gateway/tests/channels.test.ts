@@ -17,7 +17,14 @@ async function setup(fetcher: typeof fetch) {
     model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
   });
 
-  const channels = new Channels(services, fetcher);
+  // Connecting asks Telegram which account the bot is; only the deliveries reach the fetcher
+  // each test inspects.
+  const telegram: typeof fetch = async (url, options) =>
+    String(url).endsWith('/getMe')
+      ? Response.json({ ok: true, result: { id: 700 } })
+      : fetcher(url, options);
+
+  const channels = new Channels(services, telegram);
 
   const channel = await channels.connect(profile.id, {
     type: 'telegram',

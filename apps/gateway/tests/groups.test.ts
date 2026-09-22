@@ -1,0 +1,348 @@
+import { randomBytes } from 'node:crypto';
+import { GROUP_AGENT_TURN_LIMIT } from '@jian/contracts';
+import { describe, expect, it } from 'vitest';
+import { createApp } from '../src/app.js';
+import type { IncomingMessage } from '../src/channels/channel.js';
+import { ChannelRegistry } from '../src/channels/registry.js';
+import { Channels } from '../src/channels/service.js';
+import { WhatsAppChannel } from '../src/channels/whatsapp/adapter.js';
+import { WhatsAppConnections } from '../src/channels/whatsapp/connections.js';
+import type { DeviceCallbacks, DeviceFactory } from '../src/channels/whatsapp/types.js';
+import { SecretBox } from '../src/security/crypto.js';
+import { testServices } from './helpers/services.js';
+
+const room = '120363000000000000@g.us';
+const token = 'synthetic-groups-admin-token-32-characters';
+const admin = { authorization: `Bearer ${token}` };
+
+const owner = { address: '5511900000000@c.us', name: 'Lucas' };
+const guest = { address: '5511911111111@c.us', name: 'Marina' };
+
+/**
+ * One installation, one WhatsApp room, one linked device per profile — which is how the owner
+ * decided to build it: each agent has its own number, so the protocol itself carries what one
+ * agent writes to the others.
+ */
+async function setup() {
+  const services = testServices();
+  const store = services.store;
+  const box = new SecretBox({ activeKeyId: 'v1', keys: { v1: randomBytes(32) } });
+  const devices = new Map<string, DeviceCallbacks>();
+  const sent: Array<{ channelId: string; chatId: string; text: string }> = [];
+
+  const factory: DeviceFactory = async (channelId, _sessionStore, callbacks) => {
+    devices.set(channelId, callbacks);
+
+    return {
+      start: async () => {},
+      send: async (chatId, text) => {
+        sent.push({ channelId, chatId, text });
+
+        return `wa-sent-${sent.length}`;
+      },
+      stop: async () => {},
+    };
+  };
+
+  const whatsapp = new WhatsAppConnections(store, box, factory);
+  const registry = new ChannelRegistry([new WhatsAppChannel(whatsapp)]);
+  const channels = new Channels(services, fetch, registry);
+  const receive = (id: string, input: IncomingMessage, generation: number) =>
+    channels.receiveLinked(id, input, generation);
+  const app = createApp({ ...services, channels, whatsapp, token, logger: false });
+
+  const agents: Array<{ name: string; address: string; profileId: string; channelId: string }> = [];
+
+  const join = async (name: string, address: string) => {
+    const profile = await services.profiles.createProfile({
+      name,
+      instructions: 'Help.',
+      model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
+    });
+
+    const channel = await channels.connect(profile.id, { type: 'whatsapp' });
+
+    await whatsapp.connect(profile.id, channel.id);
+    await whatsapp.tick(receive);
+    await devices.get(channel.id)?.ready(address);
+
+    const agent = { name, address, profileId: profile.id, channelId: channel.id };
+
+    agents.push(agent);
+
+    return agent;
+  };
+
+  let messages = 0;
+
+  /** What the protocol does: the message reaches every device in the room except its author's. */
+  const say = async (
+    author: { name: string; address: string },
+    text: string,
+    options: { requestKey?: string; mentions?: string[] } = {},
+  ) => {
+    const requestKey = options.requestKey ?? `wa-group-${++messages}`;
+
+    for (const agent of agents) {
+      if (agent.address === author.address) {
+        continue;
+      }
+
+      await devices.get(agent.channelId)?.message({
+        actorId: author.address,
+        chatId: room,
+        text,
+        requestKey,
+        displayName: author.name,
+        groupName: 'Equipe',
+        scope: 'group',
+        mentions: options.mentions ?? [],
+      });
+    }
+
+    await whatsapp.tick(receive);
+  };
+
+  return {
+    services,
+    store,
+    channels,
+    whatsapp,
+    app,
+    sent,
+    join,
+    say,
+    runs: (profileId: string) => store.list('run', { profileId }),
+    approve: async (profileId: string) => {
+      const contact = (await channels.contacts(profileId)).find((item) => item.scope === 'group');
+
+      if (!contact) throw new Error('Group request missing');
+
+      return channels.approveContact(profileId, contact.id);
+    },
+    /** The agent answered; the room is free for the next turn. */
+    reply: async (profileId: string, output: string) => {
+      const [run] = await services.runs.activities(profileId);
+
+      if (!run) throw new Error('Run missing');
+
+      await services.lifecycle.claim(run.id, profileId, 'worker');
+      await services.lifecycle.finish(profileId, run.id, 'worker', 'completed', output);
+
+      return run;
+    },
+    close: async () => {
+      await whatsapp.stop();
+      await app.close();
+    },
+  };
+}
+
+describe('group conversations', () => {
+  it('answers in a room with several agents only the message that names it', async () => {
+    const f = await setup();
+
+    try {
+      const ada = await f.join('Ada', '5511800000001@c.us');
+      const bia = await f.join('Bia', '5511800000002@c.us');
+
+      await f.say(owner, 'bom dia');
+      await f.approve(ada.profileId);
+      await f.approve(bia.profileId);
+
+      await f.say(owner, 'alguem pode olhar o relatorio?');
+
+      expect(await f.runs(ada.profileId)).toEqual([]);
+      expect(await f.runs(bia.profileId)).toEqual([]);
+
+      await f.say(owner, 'Ada, você consegue olhar o relatório?');
+
+      const answering = await f.runs(ada.profileId);
+
+      expect(answering).toHaveLength(1);
+      expect(answering[0]?.input).toBe('Lucas: Ada, você consegue olhar o relatório?');
+      expect(answering[0]?.group).toMatchObject({ chatId: room, fromAgent: false, turns: 1 });
+      expect(await f.runs(bia.profileId)).toEqual([]);
+    } finally {
+      await f.close();
+    }
+  });
+
+  it('never answers, nor warns, in a room the owner has not approved', async () => {
+    const f = await setup();
+
+    try {
+      const ada = await f.join('Ada', '5511800000001@c.us');
+      const bia = await f.join('Bia', '5511800000002@c.us');
+
+      await f.say(owner, 'Ada, começou sem aprovação');
+
+      expect(await f.runs(ada.profileId)).toEqual([]);
+      expect(await f.channels.deliveries(ada.profileId)).toEqual([]);
+      expect(await f.sent).toEqual([]);
+      expect(await f.services.sessions.sessions(ada.profileId)).toEqual([]);
+
+      // Each profile sees the room through its own connection, so each one asks its owner.
+      for (const profileId of [ada.profileId, bia.profileId]) {
+        const contacts = await f.channels.contacts(profileId);
+
+        expect(contacts).toHaveLength(1);
+        expect(contacts[0]).toMatchObject({ scope: 'group', chatId: room, status: 'pending' });
+        expect(contacts[0]?.message).toBeUndefined();
+      }
+
+      // With one agent approved there is nobody to talk over, so a person is simply answered.
+      await f.approve(ada.profileId);
+      await f.say(owner, 'e agora?');
+
+      expect(await f.runs(ada.profileId)).toHaveLength(1);
+      expect(await f.runs(bia.profileId)).toEqual([]);
+    } finally {
+      await f.close();
+    }
+  });
+
+  it('asks the owner once for the whole room, whoever writes in it', async () => {
+    const f = await setup();
+
+    try {
+      const ada = await f.join('Ada', '5511800000001@c.us');
+
+      await f.say(owner, 'primeiro');
+      await f.say(guest, 'segundo');
+
+      expect(await f.channels.contacts(ada.profileId)).toHaveLength(1);
+
+      await f.approve(ada.profileId);
+      await f.say(guest, 'terceiro');
+
+      const runs = await f.runs(ada.profileId);
+
+      expect(runs).toHaveLength(1);
+      expect(runs[0]?.input).toBe('Marina: terceiro');
+    } finally {
+      await f.close();
+    }
+  });
+
+  it('ends a conversation between agents at the shared budget and reopens it for a person', async () => {
+    const f = await setup();
+
+    try {
+      const ada = await f.join('Ada', '5511800000001@c.us');
+      const bia = await f.join('Bia', '5511800000002@c.us');
+
+      await f.say(owner, 'oi');
+      await f.approve(ada.profileId);
+      await f.approve(bia.profileId);
+
+      await f.say(owner, 'Ada, combine o prazo com a equipe');
+
+      expect(await f.services.runs.activities(bia.profileId)).toEqual([]);
+      await f.reply(ada.profileId, 'Bia, qual prazo consegue?');
+
+      // Each agent names the next one, which is the only way the next one answers at all.
+      const spoken = ['Ada'];
+
+      for (const turn of [
+        { from: ada, to: bia },
+        { from: bia, to: ada },
+        { from: ada, to: bia },
+      ]) {
+        await f.say(turn.from, `${turn.to.name}, e você?`);
+
+        const [queued] = await f.services.runs.activities(turn.to.profileId);
+
+        if (!queued) {
+          break;
+        }
+
+        expect(queued.group).toMatchObject({ fromAgent: true, fromName: turn.from.name });
+        spoken.push(turn.to.name);
+        await f.reply(turn.to.profileId, `${turn.from.name}, ok`);
+      }
+
+      // The budget belongs to the room: it counts what every agent wrote, not what each one did.
+      expect(spoken).toEqual(['Ada', 'Bia', 'Ada']);
+      expect(spoken).toHaveLength(GROUP_AGENT_TURN_LIMIT);
+      expect(await f.services.runs.activities(bia.profileId)).toEqual([]);
+
+      // A person writing returns the budget to the room.
+      await f.say(owner, 'Ada, resume para mim');
+
+      const resumed = await f.services.runs.activities(ada.profileId);
+
+      expect(resumed).toHaveLength(1);
+      expect(resumed[0]?.group).toMatchObject({ fromAgent: false, turns: 1 });
+    } finally {
+      await f.close();
+    }
+  });
+
+  it('treats a redelivered room message as the same turn and the same answer', async () => {
+    const f = await setup();
+
+    try {
+      const ada = await f.join('Ada', '5511800000001@c.us');
+      await f.join('Bia', '5511800000002@c.us');
+
+      await f.say(owner, 'oi');
+      await f.approve(ada.profileId);
+
+      await f.say(owner, 'Ada, confirma?', { requestKey: 'wa-repeated' });
+      await f.say(owner, 'Ada, confirma?', { requestKey: 'wa-repeated' });
+
+      const runs = await f.runs(ada.profileId);
+
+      expect(runs).toHaveLength(1);
+
+      const run = runs[0];
+
+      if (!run) throw new Error('Run missing');
+
+      await f.reply(ada.profileId, 'Confirmo');
+      await f.channels.dispatch();
+      await f.channels.dispatch();
+
+      expect(f.sent.filter((item) => item.chatId === room)).toHaveLength(1);
+      expect(
+        (await f.channels.deliveries(ada.profileId)).filter((item) => item.runId === run.id),
+      ).toHaveLength(1);
+    } finally {
+      await f.close();
+    }
+  });
+
+  it('shows the owner each room with the profiles that sit in it', async () => {
+    const f = await setup();
+
+    try {
+      const ada = await f.join('Ada', '5511800000001@c.us');
+      const bia = await f.join('Bia', '5511800000002@c.us');
+
+      await f.say(owner, 'oi');
+      await f.approve(ada.profileId);
+
+      expect((await f.app.inject({ url: '/v1/groups' })).statusCode).toBe(401);
+
+      const response = await f.app.inject({ url: '/v1/groups', headers: admin });
+
+      expect(response.statusCode).toBe(200);
+
+      const [group] = response.json();
+
+      expect(group).toMatchObject({ type: 'whatsapp', chatId: room, name: 'Equipe' });
+      expect(group.profiles).toEqual([
+        {
+          profileId: ada.profileId,
+          name: 'Ada',
+          contactId: expect.any(String),
+          status: 'approved',
+        },
+        { profileId: bia.profileId, name: 'Bia', contactId: expect.any(String), status: 'pending' },
+      ]);
+    } finally {
+      await f.close();
+    }
+  });
+});

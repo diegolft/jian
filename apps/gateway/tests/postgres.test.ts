@@ -1,8 +1,9 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { MockLanguageModelV4 } from 'ai/test';
 import { PgBoss } from 'pg-boss';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AgentRuntime } from '../src/agent/runtime.js';
+import { Channels } from '../src/channels/service.js';
 import { Peers } from '../src/peers/service.js';
 import { RunQueue } from '../src/runs/queue.js';
 import { SecretBox } from '../src/security/crypto.js';
@@ -184,6 +185,75 @@ describe('PostgreSQL durability', () => {
       await queue.stop();
     }
   }, 40_000);
+
+  it('keeps one room approved per profile and answers a redelivered message once', async () => {
+    const channels = new Channels({ ...services, vault: new Vault(store, box) }, async () => {
+      throw new Error('Network forbidden in test');
+    });
+
+    const ada = await services.profiles.createProfile({ ...input, name: 'Ada' });
+    const bia = await services.profiles.createProfile({ ...input, name: 'Bia' });
+    const room = `group-${randomUUID()}`;
+
+    const opened = await Promise.all(
+      [ada, bia].map(async (profile) => ({
+        profile,
+        channel: await channels.connect(profile.id, { type: 'api' }),
+      })),
+    );
+
+    const deliver = (channelId: string, webhookToken: string, requestKey: string) =>
+      channels.receive(channelId, {
+        type: 'api',
+        headers: { 'x-jian-channel-token': webhookToken },
+        payload: {
+          actorId: 'person-1',
+          chatId: room,
+          text: 'Ada, tudo certo?',
+          requestKey,
+          displayName: 'Lucas',
+          scope: 'group',
+          groupName: 'Equipe',
+        },
+      });
+
+    for (const item of opened) {
+      await deliver(item.channel.id, item.channel.webhookToken, 'room-first');
+    }
+
+    // The room is one request per profile, and nothing runs before the owner decides.
+    expect(await store.list('run', { profileId: ada.id })).toEqual([]);
+    expect(await store.list('run', { profileId: bia.id })).toEqual([]);
+
+    const [request] = (await channels.contacts(ada.id)).filter((item) => item.chatId === room);
+
+    if (!request) throw new Error('Group request missing');
+
+    expect(request.scope).toBe('group');
+    await channels.approveContact(ada.id, request.id);
+
+    const entry = opened[0];
+
+    if (!entry) throw new Error('Channel missing');
+
+    // The protocol repeats itself; the room must not answer twice, under the real locking.
+    const results = await Promise.all([
+      deliver(entry.channel.id, entry.channel.webhookToken, 'room-second'),
+      deliver(entry.channel.id, entry.channel.webhookToken, 'room-second'),
+    ]);
+
+    expect(new Set(results.map((result) => result.runId)).size).toBe(1);
+    expect(await store.list('run', { profileId: ada.id })).toHaveLength(1);
+    expect(await store.list('run', { profileId: bia.id })).toEqual([]);
+
+    const room_ = (await channels.groups()).find((group) => group.chatId === room);
+
+    expect(room_?.name).toBe('Equipe');
+    expect(room_?.profiles.map((item) => [item.name, item.status])).toEqual([
+      ['Ada', 'approved'],
+      ['Bia', 'pending'],
+    ]);
+  }, 30_000);
 });
 
 it('applies migrations repeatedly and searches old records through stable cursors', async () => {

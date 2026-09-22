@@ -1,0 +1,162 @@
+import { GROUP_AGENT_TURN_LIMIT, type GroupTurn } from '@jian/contracts';
+import type { Transaction } from '../core/store.js';
+import type { IncomingMessage } from './channel.js';
+import type { ContactRecord } from './contacts.js';
+import type { ChannelRecord } from './service.js';
+
+/**
+ * How many recent protocol message ids a room remembers. A redelivered message must not spend
+ * a turn twice, and the protocols repeat the most recent messages, not arbitrary old ones.
+ */
+const OBSERVED_KEYS = 32;
+
+export type GroupDecision =
+  | { speak: true; turn: GroupTurn }
+  | { speak: false; reason: 'unaddressed' | 'budget' };
+
+type Participant = { profileId: string; name: string };
+
+const quote = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Case and accents are not how a person addresses an agent, so neither decides the match. */
+const fold = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase();
+
+/**
+ * A room where more than one agent listens. Two rules keep it usable: an agent stays quiet
+ * unless a message names it, and the agents of this installation share one budget of
+ * consecutive turns, so a conversation between them ends without a person having to stop it.
+ */
+export class Groups {
+  /**
+   * Addressed by the protocol's own mention of this connection, or by name in the text. The
+   * first word of a composed name counts, because that is how people write in a group.
+   */
+  static addressed(message: IncomingMessage, name: string, address?: string): boolean {
+    if (address && message.mentions.includes(address)) {
+      return true;
+    }
+
+    const text = fold(message.text);
+    const full = fold(name).trim();
+    const first = full.split(/\s+/)[0] ?? '';
+    const words = new Set([full, ...(first.length >= 3 ? [first] : [])]);
+
+    return [...words].some((word) =>
+      new RegExp(`(?<![\\p{L}\\p{N}])${quote(word)}(?![\\p{L}\\p{N}])`, 'u').test(text),
+    );
+  }
+
+  /** The other profiles of this installation, recognised by the address their channel speaks as. */
+  private async fromAgent(tx: Transaction, channel: ChannelRecord, actorId: string) {
+    const channels = await tx.list('channel', { where: { type: channel.type }, limit: 200 });
+
+    return channels.some(
+      (item) => item.id !== channel.id && !item.revokedAt && item.address === actorId,
+    );
+  }
+
+  /** Who of this installation answers in this room: an approved group contact is membership. */
+  async participants(tx: Transaction, contact: ContactRecord): Promise<Participant[]> {
+    const contacts = await tx.list('contact', {
+      where: {
+        scope: 'group',
+        type: contact.type,
+        chatId: contact.chatId,
+        status: 'approved',
+      },
+      limit: 100,
+    });
+
+    const participants: Participant[] = [];
+
+    for (const item of contacts) {
+      const profile = await tx.get('profile', item.profileId);
+
+      if (profile) {
+        participants.push({ profileId: profile.id, name: profile.name });
+      }
+    }
+
+    return participants;
+  }
+
+  /**
+   * Reads one group message and decides whether this profile answers it. The counter lives on
+   * the room's contact and is written here, inside the caller's transaction: observing an
+   * agent spends a turn, a person writing returns the budget, and a message already seen
+   * changes nothing — a protocol redelivery is the same turn, not a new one.
+   */
+  async observe(
+    tx: Transaction,
+    channel: ChannelRecord,
+    contact: ContactRecord,
+    message: IncomingMessage,
+    profileName: string,
+  ): Promise<GroupDecision> {
+    const fromAgent = await this.fromAgent(tx, channel, message.actorId);
+    const seen = contact.seen ?? [];
+    const duplicate = seen.includes(message.requestKey);
+    const observed = duplicate
+      ? (contact.agentTurns ?? 0)
+      : fromAgent
+        ? (contact.agentTurns ?? 0) + 1
+        : 0;
+
+    const save = async (turns: number) => {
+      if (duplicate) {
+        return;
+      }
+
+      await tx.put('contact', contact.id, contact.profileId, {
+        ...contact,
+        agentTurns: turns,
+        seen: [...seen, message.requestKey].slice(-OBSERVED_KEYS),
+      });
+    };
+
+    const participants = await this.participants(tx, contact);
+    const others = participants.filter((item) => item.profileId !== channel.profileId);
+
+    // With a single agent in the room there is nobody to talk over, so a person is answered
+    // as in a private conversation. Another agent always has to name who it wants.
+    if (
+      (fromAgent || others.length > 0) &&
+      !Groups.addressed(message, profileName, channel.address)
+    ) {
+      await save(observed);
+
+      return { speak: false, reason: 'unaddressed' };
+    }
+
+    // A message already seen is judged by the same spent budget: a redelivery must never be
+    // what reopens a conversation the limit closed.
+    if (fromAgent && observed >= GROUP_AGENT_TURN_LIMIT) {
+      await save(observed);
+
+      return { speak: false, reason: 'budget' };
+    }
+
+    const turns = Math.min(
+      duplicate ? Math.max(observed, 1) : observed + 1,
+      GROUP_AGENT_TURN_LIMIT,
+    );
+
+    await save(turns);
+
+    return {
+      speak: true,
+      turn: {
+        chatId: contact.chatId,
+        ...(contact.displayName ? { name: contact.displayName } : {}),
+        fromName: message.displayName ?? message.actorId,
+        fromAgent,
+        turns,
+        agents: others.map((item) => item.name),
+      },
+    };
+  }
+}

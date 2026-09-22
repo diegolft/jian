@@ -9,12 +9,20 @@ import type { ProfileReader } from '../profiles/port.js';
 import type { SessionWriter } from '../sessions/port.js';
 import type { ChannelType, IncomingMessage } from './channel.js';
 
-/** `requestKey` stays out of the contract: it is the protocol's message ID, not owner-facing. */
-export type ContactRecord = z.infer<typeof contactSchema> & { requestKey?: string };
+/**
+ * `requestKey` stays out of the contract: it is the protocol's message ID, not owner-facing.
+ * So do the two counters a room keeps — the agent turns spent since a person wrote, and the
+ * message ids already observed, which is what stops a redelivery from spending another turn.
+ */
+export type ContactRecord = z.infer<typeof contactSchema> & {
+  requestKey?: string;
+  agentTurns?: number;
+  seen?: string[];
+};
 
 export type Contact = z.infer<typeof contactSchema>;
 
-type Intake =
+export type Intake =
   | { status: 'approved'; contact: ContactRecord }
   | { status: 'pending'; announce: boolean }
   | { status: 'blocked' };
@@ -41,12 +49,14 @@ export class Contacts {
     private readonly clock: Clock = Date.now,
   ) {}
 
-  private title(contact: Pick<ContactRecord, 'type' | 'actorId' | 'displayName'>) {
-    return `${names[contact.type]} · ${contact.displayName ?? contact.actorId}`.slice(0, 160);
+  private title(contact: Pick<ContactRecord, 'type' | 'scope' | 'actorId' | 'displayName'>) {
+    const who = `${contact.scope === 'group' ? 'Grupo ' : ''}${contact.displayName ?? contact.actorId}`;
+
+    return `${names[contact.type]} · ${who}`.slice(0, 160);
   }
 
   /** The owner-facing shape of a contact. */
-  view({ requestKey: _key, ...contact }: ContactRecord): Contact {
+  view({ requestKey: _key, agentTurns: _turns, seen: _seen, ...contact }: ContactRecord): Contact {
     return contact;
   }
 
@@ -68,7 +78,8 @@ export class Contacts {
 
   /**
    * Runs inside the channel transaction so that a burst from one stranger produces exactly one
-   * request: the second message finds the record the first one wrote.
+   * request: the second message finds the record the first one wrote. A group is one request
+   * for the whole room — the owner decides about the conversation, not about each participant.
    */
   async intake(
     tx: Transaction,
@@ -77,27 +88,35 @@ export class Contacts {
   ): Promise<Intake> {
     const profileId = channel.profileId;
     const now = nowIso(this.clock);
+    const group = message.scope === 'group';
 
     const existing = (
       await tx.list('contact', {
         profileId,
-        where: { channelId: channel.id, actorId: message.actorId },
+        where: group
+          ? { channelId: channel.id, scope: 'group', chatId: message.chatId }
+          : { channelId: channel.id, scope: 'direct', actorId: message.actorId },
         limit: 1,
       })
     )[0];
 
     if (!existing) {
+      const name = group ? message.groupName : message.displayName;
+
       const contact: ContactRecord = {
         id: randomUUID(),
         profileId,
         channelId: channel.id,
         type: channel.type,
-        actorId: message.actorId,
+        scope: message.scope,
+        // The room is the identity of a group contact: whoever writes there is the same request.
+        actorId: group ? message.chatId : message.actorId,
         chatId: message.chatId,
-        ...(message.displayName ? { displayName: message.displayName } : {}),
+        ...(name ? { displayName: name } : {}),
         status: 'pending',
-        message: message.text,
-        requestKey: message.requestKey,
+        // Nothing is held for a room. Releasing it on approval would answer a message that
+        // named nobody, which is exactly what a group with several agents must not do.
+        ...(group ? {} : { message: message.text, requestKey: message.requestKey }),
         createdAt: now,
         updatedAt: now,
       };
@@ -105,7 +124,7 @@ export class Contacts {
       await tx.put('contact', contact.id, profileId, contact);
       await recordEvent(tx, this.clock, profileId, 'contact.requested', this.view(contact));
 
-      return { status: 'pending', announce: true };
+      return { status: 'pending', announce: !group };
     }
 
     if (existing.status === 'blocked') {
@@ -118,7 +137,7 @@ export class Contacts {
     if (existing.status === 'pending') {
       const held = existing.message ? `${existing.message}\n\n${message.text}` : message.text;
 
-      if (held !== existing.message && held.length <= MAX_HELD_CHARACTERS) {
+      if (!group && held !== existing.message && held.length <= MAX_HELD_CHARACTERS) {
         await tx.put('contact', existing.id, profileId, {
           ...existing,
           message: held,
@@ -129,13 +148,25 @@ export class Contacts {
       return { status: 'pending', announce: false };
     }
 
-    if (existing.sessionId && (await tx.get('session', existing.sessionId))) {
-      return { status: 'approved', contact: existing };
+    // A renamed room keeps its request: the owner approved the conversation, not its subject.
+    const renamed =
+      group && message.groupName && message.groupName !== existing.displayName
+        ? { displayName: message.groupName }
+        : {};
+
+    const current = { ...existing, ...renamed };
+
+    if (current.sessionId && (await tx.get('session', current.sessionId))) {
+      if (Object.keys(renamed).length) {
+        await tx.put('contact', current.id, profileId, { ...current, updatedAt: now });
+      }
+
+      return { status: 'approved', contact: current };
     }
 
     const contact: ContactRecord = {
-      ...existing,
-      sessionId: await this.openSession(tx, existing),
+      ...current,
+      sessionId: await this.openSession(tx, current),
       updatedAt: now,
     };
 

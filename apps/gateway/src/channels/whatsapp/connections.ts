@@ -279,6 +279,17 @@ export class WhatsAppConnections {
             error: undefined,
             updatedAt: this.now(),
           });
+
+          // The paired account is also the address this profile speaks as in a room, which is
+          // how the other agents of this installation recognise its messages as an agent's.
+          const channel = await tx.get('channel', record.id);
+
+          if (channel && channel.address !== accountId) {
+            await tx.put('channel', record.id, record.profileId, {
+              ...channel,
+              address: accountId,
+            });
+          }
         });
       },
       disconnected: async (loggedOut) => {
