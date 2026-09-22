@@ -1,10 +1,10 @@
 import { createJianClient } from '@jian/sdk';
 import { channelCalls } from './channels';
-import { conversationCalls } from './conversations';
 import { readEvents } from './events';
 import { profileCalls } from './profiles';
 import { providerCalls } from './providers';
 import { resourceCalls } from './resources';
+import { sessionCalls } from './sessions';
 
 export * from './types';
 
@@ -28,7 +28,7 @@ export function gatewayApi() {
   return {
     ...profileCalls(client),
     ...providerCalls(client),
-    ...conversationCalls(client),
+    ...sessionCalls(client),
     ...channelCalls(client),
     ...resourceCalls(client),
     events: readEvents,

@@ -1,8 +1,19 @@
 'use client';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect } from 'react';
 
-import { Sessions } from '../../../components/conversations/index';
-import { useSection } from '../../../lib/workspace';
-
+function LegacyRoute() {
+  const router = useRouter();
+  const query = useSearchParams();
+  useEffect(() => {
+    router.replace(`/sessions${query.size ? `?${query}` : ''}`);
+  }, [router, query]);
+  return null;
+}
 export default function Page() {
-  return <Sessions {...useSection()} />;
+  return (
+    <Suspense>
+      <LegacyRoute />
+    </Suspense>
+  );
 }

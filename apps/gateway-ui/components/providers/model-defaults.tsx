@@ -10,6 +10,7 @@ import type {
 } from '../../lib/api';
 import type { SectionProps } from '../props';
 import { Badge, Button, Empty, Field, SectionHeading } from '../ui';
+import { Select } from '../ui/select';
 import { efforts, modelLabel, type Role, roles, usableProviders } from './catalog';
 
 type RoleValue = {
@@ -77,7 +78,7 @@ export function ModelDefaults({ profile, data, api, mutate, busy }: SectionProps
     <>
       <SectionHeading
         title="Modelos padrão"
-        description="Um modelo por atividade, com o nível de esforço onde o modelo aceita. Cada um pode ficar vazio."
+        description="Escolha o modelo e o esforço de raciocínio para cada atividade."
       />
       <form
         method="post"
@@ -113,7 +114,7 @@ export function ModelDefaults({ profile, data, api, mutate, busy }: SectionProps
                 <h2>{role.label}</h2>
                 <p>{role.hint}</p>
                 {!role.runtime && (
-                  <Badge tone="warn">Configurável, ainda sem runtime: salvo e não usado</Badge>
+                  <Badge tone="warn">Escolha salva, atividade ainda não disponível</Badge>
                 )}
                 {selected && !selected.known && (
                   <Badge tone="warn">Capacidades desconhecidas: limites conservadores</Badge>
@@ -126,29 +127,29 @@ export function ModelDefaults({ profile, data, api, mutate, busy }: SectionProps
               </div>
               <div className="settings-fields">
                 <Field label={`Provider · ${role.label}`}>
-                  <select
+                  <Select
                     value={value.providerId}
                     disabled={busy}
-                    onChange={(event) =>
+                    onValueChange={(providerId) =>
                       change(role.key, {
-                        providerId: event.target.value,
+                        providerId,
                         modelId: '',
                         reasoningEffort: '',
                         manual: false,
                       })
                     }
-                  >
-                    <option value="">Nenhum</option>
-                    {configured.map((provider) => (
-                      <option key={provider.id} value={provider.id}>
-                        {provider.name}
-                      </option>
-                    ))}
-                    {value.providerId &&
-                      !configured.some((provider) => provider.id === value.providerId) && (
-                        <option value={value.providerId}>Provider salvo (indisponível)</option>
-                      )}
-                  </select>
+                    options={[
+                      { value: '', label: 'Nenhum' },
+                      ...configured.map((provider) => ({
+                        value: provider.id,
+                        label: provider.name,
+                      })),
+                      ...(value.providerId &&
+                      !configured.some((provider) => provider.id === value.providerId)
+                        ? [{ value: value.providerId, label: 'Provider salvo (indisponível)' }]
+                        : []),
+                    ]}
+                  />
                 </Field>
                 <Field
                   label={`Modelo · ${role.label}`}
@@ -168,23 +169,20 @@ export function ModelDefaults({ profile, data, api, mutate, busy }: SectionProps
                       onChange={(event) => change(role.key, { modelId: event.target.value })}
                     />
                   ) : (
-                    <select
+                    <Select
                       value={value.modelId}
                       disabled={busy || !value.providerId}
-                      onChange={(event) =>
-                        event.target.value === '__manual__'
+                      onValueChange={(modelId) =>
+                        modelId === '__manual__'
                           ? change(role.key, { manual: true, modelId: '', reasoningEffort: '' })
-                          : change(role.key, { modelId: event.target.value, reasoningEffort: '' })
+                          : change(role.key, { modelId, reasoningEffort: '' })
                       }
-                    >
-                      <option value="">Nenhum</option>
-                      {models.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {modelLabel(model)}
-                        </option>
-                      ))}
-                      <option value="__manual__">Informar ID…</option>
-                    </select>
+                      options={[
+                        { value: '', label: 'Nenhum' },
+                        ...models.map((model) => ({ value: model.id, label: modelLabel(model) })),
+                        { value: '__manual__', label: 'Informar ID…' },
+                      ]}
+                    />
                   )}
                 </Field>
                 <Field
@@ -195,18 +193,12 @@ export function ModelDefaults({ profile, data, api, mutate, busy }: SectionProps
                       : 'Este modelo não tem níveis de esforço catalogados.'
                   }
                 >
-                  <select
+                  <Select
                     value={value.reasoningEffort}
                     disabled={busy || !allowed.length}
-                    onChange={(event) => change(role.key, { reasoningEffort: event.target.value })}
-                  >
-                    <option value="">Padrão do provider</option>
-                    {allowed.map((effort) => (
-                      <option key={effort.value} value={effort.value}>
-                        {effort.label}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={(reasoningEffort) => change(role.key, { reasoningEffort })}
+                    options={[{ value: '', label: 'Padrão do provider' }, ...allowed]}
+                  />
                 </Field>
               </div>
             </div>

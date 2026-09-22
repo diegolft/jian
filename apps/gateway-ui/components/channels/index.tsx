@@ -1,6 +1,6 @@
 'use client';
 
-import { QrCode, Unplug } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, QrCode, Unplug } from 'lucide-react';
 import { useState } from 'react';
 import type { Channel, ChannelType } from '../../lib/api';
 import { date } from '../../lib/format';
@@ -14,6 +14,7 @@ import { Rooms } from './rooms';
 
 export function Channels(props: SectionProps) {
   const { profile, data, api, mutate, busy } = props;
+  const [editing, setEditing] = useState<ChannelType>();
   const [pairing, setPairing] = useState<Channel>();
   const [secret, setSecret] = useState<string>();
   const [token, setToken] = useState('');
@@ -58,25 +59,61 @@ export function Channels(props: SectionProps) {
 
   return (
     <>
-      <SectionHeading
-        title="Canais"
-        description="Três formas de falar com o seu agente. Cada uma está conectada ou não."
-      />
+      <SectionHeading title="Canais" description="Leve as conversas para onde você já está." />
       <Requests {...props} />
-      <div className="resource-list">
+      <div className="connections-grid channels-grid">
         {kinds.map((kind) => {
           const channel = connected(kind.type);
 
           return (
-            <div className="settings-section" key={kind.type}>
-              <div className="settings-caption">
-                <h2>{kind.name}</h2>
-                <p>{kind.description}</p>
+            <article className="connection-card" data-connected={!!channel} key={kind.type}>
+              <header className="connection-card-header">
+                <span className="channel-symbol">
+                  <kind.icon size={24} strokeWidth={1.5} />
+                </span>
                 <Badge tone={channel ? 'good' : 'neutral'}>
                   {channel ? 'Conectado' : 'Não conectado'}
                 </Badge>
-              </div>
-              <div className="settings-fields">
+              </header>
+              <h2>{kind.name}</h2>
+              <p className="connection-description">
+                {
+                  {
+                    whatsapp: 'Converse pelo seu WhatsApp.',
+                    telegram: 'Receba mensagens pelo seu bot.',
+                    api: 'Integre seus próprios sistemas.',
+                  }[kind.type]
+                }
+              </p>
+              <p className="connection-meta">
+                {
+                  {
+                    whatsapp: 'Pareamento por QR Code',
+                    telegram: 'Token do BotFather',
+                    api: 'URL e token de webhook',
+                  }[kind.type]
+                }
+              </p>
+              <button
+                type="button"
+                className="connection-action"
+                disabled={busy}
+                aria-expanded={editing === kind.type}
+                aria-controls={`channel-${kind.type}`}
+                onClick={() => setEditing(editing === kind.type ? undefined : kind.type)}
+              >
+                {editing === kind.type
+                  ? 'Fechar configuração'
+                  : channel
+                    ? 'Gerenciar conexão'
+                    : 'Configurar'}
+                {editing === kind.type ? <ChevronDown size={16} /> : <ArrowUpRight size={16} />}
+              </button>
+              <div
+                className="connection-disclosure"
+                id={`channel-${kind.type}`}
+                hidden={editing !== kind.type}
+              >
                 {channel ? (
                   <>
                     {kind.type !== 'whatsapp' && (
@@ -91,7 +128,7 @@ export function Channels(props: SectionProps) {
                         novo.
                       </p>
                     )}
-                    <div className="save-bar">
+                    <div className="flex flex-wrap items-center gap-3">
                       {kind.type === 'whatsapp' && (
                         <Button variant="secondary" onClick={() => setPairing(channel)}>
                           <QrCode size={16} />
@@ -106,7 +143,6 @@ export function Channels(props: SectionProps) {
                         <Unplug size={16} />
                         Desconectar
                       </Button>
-                      <span>Cada conversa aprovada vira uma sessão sua.</span>
                     </div>
                   </>
                 ) : (
@@ -128,7 +164,7 @@ export function Channels(props: SectionProps) {
                     {kind.type === 'telegram' && (
                       <Field
                         label="Token do bot"
-                        hint="O valor do BotFather. Fica criptografado no cofre e não aparece de novo."
+                        hint="O token fica criptografado e não aparece novamente."
                       >
                         <input
                           name="botToken"
@@ -137,26 +173,27 @@ export function Channels(props: SectionProps) {
                           spellCheck={false}
                           value={token}
                           onChange={(event) => setToken(event.target.value)}
+                          required
                         />
                       </Field>
                     )}
-                    <div className="save-bar">
+                    <div className="flex flex-wrap items-center gap-3">
                       <Button type="submit" busy={busy}>
                         <kind.icon size={16} />
                         Conectar {kind.name}
                       </Button>
-                      <span>
+                      <span className="text-xs text-muted">
                         {kind.type === 'whatsapp'
                           ? 'Abre o QR Code para ler no celular.'
                           : kind.type === 'api'
                             ? 'Gera a URL e o token do webhook, mostrados uma única vez.'
-                            : 'Nada mais é pedido: nem nome, nem sessão.'}
+                            : 'Use o token criado pelo BotFather.'}
                       </span>
                     </div>
                   </form>
                 )}
               </div>
-            </div>
+            </article>
           );
         })}
       </div>

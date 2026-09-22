@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  ArrowRight,
-  BookOpen,
-  CircleHelp,
-  LockKeyhole,
-  MessageSquare,
-  ShieldCheck,
-  Smartphone,
-} from 'lucide-react';
+import { ArrowRight, CircleHelp, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { gatewayApi } from '../lib/api';
 import { Button, Field, Mark } from './ui';
@@ -27,34 +19,19 @@ export function SignIn({ connected }: { connected: () => void }) {
         <a className="brand" href="/ui/">
           <Mark />
           <span>
-            jian<span className="brand-label">GATEWAY</span>
+            jian<span className="brand-label">比翼の鳥</span>
           </span>
         </a>
         <div className="login-copy">
-          <span className="eyebrow">SEU AGENTE. EM TODA CONVERSA.</span>
-          <h1>
-            Muitas conversas.
-            <br />
-            Uma identidade.
-          </h1>
-          <p>
-            Um lugar para conectar seus agentes, dar contexto às conversas e manter você no
-            controle.
-          </p>
-          <div className="identity-orbit" aria-hidden="true">
-            <span className="orbit-node node-one">
-              <MessageSquare />
-            </span>
-            <span className="orbit-node node-two">
-              <Smartphone />
-            </span>
-            <span className="orbit-center">
-              <Mark />
-            </span>
-            <span className="orbit-node node-three">
-              <BookOpen />
-            </span>
+          <div className="login-emblem" aria-hidden="true">
+            <Mark />
           </div>
+          <h1>
+            Seu espaço.
+            <br />
+            Seus agentes.
+          </h1>
+          <p>Conversas, memória e ferramentas sob seu controle.</p>
         </div>
         <small>Aberto por natureza. Seu por completo.</small>
       </section>
@@ -87,7 +64,7 @@ export function SignIn({ connected }: { connected: () => void }) {
           <div className="login-lock">
             <LockKeyhole size={24} />
           </div>
-          <h2>Seu Gateway começa aqui.</h2>
+          <h2>Conecte-se ao Jian.</h2>
           <p>Entre com o token de administrador desta instância.</p>
           <Field label="Token de administrador">
             <input
@@ -110,8 +87,8 @@ export function SignIn({ connected }: { connected: () => void }) {
             <ArrowRight size={17} />
           </Button>
           <p className="secure-note">
-            <ShieldCheck size={16} />O token não fica no navegador: a sessão vira um cookie
-            assinado, ilegível por scripts, que expira em 30 dias.
+            <ShieldCheck size={16} />
+            Seu token não é armazenado no navegador. A sessão expira em 30 dias.
           </p>
           <details className="login-help">
             <summary>

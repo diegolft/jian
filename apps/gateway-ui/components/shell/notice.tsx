@@ -1,30 +1,38 @@
 'use client';
-
-import { X } from 'lucide-react';
+import { CircleCheck, CircleX, Info } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { Toaster, toast } from 'sonner';
 import { useWorkspace } from '../../lib/workspace';
 
-/** The one place a result is announced, so no screen invents its own banner. */
-export function NoticeBar() {
-  const { notice, setNotice } = useWorkspace();
-
-  if (!notice) {
-    return null;
-  }
-
+export function Notifications() {
   return (
-    <div
-      className={`notice toast ${notice.error ? 'error' : 'success'}`}
-      role={notice.error ? 'alert' : 'status'}
-    >
-      <span>{notice.text}</span>
-      <button
-        type="button"
-        className="icon-button"
-        aria-label="Fechar aviso"
-        onClick={() => setNotice(undefined)}
-      >
-        <X size={16} />
-      </button>
-    </div>
+    <Toaster
+      position="top-right"
+      containerAriaLabel="Notificações"
+      gap={10}
+      closeButton
+      icons={{
+        success: <CircleCheck size={20} />,
+        error: <CircleX size={20} />,
+        info: <Info size={20} />,
+      }}
+      toastOptions={{
+        className: 'jian-toast',
+        duration: 5000,
+        closeButtonAriaLabel: 'Fechar notificação',
+      }}
+    />
   );
+}
+
+export function NoticeBar() {
+  const { notice } = useWorkspace();
+  const announced = useRef<typeof notice>(undefined);
+  useEffect(() => {
+    if (!notice || announced.current === notice) return;
+    announced.current = notice;
+    if (notice.error) toast.error(notice.text, { duration: 8000 });
+    else toast.success(notice.text);
+  }, [notice]);
+  return null;
 }

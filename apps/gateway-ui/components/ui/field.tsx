@@ -17,7 +17,13 @@ export function Field({
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
-      {cloneElement(children, { id, 'aria-describedby': hint ? `${id}-hint` : undefined })}
+      {cloneElement(children, {
+        id,
+        'aria-describedby':
+          [children.props['aria-describedby'], hint ? `${id}-hint` : undefined]
+            .filter(Boolean)
+            .join(' ') || undefined,
+      })}
       {hint && <small id={`${id}-hint`}>{hint}</small>}
     </div>
   );

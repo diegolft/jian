@@ -1,13 +1,13 @@
 'use client';
 
 import { LoaderCircle, Plus } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
 import { NewProfileDialog } from '../../components/profile/editor';
 import { NoticeBar } from '../../components/shell/notice';
 import { Sidebar } from '../../components/shell/sidebar';
 import { Topbar } from '../../components/shell/topbar';
-import { Badge, Button, Empty } from '../../components/ui';
+import { Button, Empty } from '../../components/ui';
 import { gatewayApi, type Profile } from '../../lib/api';
 import { useWorkspace, WorkspaceProvider } from '../../lib/workspace';
 
@@ -48,6 +48,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
 }
 
 function Shell({ children }: { children: ReactNode }) {
+  const settings = usePathname().startsWith('/settings');
   const { profiles, profile, data, loading, refresh, adopt } = useWorkspace();
   const [mobile, setMobile] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -57,19 +58,55 @@ function Shell({ children }: { children: ReactNode }) {
       return;
     }
 
+    const previous = document.activeElement;
+    const sidebar = document.getElementById('main-navigation');
+    const focusable = () =>
+      Array.from(
+        sidebar?.querySelectorAll<HTMLElement>(
+          'a[href], button:not(:disabled), input:not(:disabled), [tabindex="0"]',
+        ) ?? [],
+      ).filter((element) => element.getClientRects().length > 0);
+    const frame = requestAnimationFrame(() => focusable()[0]?.focus({ preventScroll: true }));
+    const desktop = window.matchMedia('(min-width: 761px)');
+    const resize = () => {
+      if (desktop.matches) setMobile(false);
+    };
     const close = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setMobile(false);
+      if (event.defaultPrevented) return;
+      if (event.key === 'Escape') setMobile(false);
+      if (event.key !== 'Tab') return;
+      const items = focusable();
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (
+        event.shiftKey &&
+        (document.activeElement === first || !sidebar?.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        last?.focus();
+      } else if (
+        !event.shiftKey &&
+        (document.activeElement === last || !sidebar?.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        first?.focus();
       }
     };
-
     window.addEventListener('keydown', close);
-
-    return () => window.removeEventListener('keydown', close);
+    desktop.addEventListener('change', resize);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('keydown', close);
+      desktop.removeEventListener('change', resize);
+      if (previous instanceof HTMLElement) previous.focus();
+    };
   }, [mobile]);
 
   return (
     <div className="app-shell">
+      <a href="#main-content" className="skip-link">
+        Pular para o conteúdo
+      </a>
       {mobile && (
         <button
           className="sidebar-backdrop"
@@ -81,17 +118,18 @@ function Shell({ children }: { children: ReactNode }) {
       <Sidebar
         open={mobile}
         onNavigate={() => setMobile(false)}
-        onCreateProfile={() => setCreating(true)}
+        onCreateProfile={() => {
+          setMobile(false);
+          setCreating(true);
+        }}
       />
       <div className="workspace" inert={mobile}>
-        <Topbar onOpenNavigation={() => setMobile(true)} />
-        <main id="main-content" className="main-content">
-          <div className="page-meta">
-            <span className="profile-context">{profile?.name ?? 'Seu Gateway'}</span>
-            <Badge>Administrador</Badge>
-          </div>
+        <Topbar navigationOpen={mobile} onOpenNavigation={() => setMobile(true)} />
+        <main id="main-content" tabIndex={-1} className="main-content">
           <NoticeBar />
-          {!profiles.length ? (
+          {settings ? (
+            children
+          ) : !profiles.length ? (
             <Empty
               title="Dê vida ao seu primeiro agente"
               action={

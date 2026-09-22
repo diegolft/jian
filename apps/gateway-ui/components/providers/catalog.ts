@@ -24,7 +24,7 @@ export const roles = [
   {
     key: 'conversation',
     label: 'Conversas',
-    hint: 'Usado no painel e na API quando nenhum modelo é indicado.',
+    hint: 'Usado pela API quando nenhum modelo é indicado.',
     runtime: true,
   },
   {
@@ -78,15 +78,6 @@ export const efforts: Array<{ value: ReasoningEffort; label: string }> = [
 /** A live provider carries its own key: revoking it takes the key with it. */
 export const usableProviders = (data: ProfileData) =>
   data.providers.filter((provider) => !provider.revokedAt);
-
-/**
- * Every model the configured accounts actually reported, as the gateway last heard it. An
- * empty result means no provider answered — never that the panel has nothing to show.
- */
-export const availableModels = (data: ProfileData) =>
-  usableProviders(data).flatMap((provider) =>
-    (data.providerModels[provider.id]?.models ?? []).map((model) => ({ provider, model })),
-  );
 
 export const modelLabel = (model: ProviderModel) =>
   `${model.displayName ?? model.id}${model.known ? '' : ' · capacidades desconhecidas'}`;

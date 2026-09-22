@@ -1,0 +1,171 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: Component descendants are grouped by surface and do not overlap. */
+@reference "tailwindcss";
+@reference "./themes.css";
+
+@layer components {
+  .activity-empty {
+    @apply flex min-h-52 flex-col items-start justify-center gap-3 rounded-lg bg-surface/70 p-7;
+  }
+  .activity-empty > svg {
+    @apply mb-1 text-accent;
+  }
+  .activity-empty h3 {
+    @apply font-display text-3xl font-medium;
+  }
+  .activity-empty p {
+    @apply text-sm;
+  }
+  .login-layout {
+    @apply grid min-h-dvh grid-cols-[1.1fr_1fr];
+  }
+  .login-story {
+    @apply relative flex flex-col overflow-hidden border-r border-line px-14 py-10;
+  }
+  .login-copy {
+    @apply flex flex-1 flex-col justify-center py-10;
+  }
+  .login-copy h1 {
+    @apply relative font-display text-7xl font-semibold leading-[0.95] tracking-tight xl:text-8xl;
+  }
+  .login-copy > p {
+    @apply mt-6 max-w-sm text-sm leading-7;
+  }
+  .login-story > small {
+    @apply font-mono text-[10px] text-muted;
+  }
+  .login-emblem {
+    @apply mb-8 grid h-48 w-48 place-items-center text-accent;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: linear-gradient(135deg, black 50%, transparent);
+  }
+  .login-emblem .brand-mark {
+    @apply h-40 w-40;
+  }
+  .login-form-wrap {
+    @apply relative flex flex-col items-center justify-center px-10 py-24;
+  }
+  .login-form {
+    @apply w-full max-w-sm;
+  }
+  .login-lock {
+    @apply mb-5 flex text-accent;
+  }
+  .login-form h2 {
+    @apply text-4xl;
+  }
+  .login-form > p {
+    @apply mb-8 mt-3 text-sm;
+  }
+  .login-form > .button {
+    @apply w-full justify-between;
+  }
+  .login-form > .secure-note {
+    @apply mt-5 flex items-start gap-2 text-xs text-muted;
+  }
+  .secure-note svg {
+    @apply mt-0.5;
+  }
+  .login-help {
+    @apply mt-8 border-t border-line pt-5 text-xs text-muted;
+  }
+  .login-help summary {
+    @apply flex list-none items-center gap-2;
+  }
+  .login-help summary::-webkit-details-marker {
+    display: none;
+  }
+  .login-help p {
+    @apply mt-3 text-xs leading-7;
+  }
+}
+
+.jian-wing {
+  transform-origin: 60px 58px;
+  transform: rotate(-7deg);
+  transition: transform 240ms ease-out;
+}
+.connected .jian-wing,
+[data-connected="true"] .jian-wing {
+  transform: rotate(0);
+}
+.brand:hover .jian-wing {
+  transform: rotate(6deg);
+}
+.connecting .jian-wing {
+  animation: wing-link 900ms ease-in-out infinite alternate;
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+.message,
+.modal[open] {
+  animation: arrive 180ms ease-out;
+}
+.page-enter {
+  animation: arrive 160ms ease-out;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes wing-link {
+  to {
+    transform: rotate(8deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .login-layout {
+    @apply block;
+  }
+  .login-story {
+    @apply border-b border-r-0 px-7 py-6;
+  }
+  .login-copy {
+    @apply py-8;
+  }
+  .login-copy h1 {
+    @apply text-6xl;
+  }
+  .login-copy > p {
+    @apply mt-4;
+  }
+  .login-emblem {
+    @apply absolute right-4 top-4 mb-0 h-24 w-24;
+  }
+  .login-emblem .brand-mark {
+    @apply h-20 w-20;
+  }
+  .login-form-wrap {
+    @apply px-7 pb-12 pt-24;
+  }
+  .login-form {
+    @apply max-w-none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: Reduced motion must override all component animations. */
+    animation: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Reduced motion must override all component animations. */
+    transition: none !important;
+    /* biome-ignore lint/complexity/noImportantStyles: Reduced motion must override all component animations. */
+    scroll-behavior: auto !important;
+  }
+}

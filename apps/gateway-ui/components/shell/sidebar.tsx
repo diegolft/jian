@@ -1,6 +1,6 @@
 'use client';
 
-import { LogOut } from 'lucide-react';
+import { LogOut, Settings2, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { currentSection, groupLabels, navigation } from '../../lib/navigation';
@@ -19,14 +19,22 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const active = currentSection(pathname);
-  const { data, signOut } = useWorkspace();
+  const { data, loading, signOut } = useWorkspace();
 
   return (
-    <aside className={`sidebar ${open ? 'open' : ''}`}>
-      <Link className="brand" href="/">
-        <Mark />
+    <aside id="main-navigation" className={`sidebar ${open ? 'open' : ''}`}>
+      <button
+        type="button"
+        className="icon-button mobile-menu absolute right-3 top-3"
+        aria-label="Fechar navegação"
+        onClick={onNavigate}
+      >
+        <X size={18} />
+      </button>
+      <Link className="brand" href="/" onClick={onNavigate}>
+        <Mark className={loading ? 'connecting' : data ? 'connected' : ''} />
         <span>
-          jian<span className="brand-label">GATEWAY</span>
+          jian<span className="brand-label">比翼の鳥</span>
         </span>
       </Link>
       <ProfileSwitcher onCreate={onCreateProfile} />
@@ -46,20 +54,21 @@ export function Sidebar({
                 >
                   <item.icon size={18} strokeWidth={1.7} />
                   <span>{item.label}</span>
-                  {item.href === '/channels' && data && (
-                    <small>{data.channels.filter((channel) => !channel.revokedAt).length}</small>
-                  )}
                 </Link>
               ))}
           </div>
         ))}
       </nav>
       <div className="sidebar-footer">
-        <div>
-          <span className="live-dot" />
-          <span>Gateway conectado</span>
-          <code>v0.1</code>
-        </div>
+        <Link
+          href="/settings/appearance"
+          className={`settings-link ${pathname.startsWith('/settings') ? 'active' : ''}`}
+          aria-current={pathname.startsWith('/settings') ? 'page' : undefined}
+          onClick={onNavigate}
+        >
+          <Settings2 size={17} />
+          Configurações
+        </Link>
         <button type="button" onClick={() => void signOut()}>
           <LogOut size={16} />
           Sair do painel

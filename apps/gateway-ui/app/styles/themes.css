@@ -1,0 +1,63 @@
+/* Every accent meets AA for normal text on white and its paired soft surface. */
+:root,
+[data-theme="strelizia"] {
+  --accent: #b51e49;
+  --accent-hover: #93133a;
+  --accent-soft: #fff1f4;
+}
+[data-theme="delphinium"] {
+  --accent: #245bb5;
+  --accent-hover: #19458f;
+  --accent-soft: #eff5ff;
+}
+[data-theme="argentea"] {
+  --accent: #a92a72;
+  --accent-hover: #86205a;
+  --accent-soft: #fff0f8;
+}
+[data-theme="genista"] {
+  --accent: #14714f;
+  --accent-hover: #0e563b;
+  --accent-soft: #edf8f2;
+}
+[data-theme="chlorophytum"] {
+  --accent: #7146b2;
+  --accent-hover: #59358f;
+  --accent-soft: #f6f0ff;
+}
+
+:root {
+  --canvas: #ffffff;
+  --ink: #20252d;
+  --muted: #59616d;
+  --line: #dce0e5;
+  --control: #858d99;
+  --surface: #f6f7f9;
+  --good: #176346;
+  --good-soft: #edf7f1;
+  --warn: #81500b;
+  --warn-soft: #fff7e7;
+  --bad: #a42137;
+  --bad-soft: #fff0f2;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-control: var(--control);
+  --color-surface: var(--surface);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --font-sans: "IBM Plex Sans Variable", sans-serif;
+  --font-display: "Barlow Condensed", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+}

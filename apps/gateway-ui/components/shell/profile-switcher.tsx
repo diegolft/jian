@@ -1,40 +1,48 @@
 'use client';
 
-import { ChevronDown, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useWorkspace } from '../../lib/workspace';
 import { Avatar } from '../profile/avatar-field';
+import { Select } from '../ui/select';
 
 export function ProfileSwitcher({ onCreate }: { onCreate: () => void }) {
   const { profiles, profile, selected, select, busy } = useWorkspace();
-
   return (
     <div className="profile-selector">
-      <label htmlFor="profile-picker">SEU ESPAÇO</label>
-      <div>
-        <Avatar name={profile?.name} avatar={profile?.avatar} className="mini-avatar" />
-        <select
-          id="profile-picker"
-          value={selected}
-          disabled={busy}
-          onChange={(event) => select(event.target.value)}
-          aria-label="Perfil ativo"
-        >
-          {profiles.length ? (
-            profiles.map((item) => (
-              <option value={item.id} key={item.id}>
-                {item.name}
-              </option>
-            ))
-          ) : (
-            <option value="">Nenhum perfil</option>
-          )}
-        </select>
-        <ChevronDown size={14} />
-      </div>
-      <button type="button" className="new-profile" onClick={onCreate}>
-        <Plus size={14} />
-        Novo perfil
-      </button>
+      <Select
+        aria-label="Perfil ativo"
+        className="profile-trigger"
+        value={selected}
+        onValueChange={select}
+        disabled={busy}
+        searchThreshold={5}
+        options={profiles.map((item) => ({
+          value: item.id,
+          label: item.name,
+          icon: <Avatar name={item.name} avatar={item.avatar} className="mini-avatar" />,
+        }))}
+        renderValue={() => (
+          <>
+            <Avatar name={profile?.name} avatar={profile?.avatar} className="mini-avatar" />
+            <span className="profile-trigger-copy">
+              <small>Perfil ativo</small>
+              <strong>{profile?.name ?? 'Selecionar perfil'}</strong>
+            </span>
+          </>
+        )}
+        footer={(close) => (
+          <button
+            type="button"
+            onClick={() => {
+              close();
+              onCreate();
+            }}
+          >
+            <Plus size={16} />
+            Criar perfil
+          </button>
+        )}
+      />
     </div>
   );
 }

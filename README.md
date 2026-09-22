@@ -1,3 +1,5 @@
+![Jian — Só voa quando se conecta.](apps/gateway-ui/public/brand/readme-banner.png)
+
 # Jian
 
 Jian is a self-hosted gateway that gives AI agents a persistent identity. A profile keeps

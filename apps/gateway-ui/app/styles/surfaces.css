@@ -1,0 +1,383 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: Component descendants are grouped by surface and do not overlap. */
+@reference "tailwindcss";
+@reference "./themes.css";
+
+/* Shared component surfaces, expressed in the same Tailwind semantic tokens as page layouts. */
+@layer components {
+  .app-shell {
+    @apply min-h-dvh;
+  }
+  .sidebar {
+    @apply fixed inset-y-0 left-0 z-30 flex w-60 flex-col overflow-y-auto border-r border-line bg-canvas px-5 pb-5 pt-8;
+  }
+  .brand {
+    @apply flex w-fit items-center gap-3 text-accent;
+  }
+  .brand > span:last-child {
+    @apply font-display text-5xl font-semibold leading-none tracking-tight text-ink;
+  }
+  .brand-label {
+    @apply mt-1 block font-sans text-[10px] font-normal tracking-[0.3em] text-muted;
+  }
+  .brand-mark {
+    @apply block h-12 w-12 shrink-0 text-accent;
+  }
+  .brand-mark.small {
+    @apply h-9 w-9;
+  }
+  .sidebar .brand {
+    @apply mb-9 ml-2;
+  }
+  .profile-selector {
+    @apply mb-7;
+  }
+  .mini-avatar {
+    @apply grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-sm bg-accent-soft text-xs font-semibold text-accent;
+  }
+  .nav-group {
+    @apply mb-6;
+  }
+  .nav-label {
+    @apply mb-2 block px-3 text-xs text-muted;
+  }
+  .nav-group a {
+    @apply relative my-0.5 flex items-center gap-3 rounded-sm px-3 py-2.5 text-[13px] text-muted transition-colors hover:bg-surface hover:text-ink;
+  }
+  .nav-group a.active {
+    @apply bg-accent-soft font-medium text-accent;
+  }
+  .nav-group a.active::before {
+    @apply absolute inset-y-3 -left-5 w-0.5 bg-accent;
+    content: "";
+  }
+  .nav-group a small {
+    @apply ml-auto font-mono text-[10px];
+  }
+  .sidebar-footer {
+    @apply mt-auto border-t border-line pt-5 text-xs text-muted;
+  }
+  .sidebar-footer > div {
+    @apply flex items-center gap-2;
+  }
+  .live-dot {
+    @apply h-1.5 w-1.5 rounded-full bg-good;
+  }
+  .live-dot.offline {
+    @apply bg-bad;
+  }
+  .sidebar-footer button {
+    @apply mt-3 flex items-center gap-2 py-1 hover:text-accent;
+  }
+  .workspace {
+    @apply ml-60;
+  }
+  .topbar {
+    @apply hidden;
+  }
+  .main-content {
+    @apply mx-auto max-w-[1120px] px-10 pb-12 pt-12;
+  }
+  .icon-button.mobile-menu {
+    @apply hidden;
+  }
+  .settings-section {
+    @apply grid grid-cols-[200px_minmax(0,1fr)] gap-8 border-t border-line py-7;
+  }
+  .settings-caption p {
+    @apply mb-4 mt-2 text-sm;
+  }
+  .settings-caption .badge {
+    @apply items-center whitespace-normal;
+  }
+  .settings-fields {
+    @apply max-w-3xl;
+  }
+  .field {
+    @apply mb-5 flex min-w-0 flex-col gap-2;
+  }
+  .field > label {
+    @apply text-xs font-medium;
+  }
+  .field > small {
+    @apply text-xs leading-relaxed text-muted;
+  }
+  .form-grid {
+    @apply grid grid-cols-2 gap-x-5;
+  }
+  .check-row {
+    @apply flex cursor-pointer gap-3 py-2.5;
+  }
+  .check-row strong {
+    @apply block text-sm font-medium;
+  }
+  .check-row small {
+    @apply mt-1 block text-xs leading-relaxed text-muted;
+  }
+  .save-bar {
+    @apply sticky bottom-5 z-10 ml-auto mt-8 flex w-fit max-w-full items-center justify-between gap-6 rounded-md bg-ink py-2 pl-5 pr-2 text-white;
+    box-shadow: 0 8px 28px #20252d26;
+  }
+  .save-bar > span {
+    @apply flex items-center gap-2 text-xs text-white;
+  }
+  .avatar-field {
+    @apply mb-6 flex items-start gap-5;
+  }
+  .avatar-actions {
+    @apply flex flex-wrap items-center gap-2 pt-1.5;
+  }
+  .avatar-actions small {
+    @apply basis-full text-xs text-muted;
+  }
+  .avatar-actions .form-error {
+    @apply basis-full;
+  }
+  .profile-avatar {
+    @apply grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-sm border border-line bg-accent-soft font-display text-3xl text-accent;
+  }
+  .profile-avatar img,
+  .mini-avatar img {
+    @apply h-full w-full object-cover;
+  }
+  .memory-grid {
+    @apply grid grid-cols-2 gap-5;
+  }
+  .memory-card {
+    @apply relative rounded-sm border border-line border-t-accent p-6;
+  }
+  .memory-card header {
+    @apply mb-4 flex items-center justify-between gap-3;
+  }
+  .memory-card header code {
+    @apply text-accent;
+  }
+  .memory-card > p {
+    @apply whitespace-pre-wrap break-words text-sm leading-7 text-ink;
+  }
+  .memory-card > small {
+    @apply mt-6 block font-mono text-[10px] text-muted;
+  }
+  .pairing-stage {
+    @apply my-4 flex min-h-72 flex-col items-center justify-center gap-4 text-center text-muted;
+  }
+  .qr-frame {
+    @apply rounded-sm border border-line bg-canvas p-4;
+  }
+  .qr-frame svg {
+    @apply block h-auto max-w-full;
+  }
+  .success-orbit {
+    @apply grid h-20 w-20 place-items-center rounded-full bg-good-soft text-good;
+  }
+  .request-panel {
+    @apply mb-6 rounded-sm border border-warn bg-warn-soft p-6;
+  }
+  .request-panel > header {
+    @apply flex items-center gap-3 text-warn;
+  }
+  .request-panel h2 {
+    @apply text-ink;
+  }
+  .request-panel header p {
+    @apply mt-1 text-xs;
+  }
+  .request-row {
+    @apply mt-4 flex flex-wrap items-center gap-4 border-t border-line pt-4;
+  }
+  .request-row small {
+    @apply mt-1 block text-xs text-muted;
+  }
+  .request-message {
+    @apply mt-2 break-words text-sm text-ink;
+  }
+  .modal {
+    @apply m-auto w-[min(600px,calc(100vw-32px))] max-h-[calc(100dvh-48px)] overflow-y-auto rounded-xl border border-line bg-canvas p-7 text-ink shadow-2xl;
+  }
+  .modal::backdrop {
+    background: #20252d70;
+    backdrop-filter: blur(4px);
+  }
+  .modal > header {
+    @apply mb-7 flex items-start justify-between gap-5;
+  }
+  .modal header h2 {
+    @apply text-3xl;
+  }
+  .modal header p {
+    @apply mt-2 text-sm;
+  }
+  .modal footer {
+    @apply mt-4 flex justify-end gap-3 border-t border-line pt-5;
+  }
+  .secret-value {
+    @apply font-mono text-xs;
+  }
+  .notice {
+    @apply mb-6 flex items-start gap-3 rounded-sm border border-control bg-surface px-5 py-4 text-sm text-ink;
+  }
+  .notice p {
+    @apply text-inherit;
+  }
+  .notice > svg {
+    @apply mt-0.5;
+  }
+  .form-error {
+    @apply border border-bad bg-bad-soft text-bad;
+  }
+  .form-error {
+    @apply border border-bad bg-bad-soft text-bad;
+  }
+  .form-error {
+    @apply my-3 rounded-sm px-4 py-3 text-sm;
+  }
+  .note {
+    @apply my-4 text-xs leading-relaxed;
+  }
+  .empty {
+    @apply rounded-sm bg-surface/60 px-6 py-14 text-center;
+  }
+  .empty-orbit {
+    @apply mx-auto mb-5 grid h-16 w-16 place-items-center bg-accent-soft;
+    clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  }
+  .empty h3 {
+    @apply mb-2 font-display text-3xl;
+  }
+  .empty p {
+    @apply mx-auto max-w-md text-sm leading-7;
+  }
+  .empty .button {
+    @apply mt-6;
+  }
+  .loading-state {
+    @apply flex min-h-96 items-center justify-center gap-3 text-muted;
+  }
+  .sessions-layout {
+    @apply grid min-h-[580px] grid-cols-[220px_minmax(0,1fr)] overflow-hidden rounded-sm border border-line;
+  }
+  .session-row {
+    @apply flex items-center rounded-sm;
+  }
+  .session-list {
+    @apply max-h-[780px] overflow-auto border-r border-line bg-surface p-3;
+  }
+  .session-list button {
+    @apply flex w-full items-start gap-2.5 rounded-sm border border-transparent p-3 text-left;
+  }
+  .session-list button svg {
+    @apply mt-0.5 text-muted;
+  }
+  .session-list button span {
+    @apply min-w-0;
+  }
+  .session-list strong {
+    @apply block break-words text-xs font-medium;
+  }
+  .session-list strong.unnamed {
+    @apply italic text-muted;
+  }
+  .session-list small {
+    @apply mt-1.5 block text-[11px] text-muted;
+  }
+  .session-row.selected {
+    @apply border-l-2 border-accent bg-canvas;
+  }
+  .session-history {
+    @apply flex min-w-0 flex-col p-6;
+  }
+  .message-history {
+    @apply max-h-[640px] min-h-64 flex-1 overscroll-contain overflow-auto p-1;
+  }
+  .message-history .empty {
+    @apply border-0;
+  }
+  .message {
+    @apply mb-5 rounded-sm bg-surface p-4;
+  }
+  .message.user {
+    @apply ml-10 border-l-2 border-accent bg-accent-soft;
+  }
+  .message.assistant {
+    @apply mr-5;
+  }
+  .message header {
+    @apply mb-2 flex flex-wrap items-center justify-between gap-2 text-xs;
+  }
+  .message header time {
+    @apply font-mono text-[10px] text-muted;
+  }
+  .message p {
+    @apply whitespace-pre-wrap break-words text-sm leading-7 text-ink;
+  }
+  .run-status {
+    @apply flex flex-wrap items-center gap-3 py-3 text-muted;
+  }
+}
+
+@media (max-width: 1100px) {
+  .settings-section {
+    @apply grid-cols-1 gap-3;
+  }
+  .sessions-layout {
+    @apply grid-cols-1;
+  }
+  .session-list {
+    @apply max-h-44 border-b border-r-0;
+  }
+  .memory-grid {
+    @apply grid-cols-1;
+  }
+}
+@media (max-width: 760px) {
+  .sidebar {
+    @apply invisible w-64 -translate-x-full;
+    transition:
+      transform 160ms,
+      visibility 160ms;
+  }
+  .sidebar.open {
+    @apply visible translate-x-0;
+  }
+  .sidebar-backdrop {
+    @apply fixed inset-0 z-20 bg-ink/40;
+  }
+  .workspace {
+    @apply ml-0;
+  }
+  .topbar {
+    @apply flex min-h-14 items-center justify-between gap-2 border-b border-line px-4;
+  }
+  .icon-button.mobile-menu {
+    @apply inline-flex;
+  }
+  .main-content {
+    @apply px-5 pt-6;
+  }
+  .form-grid {
+    @apply grid-cols-1;
+  }
+  .resource-row {
+    @apply gap-3 p-4;
+  }
+  .resource-row > .small {
+    @apply hidden;
+  }
+  .save-bar {
+    @apply gap-2 p-3;
+  }
+  .save-bar > span {
+    @apply text-[11px];
+  }
+  .save-bar > span svg {
+    @apply hidden;
+  }
+  .session-history {
+    @apply p-3;
+  }
+  .message.user {
+    @apply ml-4;
+  }
+  .message.assistant {
+    @apply mr-2;
+  }
+}

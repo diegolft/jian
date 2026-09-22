@@ -24,13 +24,13 @@ export const navigation: NavigationItem[] = [
   { href: '/providers', label: 'Providers', icon: Plug, group: 'workspace' },
   { href: '/models', label: 'Modelos padrão', icon: Cpu, group: 'workspace' },
   { href: '/channels', label: 'Canais', icon: Smartphone, group: 'workspace' },
-  { href: '/conversations', label: 'Conversas', icon: MessageSquare, group: 'workspace' },
+  { href: '/sessions', label: 'Sessões', icon: MessageSquare, group: 'workspace' },
   { href: '/memories', label: 'Memórias', icon: BookOpen, group: 'capabilities' },
   { href: '/skills', label: 'Skills', icon: Sparkles, group: 'capabilities' },
   { href: '/mcp', label: 'Servidores MCP', icon: Plug, group: 'capabilities' },
 ];
 
-export const groupLabels = { workspace: 'WORKSPACE', capabilities: 'CAPACIDADES' } as const;
+export const groupLabels = { workspace: 'Operação', capabilities: 'Capacidades' } as const;
 
 /** The deepest section whose route prefixes the current one, so a child route stays marked. */
 export function currentSection(pathname: string): NavigationItem | undefined {
