@@ -148,11 +148,6 @@ export const deliverySchema = z.strictObject({
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   remoteMessageIds: z.array(z.union([z.number(), z.string()])).default([]),
-  preview: z
-    .string()
-    .max(8000)
-    .optional()
-    .describe('The answer as last shown while the run was still writing it.'),
   notice: z
     .string()
     .max(1000)

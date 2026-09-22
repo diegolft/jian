@@ -19,15 +19,6 @@ export class WhatsAppChannel implements Channel {
     return this.connections.typing(context.channelId, chatId, context.connectionGeneration);
   }
 
-  edit(message: OutgoingMessage & { remoteMessageId: string | number }, context: DeliveryContext) {
-    return this.connections.edit(
-      context.channelId,
-      message,
-      context.signal,
-      context.connectionGeneration,
-    );
-  }
-
   send(message: OutgoingMessage, context: DeliveryContext) {
     return this.connections.send(
       context.channelId,

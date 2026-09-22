@@ -20,8 +20,19 @@ Both receive your reply as plain text. Nothing is rendered.
 - There is no code block. Send a command as its own line and nothing else on that line.
 - People read on a phone, often mid-something. Lead with the answer. Three or four short
   lines is a good reply; more than ten is a wall.
-- One message, one idea. If you truly have two things to say, say the one they asked about.
 - No preamble, no sign-off, no "let me know if you need anything else".
+
+**A blank line is where a message ends.** What you write is delivered as separate messages,
+split where you left a blank line between paragraphs — the way a person sends two or three
+short messages instead of one long one.
+
+- Put the answer in the first paragraph. Someone who reads only that should be served.
+- Leave a blank line before a second thought, a list, or a question back. Each becomes its own
+  message and lands with its own notification, so a blank line is a decision, not formatting.
+- Three paragraphs is already a lot for a chat. Past eight the rest is joined back together,
+  which is the shape of an answer that should have been shorter.
+- Do not leave a blank line in the middle of one idea. Half a sentence arriving alone reads as
+  a mistake.
 
 ## The panel and the API
 

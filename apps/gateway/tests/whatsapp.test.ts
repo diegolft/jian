@@ -44,7 +44,6 @@ async function setup(send?: (chatId: string, text: string) => Promise<string>) {
         sent.push({ chatId, text });
         return send ? send(chatId, text) : `wa-sent-${sent.length}`;
       },
-      edit: async () => {},
       typing: async () => {},
       stop: async () => {},
     };

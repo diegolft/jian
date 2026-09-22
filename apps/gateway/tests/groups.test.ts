@@ -41,7 +41,6 @@ async function setup() {
 
         return `wa-sent-${sent.length}`;
       },
-      edit: async () => {},
       typing: async () => {},
       stop: async () => {},
     };

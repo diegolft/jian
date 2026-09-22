@@ -482,38 +482,6 @@ export class WhatsAppConnections {
       .catch(() => undefined);
   }
 
-  /**
-   * Replaces the message that already carries this answer. An edit that fails leaves the last
-   * text on screen, so the caller keeps the id and tries again on the next tick.
-   */
-  async edit(
-    id: string,
-    message: OutgoingMessage & { remoteMessageId: string | number },
-    signal: AbortSignal,
-    generation?: number,
-  ): Promise<DeliveryOutcome> {
-    const remoteMessageIds = [message.remoteMessageId];
-
-    try {
-      if (!(await this.canSend(id, generation))) {
-        return { status: 'failed', remoteMessageIds };
-      }
-
-      const local = assertFound(this.devices.get(id), 'Device');
-
-      await local.device.edit(
-        message.chatId,
-        String(message.remoteMessageId),
-        Array.from(message.text).slice(0, 4000).join(''),
-        signal,
-      );
-
-      return { status: 'sent', remoteMessageIds };
-    } catch {
-      return { status: 'unknown', remoteMessageIds };
-    }
-  }
-
   start(receive: Receiver) {
     const poll = async () => {
       if (this.stopped) return;

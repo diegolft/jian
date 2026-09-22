@@ -3553,8 +3553,6 @@ export interface operations {
                         updatedAt: string;
                         /** @default [] */
                         remoteMessageIds: (number | string)[];
-                        /** @description The answer as last shown while the run was still writing it. */
-                        preview?: string;
                         /** @description Gateway-authored text sent without a run, such as the approval notice. */
                         notice?: string;
                     }[];

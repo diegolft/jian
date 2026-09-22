@@ -455,9 +455,6 @@ export const deliveries = pgTable(
     notice: text('notice'),
     status: deliveryStatus('status').notNull(),
     error: text('error'),
-    // The answer as last shown while the run was still writing it, so a tick that changes
-    // nothing sends nothing and the final edit knows what is already on screen.
-    preview: text('preview'),
     // What the protocol called the message it accepted, for a later receipt to match.
     remoteMessageIds: jsonb('remote_message_ids')
       .$type<Array<string | number>>()

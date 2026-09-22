@@ -330,7 +330,7 @@ describe('Telegram transport', () => {
 });
 
 describe('what a chat sees while the agent is still working', () => {
-  it('shows typing, grows one message, and never names a tool', async () => {
+  it('shows typing, then the finished answer as separate messages, and never a tool name', async () => {
     const calls: Array<{ path: string; body: Record<string, unknown> }> = [];
 
     const f = await setup(async (url, options) => {
@@ -338,7 +338,7 @@ describe('what a chat sees while the agent is still working', () => {
 
       calls.push({ path, body: JSON.parse(String(options?.body ?? '{}')) });
 
-      return Response.json({ ok: true, result: { message_id: 42 } });
+      return Response.json({ ok: true, result: { message_id: calls.length } });
     });
 
     try {
@@ -350,6 +350,9 @@ describe('what a chat sees while the agent is still working', () => {
       await f.channels.approveContact(f.profile.id, pending.id);
       await f.channels.dispatch();
 
+      // The approval notice has gone out by now; only what follows it is the answer.
+      const beforeAnswer = calls.filter((call) => call.path === 'sendMessage').length;
+
       const [run] = await f.services.runs.activities(f.profile.id);
       if (!run) throw new Error('Run missing');
 
@@ -359,44 +362,39 @@ describe('what a chat sees while the agent is still working', () => {
       await f.services.lifecycle.progress(run.id, 'worker', {
         phase: 'tool',
         tool: 'read_memories',
-        text: '',
+        text: 'Deixa eu ver',
         steps: 1,
         updatedAt: new Date().toISOString(),
       });
       await f.channels.dispatch();
 
-      await f.services.lifecycle.progress(run.id, 'worker', {
-        phase: 'writing',
-        text: 'Estou verificando o que você me pediu e já te respondo com o resultado.',
-        steps: 2,
-        updatedAt: new Date().toISOString(),
-      });
-      await f.channels.dispatch();
+      expect(calls.filter((call) => call.path === 'sendChatAction').length).toBeGreaterThan(0);
+      // Nothing half-written reaches the chat while the run is still going.
+      expect(calls.filter((call) => call.path === 'sendMessage')).toHaveLength(beforeAnswer);
 
       await f.services.lifecycle.finish(
         f.profile.id,
         run.id,
         'worker',
         'completed',
-        'Estou verificando o que você me pediu: está tudo certo.',
+        'Verifiquei aqui.\n\nEstá tudo certo, pode seguir.',
       );
       await f.channels.dispatch();
 
-      const typing = calls.filter((call) => call.path === 'sendChatAction');
-      const sends = calls.filter((call) => call.path === 'sendMessage');
-      const edits = calls.filter((call) => call.path === 'editMessageText');
+      const sends = calls
+        .filter((call) => call.path === 'sendMessage')
+        .slice(beforeAnswer)
+        .map((call) => call.body.text);
 
-      expect(typing.length).toBeGreaterThanOrEqual(2);
-      expect(sends.at(-1)?.body.text).toContain('Estou verificando');
-      // The preview was sent once and then finished in place, not sent twice.
-      expect(edits.at(-1)?.body.text).toBe(
-        'Estou verificando o que você me pediu: está tudo certo.',
-      );
+      expect(sends).toEqual(['Verifiquei aqui.', 'Está tudo certo, pode seguir.']);
       expect(JSON.stringify(calls)).not.toContain('read_memories');
 
-      expect(
-        (await f.channels.deliveries(f.profile.id)).find((item) => item.runId === run.id)?.status,
-      ).toBe('sent');
+      const delivery = (await f.channels.deliveries(f.profile.id)).find(
+        (item) => item.runId === run.id,
+      );
+
+      expect(delivery?.status).toBe('sent');
+      expect(delivery?.remoteMessageIds).toHaveLength(2);
     } finally {
       await f.app.close();
     }
@@ -514,7 +512,7 @@ describe('markdown in a bubble that cannot draw it', () => {
       );
       await f.channels.dispatch();
 
-      const answer = sends.at(-1) ?? '';
+      const answer = sends.join('\n\n');
 
       expect(answer).toContain('Pro\nPreco: R$ 90');
       expect(answer).toContain('O Pro vale mais.');

@@ -152,42 +152,6 @@ export class TelegramChannel implements Channel {
     );
   }
 
-  async edit(
-    message: OutgoingMessage & { remoteMessageId: string | number },
-    context: DeliveryContext,
-  ): Promise<DeliveryOutcome> {
-    const token = context.credential;
-    const remoteMessageIds = [message.remoteMessageId];
-
-    if (!token || !BOT_TOKEN.test(token)) {
-      return { status: 'failed', remoteMessageIds };
-    }
-
-    const body = await this.request(
-      'editMessageText',
-      token,
-      {
-        chat_id: message.chatId,
-        message_id: Number(message.remoteMessageId),
-        text: message.text.slice(0, MESSAGE_CHUNK_SIZE),
-      },
-      { fetch: context.fetch, signal: context.signal, channelId: context.channelId },
-    );
-
-    if (body?.ok) {
-      return { status: 'sent', remoteMessageIds };
-    }
-
-    // Editing a message to the text it already carries is refused, and it is not a failure:
-    // what the person sees is exactly what was asked for.
-    if (body && !body.ok && body.description.includes('not modified')) {
-      return { status: 'sent', remoteMessageIds };
-    }
-
-    // The message already on screen is stale, never wrong, so the next tick may edit it again.
-    return { status: refused(body) ? 'pending' : 'unknown', remoteMessageIds };
-  }
-
   async send(message: OutgoingMessage, context: DeliveryContext): Promise<DeliveryOutcome> {
     const token = context.credential;
     const remoteMessageIds: number[] = [];

@@ -5870,11 +5870,6 @@
                           ]
                         }
                       },
-                      "preview": {
-                        "description": "The answer as last shown while the run was still writing it.",
-                        "type": "string",
-                        "maxLength": 8000
-                      },
                       "notice": {
                         "description": "Gateway-authored text sent without a run, such as the approval notice.",
                         "type": "string",

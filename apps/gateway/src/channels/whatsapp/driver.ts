@@ -376,21 +376,6 @@ export function createWhatsAppDeviceFactory(): DeviceFactory {
           // A bubble nobody saw is not worth failing anything over.
         }
       },
-      edit: async (chatId, remoteMessageId, text, signal) => {
-        const jid = toDeviceJid(chatId);
-
-        if (closed || !socket || !jid) {
-          throw new Error('Device unavailable');
-        }
-
-        signal.throwIfAborted();
-
-        // A failed edit leaves the previous text on screen, which is stale but never wrong.
-        await socket.sendMessage(jid, {
-          text,
-          edit: { remoteJid: jid, id: remoteMessageId, fromMe: true },
-        });
-      },
       send: async (chatId, text, signal) => {
         const jid = toDeviceJid(chatId);
 

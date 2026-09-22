@@ -5,7 +5,6 @@ import {
   type deliverySchema,
   type Group,
   type GroupTurn,
-  type Run,
 } from '@jian/contracts';
 import type { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
@@ -18,14 +17,9 @@ import { issueToken, verifyToken } from '../security/tokens.js';
 import type { Vault } from '../security/vault.js';
 import type { SessionWriter } from '../sessions/port.js';
 import type { Queryable, Store } from '../storage/database.js';
-import type {
-  Channel,
-  ChannelRequest,
-  ChannelType,
-  DeliveryOutcome,
-  IncomingMessage,
-} from './channel.js';
+import type { ChannelRequest, ChannelType, DeliveryOutcome, IncomingMessage } from './channel.js';
 import { type ContactRecord, Contacts, type Intake } from './contacts.js';
+import { conversational } from './conversation.js';
 import { type GroupDecision, Groups } from './groups.js';
 import { plainText } from './plain.js';
 import { ChannelRegistry } from './registry.js';
@@ -60,17 +54,35 @@ export const channelSecret = (channelId: string) => `channel:${channelId}`;
 export type DeliveryRecord = z.infer<typeof deliverySchema> & { connectionGeneration?: number };
 
 const DISPATCH_INTERVAL_MS = 2000;
-/** A preview shorter than this reads as a glitch rather than as an answer taking shape. */
-const PREVIEW_MIN_CHARS = 40;
+/** What one message holds on the chat protocols; the adapter still enforces its own. */
+const MESSAGE_LIMIT = 4000;
+/** The longest a part waits behind the composing bubble before it is sent. */
+const BETWEEN_MESSAGES_MS = 1200;
 const UNCERTAIN_DELIVERY_AFTER_MS = 10 * 60_000;
 
 /** Sent once to a sender the owner has not decided on yet. It must never depend on a run. */
 const APPROVAL_NOTICE =
   'This gateway does not know you yet. Its owner was asked to approve this conversation, and your message is waiting for that decision.';
 
-/** The answer as this protocol's bubble will actually show it. */
-function bubbleText(adapter: Channel, text: string): string {
-  return adapter.rendersMarkdown ? text.trim() : plainText(text);
+/** Resolves after the wait, or at once when the gateway is shutting down. */
+function pause(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) {
+      resolve();
+
+      return;
+    }
+
+    const timer = setTimeout(done, ms);
+
+    function done() {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', done);
+      resolve();
+    }
+
+    signal.addEventListener('abort', done, { once: true });
+  });
 }
 
 /** Owns access checks and durable delivery state, independently of each protocol adapter. */
@@ -567,7 +579,7 @@ export class Channels {
         const run = await this.services.runs.run(delivery.profileId, delivery.runId);
 
         if (run.status === 'queued' || run.status === 'running') {
-          await this.showProgress(delivery, run);
+          await this.showProgress(delivery);
           continue;
         }
 
@@ -617,11 +629,11 @@ export class Channels {
   }
 
   /**
-   * What the person sees while the agent is still working: the composing bubble every tick, and
-   * the answer so far growing inside one message. Only the text crosses — a tool name is for the
-   * panel, never for a chat. None of it is history, so a tick that fails is simply skipped.
+   * While a run is live the chat shows only that the agent is answering. The answer itself is
+   * never shown half-written: it arrives when it is finished, as the messages it was written
+   * in. Nothing here is history, so a tick that fails is simply skipped.
    */
-  private async showProgress(delivery: DeliveryRecord, run: Run): Promise<void> {
+  private async showProgress(delivery: DeliveryRecord): Promise<void> {
     const channel = await findChannel(this.services.store.db, delivery.channelId);
 
     if (!channel || channel.revokedAt) {
@@ -630,55 +642,19 @@ export class Channels {
 
     const adapter = this.registry.get(channel.type);
 
-    if (adapter.canSend && !(await adapter.canSend(channel.id))) {
+    if (!adapter.typing || (adapter.canSend && !(await adapter.canSend(channel.id)))) {
       return;
     }
 
-    const context = {
-      channelId: delivery.channelId,
-      connectionGeneration: delivery.connectionGeneration,
-      credential: await this.services.vault.read(delivery.profileId, channelSecret(channel.id)),
-      fetch: this.fetcher,
-      signal: this.abort.signal,
-    };
-
-    await adapter.typing?.(delivery.chatId, context).catch(() => undefined);
-
-    const preview = bubbleText(adapter, run.progress?.text ?? '');
-
-    // Below this a preview is a fragment of a sentence, and the edit costs more than it says.
-    if (!adapter.edit || preview.length < PREVIEW_MIN_CHARS || preview === delivery.preview) {
-      return;
-    }
-
-    const shown = delivery.remoteMessageIds[0];
-
-    const outcome = shown
-      ? await adapter.edit(
-          { chatId: delivery.chatId, text: preview, remoteMessageId: shown },
-          context,
-        )
-      : await adapter.send?.({ chatId: delivery.chatId, text: preview }, context);
-
-    if (outcome?.status !== 'sent') {
-      return;
-    }
-
-    await this.services.store.transaction(delivery.profileId, async (tx) => {
-      const current = await findDelivery(tx, delivery.id);
-
-      // Only a delivery still waiting carries a preview; a claimed one is already being sent.
-      if (current?.status !== 'pending') {
-        return;
-      }
-
-      await updateDelivery(tx, {
-        ...current,
-        preview,
-        remoteMessageIds: outcome.remoteMessageIds,
-        updatedAt: new Date().toISOString(),
-      });
-    });
+    await adapter
+      .typing(delivery.chatId, {
+        channelId: delivery.channelId,
+        connectionGeneration: delivery.connectionGeneration,
+        credential: await this.services.vault.read(delivery.profileId, channelSecret(channel.id)),
+        fetch: this.fetcher,
+        signal: this.abort.signal,
+      })
+      .catch(() => undefined);
   }
 
   private async claimDelivery(delivery: DeliveryRecord): Promise<boolean> {
@@ -731,34 +707,42 @@ export class Channels {
 
       attemptedSend = true;
 
-      const body = bubbleText(adapter, text);
-      const shown = delivery.remoteMessageIds[0];
+      const context = {
+        channelId: delivery.channelId,
+        connectionGeneration: delivery.connectionGeneration,
+        credential,
+        fetch: this.fetcher,
+        signal: this.abort.signal,
+      };
 
-      // The answer is already on screen as a preview: finish it in place rather than sending a
-      // second copy of the same reply.
-      if (shown && adapter.edit) {
-        return await adapter.edit(
-          { chatId: delivery.chatId, text: body, remoteMessageId: shown },
-          {
-            channelId: delivery.channelId,
-            connectionGeneration: delivery.connectionGeneration,
-            credential,
-            fetch: this.fetcher,
-            signal: this.abort.signal,
-          },
-        );
+      const parts = adapter.rendersMarkdown
+        ? [text.trim()]
+        : conversational(plainText(text), MESSAGE_LIMIT);
+
+      const remoteMessageIds: Array<string | number> = [];
+
+      for (const [index, part] of parts.entries()) {
+        if (index > 0) {
+          // Between messages the bubble goes back to composing, and the pause is what keeps a
+          // three-part answer from landing as one burst of notifications.
+          await adapter.typing?.(delivery.chatId, context).catch(() => undefined);
+          await pause(Math.min(BETWEEN_MESSAGES_MS, 200 + part.length * 8), this.abort.signal);
+        }
+
+        const outcome = await adapter.send({ chatId: delivery.chatId, text: part }, context);
+
+        remoteMessageIds.push(...outcome.remoteMessageIds);
+
+        if (outcome.status !== 'sent') {
+          // Part of the answer is already there, so nothing may be replayed from the start.
+          return {
+            status: remoteMessageIds.length ? 'unknown' : outcome.status,
+            remoteMessageIds,
+          };
+        }
       }
 
-      return await adapter.send(
-        { chatId: delivery.chatId, text: body },
-        {
-          channelId: delivery.channelId,
-          connectionGeneration: delivery.connectionGeneration,
-          credential,
-          fetch: this.fetcher,
-          signal: this.abort.signal,
-        },
-      );
+      return { status: 'sent', remoteMessageIds };
     } catch {
       // An unexpected adapter failure may happen after a remote write. Never retry it blindly.
       return { status: attemptedSend ? 'unknown' : 'failed', remoteMessageIds: [] };

@@ -68,13 +68,4 @@ export interface Channel {
    * so it is called again on every dispatch tick and never has to be switched off.
    */
   typing?(chatId: string, context: DeliveryContext): Promise<void>;
-
-  /**
-   * Replaces a message already sent, which is what turns a stream into one growing answer
-   * instead of a run of fragments. An adapter without it delivers once, when the run ends.
-   */
-  edit?(
-    message: OutgoingMessage & { remoteMessageId: string | number },
-    context: DeliveryContext,
-  ): Promise<DeliveryOutcome>;
 }
