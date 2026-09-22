@@ -57,6 +57,13 @@
       "when": 1790094388292,
       "tag": "0007_mcp-all-tools",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790095956369,
+      "tag": "0008_errands",
+      "breakpoints": true
     }
   ]
 }

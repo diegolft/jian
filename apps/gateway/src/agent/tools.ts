@@ -4,6 +4,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { Coordination } from '../coordination/service.js';
 import { assertFound, GatewayError } from '../core/errors.js';
+import type { Outreach } from '../errands/port.js';
 import type { MemoryWriter } from '../memories/port.js';
 import type { PeerAgents } from '../peers/port.js';
 import type { ProfileAdmin } from '../profiles/port.js';
@@ -21,6 +22,7 @@ export type ToolServices = {
   runs: RunReader;
   peers: PeerAgents;
   lifecycle: RunExecution;
+  errands: Outreach;
   store: Store;
 };
 
@@ -203,6 +205,25 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
         'Ask another agent of this installation and wait for its written answer. Only text crosses: they never read your memories, sessions or history, and you never read theirs. The two of you keep one shared thread. A chain of calls is bounded — you cannot ask yourself, nor an agent that already spoke in this conversation, and the depth budget is shared by everyone in the chain.',
       inputSchema: agentCallSchema,
       execute: async (input, { abortSignal }) => services.peers.ask(run, input, abortSignal),
+    }),
+
+    list_contacts: tool({
+      description:
+        'The people this profile may write to on its channels: their id, name and where they are reached. Approved by the owner, never by you.',
+      inputSchema: z.object({}),
+      execute: async () => services.errands.reachable(run.profileId),
+    }),
+
+    message_contact: tool({
+      description:
+        'Write to one of this profile’s approved contacts on their own channel. With expectReply, their answer comes back to this conversation instead of theirs — say so to whoever asked, because it will not arrive in this turn.',
+      inputSchema: z.object({
+        contactId: z.string().uuid(),
+        text: z.string().trim().min(1).max(4000),
+        expectReply: z.boolean().default(false),
+      }),
+      execute: async ({ contactId, text, expectReply }) =>
+        services.errands.ask(run.profileId, contactId, run.sessionId, text, expectReply),
     }),
 
     read_inbox: tool({

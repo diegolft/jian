@@ -400,6 +400,44 @@ export const deliveryStatus = pgEnum('delivery_status', [
   'unknown',
 ]);
 
+export const errandStatus = pgEnum('errand_status', ['waiting', 'answered', 'expired']);
+
+/**
+ * A question the agent put to one of its contacts on behalf of a conversation. The contact
+ * answers on their own time, in their own chat; this row is what carries their reply back to
+ * the conversation that asked, instead of leaving it where nobody was waiting for it.
+ */
+export const errands = pgTable(
+  'errands',
+  {
+    id: uuid('id').primaryKey(),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    contactId: uuid('contact_id')
+      .notNull()
+      .references(() => contacts.id, { onDelete: 'cascade' }),
+    // Where the answer goes. A session that is gone leaves nothing to deliver to.
+    fromSessionId: uuid('from_session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    question: text('question').notNull(),
+    status: errandStatus('status').notNull(),
+    answer: text('answer'),
+    // After this, a message from that contact is a new conversation, not a late reply.
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt,
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // One open question per contact: two at once, and their replies cannot be told apart.
+    uniqueIndex('errands_open_per_contact')
+      .on(table.contactId)
+      .where(sql`${table.status} = 'waiting'`),
+    index('errands_waiting').on(table.profileId, table.status),
+  ],
+);
+
 export const deliveries = pgTable(
   'deliveries',
   {

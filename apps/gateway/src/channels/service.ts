@@ -10,6 +10,7 @@ import {
 import type { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
+import { Errands } from '../errands/service.js';
 import type { ProfileReader } from '../profiles/port.js';
 import { isUniqueViolation } from '../providers/repository.js';
 import type { RunWriter } from '../runs/port.js';
@@ -91,6 +92,7 @@ export class Channels {
     private readonly services: ChannelServices,
     private readonly fetcher: typeof fetch,
     private readonly registry = new ChannelRegistry(),
+    private readonly errands = new Errands(services.store),
     private readonly people = new Contacts(services),
     private readonly rooms = new Groups(services.profiles),
   ) {}
@@ -358,6 +360,24 @@ export class Channels {
       return { accepted: false, contact: 'approved' as const, silence: intake.decision.reason };
     }
 
+    // The answer to a question the agent put to this contact belongs to the conversation that
+    // asked, not to this one: nobody here is waiting for it.
+    if (data.scope === 'direct') {
+      const errand = await this.services.store.transaction(channel.profileId, (tx) =>
+        this.errands.answer(tx, intake.contact.id, data.text),
+      );
+
+      if (errand) {
+        const relayed = await this.relay(channel, intake.contact, errand, data);
+
+        // The asking conversation was busy. The answer is on the errand either way, and it
+        // still reaches the owner as an ordinary turn rather than disappearing.
+        if (relayed) {
+          return relayed;
+        }
+      }
+    }
+
     // In a room the author is part of the message: an agent answers people and colleagues by
     // name, and it can only do that if it reads who wrote what.
     const text =
@@ -373,6 +393,41 @@ export class Channels {
     );
 
     return { accepted: true, runId: run.id, contact: 'approved' as const };
+  }
+
+  /**
+   * Carries a contact's answer into the conversation that asked. It arrives as a turn there,
+   * so the agent is the one who decides how to pass it on to whoever asked.
+   */
+  private async relay(
+    channel: ChannelRecord,
+    contact: ContactRecord,
+    errand: { id: string; fromSessionId: string; question: string },
+    data: IncomingMessage,
+  ): Promise<{ accepted: true; runId: string; contact: 'approved' } | null> {
+    const who = contact.displayName ?? data.displayName ?? contact.actorId;
+
+    try {
+      const run = await this.services.runs.submit(
+        channel.profileId,
+        errand.fromSessionId,
+        {
+          text: [
+            `${who} answered the question you sent them.`,
+            `You asked: ${errand.question}`,
+            `They replied: ${data.text}`,
+          ].join('\n\n'),
+          requestKey: createHash('sha256')
+            .update(JSON.stringify(['errand', errand.id, data.requestKey]))
+            .digest('hex'),
+        },
+        { activity: 'channel' },
+      );
+
+      return { accepted: true, runId: run.id, contact: 'approved' as const };
+    } catch {
+      return null;
+    }
   }
 
   /** The binding, not the inbound payload, chooses the profile and session. */
