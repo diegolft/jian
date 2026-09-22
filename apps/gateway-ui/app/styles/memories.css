@@ -1,0 +1,36 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: Selectors are grouped by independent components; their descendant elements do not overlap. */
+
+/* Memories: the cards the agent writes and the owner can only delete. */
+
+.memory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.memory-card {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.memory-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px -5px 12px 0;
+}
+.memory-card header code {
+  color: #577aaf;
+}
+.memory-card > p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.8;
+  color: #526177;
+}
+.memory-card > small {
+  display: block;
+  font-size: 10px;
+  color: #6d7b8d;
+  margin-top: 25px;
+}

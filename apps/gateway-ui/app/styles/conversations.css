@@ -1,0 +1,181 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: Selectors are grouped by independent components; their descendant elements do not overlap. */
+
+/* The conversation: the session list, the history and the composer. */
+
+.sessions-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 580px;
+}
+.session-row {
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+}
+/* The rename control stays out of the way until the row is hovered or focused. */
+.session-row .button.quiet {
+  opacity: 0;
+  padding: 6px;
+}
+.session-row:hover .button.quiet,
+.session-row:focus-within .button.quiet {
+  opacity: 1;
+}
+.session-list strong.unnamed {
+  color: var(--muted);
+  font-style: italic;
+}
+.session-list {
+  background: #f8fafd;
+  padding: 12px;
+  border-right: 1px solid var(--line);
+  max-height: 740px;
+  overflow: auto;
+}
+.session-list button {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 14px 10px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  text-align: left;
+}
+.session-list button svg {
+  margin-top: 2px;
+  color: #8b9cba;
+}
+.session-list button span {
+  min-width: 0;
+}
+.session-list strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.session-list small {
+  display: block;
+  color: #6d7b8d;
+  font-size: 9px;
+  margin-top: 5px;
+}
+.session-row.selected {
+  background: white;
+  border: 1px solid #e4eaf5;
+  box-shadow: 0 2px 4px #14264404;
+}
+.conversation {
+  display: flex;
+  flex-direction: column;
+  padding: 23px;
+  min-width: 0;
+}
+.message-history {
+  flex: 1;
+  min-height: 250px;
+  max-height: 460px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 2px;
+}
+.message-history .empty {
+  border: none;
+}
+.message {
+  padding: 15px 18px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  background: #f5f7fb;
+}
+.message.user {
+  margin-left: 32px;
+  background: #eef3ff;
+}
+.message.assistant {
+  margin-right: 20px;
+}
+.message header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  margin-bottom: 8px;
+}
+.message header time {
+  color: #9ba5b5;
+  font-size: 9px;
+}
+.message p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.8;
+  color: #42546e;
+}
+.run-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  color: var(--muted);
+}
+.run-status small {
+  font-size: 10px;
+}
+.composer {
+  border: 1px solid #dce4f1;
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 15px;
+}
+.composer textarea {
+  border: 0;
+  padding: 4px;
+  font-size: 13px;
+  min-height: 65px;
+  resize: vertical;
+}
+.composer textarea:focus {
+  outline: 0;
+}
+.composer:focus-within {
+  outline: 3px solid #edf1fc;
+  border-color: #7998e3;
+}
+.composer > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-top: 8px;
+}
+.composer small {
+  font-size: 9px;
+  color: #6d7b8d;
+}
+.composer .button {
+  min-height: 32px;
+  padding: 7px;
+}
+.composer-model {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  color: var(--muted);
+  font-size: 11px;
+}
+.composer-model select {
+  max-width: 300px;
+  padding: 7px 10px;
+  font-size: 11px;
+}

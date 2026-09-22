@@ -1,0 +1,86 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: Selectors are grouped by independent components; their descendant elements do not overlap. */
+
+/* What the panel says back: notices, errors, empty and loading states. */
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #f5f8fd;
+  border: 1px solid #e5ebf5;
+  color: #6c84a9;
+  padding: 15px 18px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  font-size: 12px;
+}
+.notice p {
+  color: inherit;
+  font-size: 12px;
+}
+.notice > svg {
+  margin-top: 2px;
+}
+.toast {
+  align-items: center;
+  justify-content: space-between;
+}
+.toast.success {
+  background: #eef8f1;
+  border-color: #ddeddf;
+  color: #407951;
+}
+.toast.error,
+.form-error {
+  background: #fff3f3;
+  border: 1px solid #f1dadd;
+  color: #a44050;
+}
+.form-error {
+  padding: 12px 15px;
+  border-radius: 7px;
+  font-size: 12px;
+  margin: 12px 0;
+}
+.note {
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 15px 0;
+}
+.empty {
+  text-align: center;
+  padding: 55px 30px;
+  border: 1px dashed #dfe6ef;
+  border-radius: var(--radius);
+}
+.empty-orbit {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 20px;
+  background: #f4f7fd;
+  border: 1px solid #ebeff7;
+  border-radius: 50%;
+}
+.empty h3 {
+  font-size: 18px;
+  margin-bottom: 9px;
+}
+.empty p {
+  max-width: 425px;
+  margin: 0 auto;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.empty .button {
+  margin-top: 22px;
+}
+.loading-state {
+  min-height: 450px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+}

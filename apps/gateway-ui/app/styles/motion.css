@@ -1,0 +1,25 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: Selectors are grouped by independent components; their descendant elements do not overlap. */
+
+/* Every animation in the panel. The reduced-motion rule lives in responsive.css. */
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+.page-enter {
+  animation: enter 0.2s ease-out;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

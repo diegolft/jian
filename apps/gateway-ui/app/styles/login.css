@@ -1,0 +1,179 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: Selectors are grouped by independent components; their descendant elements do not overlap. */
+
+/* The sign-in page, the only one rendered outside the workspace. */
+
+.login-layout {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.login-story {
+  background: #f1f5fc;
+  padding: 48px 65px 30px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+.login-story > small {
+  color: #91a1ba;
+  font-size: 11px;
+  margin-top: auto;
+  padding-top: 25px;
+}
+.login-copy {
+  margin: auto 0;
+  padding-top: 60px;
+  max-width: 510px;
+}
+.login-copy .eyebrow {
+  color: #718db9;
+  font-size: 9px;
+  letter-spacing: 2px;
+}
+.login-copy h1 {
+  font-size: clamp(34px, 4vw, 60px);
+  letter-spacing: -2px;
+  font-weight: 450;
+  margin: 22px 0;
+  line-height: 1.1;
+}
+.login-copy > p {
+  font-size: 14px;
+  max-width: 340px;
+  line-height: 1.8;
+  color: #8393aa;
+}
+.identity-orbit {
+  position: relative;
+  width: 280px;
+  height: 210px;
+  margin: 40px 0 0;
+}
+.identity-orbit::before {
+  content: "";
+  width: 200px;
+  height: 160px;
+  border: 1px dashed #cdd9ee;
+  border-radius: 50%;
+  position: absolute;
+  top: 15px;
+  left: 25px;
+  transform: rotate(-25deg);
+}
+.orbit-node {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #fff;
+  color: #8aa1c9;
+  border: 1px solid #e2e9f7;
+  display: grid;
+  place-items: center;
+}
+.orbit-node svg {
+  width: 20px;
+}
+.node-one {
+  top: 18px;
+  left: 12px;
+  transform: rotate(-7deg);
+}
+.node-two {
+  top: 5px;
+  right: 39px;
+  transform: rotate(7deg);
+}
+.node-three {
+  bottom: 8px;
+  left: 106px;
+  transform: rotate(-4deg);
+}
+.orbit-center {
+  position: absolute;
+  top: 58px;
+  left: 99px;
+  width: 65px;
+  height: 65px;
+  background: #fff;
+  border: 1px solid #dbe5f7;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 12px 35px #90a9d51a;
+}
+.login-form-wrap {
+  display: grid;
+  place-items: center;
+  padding: 40px;
+}
+.login-form {
+  width: 100%;
+  max-width: 365px;
+}
+.login-lock {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  background: #f6f8fc;
+  border: 1px solid #e9edf5;
+  border-radius: 13px;
+  color: #7a93bd;
+  margin-bottom: 27px;
+}
+.login-form h2 {
+  font-size: 27px;
+  font-weight: 500;
+  letter-spacing: -0.8px;
+  margin-bottom: 11px;
+}
+.login-form > p {
+  font-size: 12px;
+  line-height: 1.8;
+}
+.login-form .field {
+  margin-top: 30px;
+}
+.login-form .field input {
+  height: 46px;
+}
+.login-form > .button {
+  width: 100%;
+  min-height: 44px;
+  justify-content: space-between;
+}
+.login-form > .secure-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 18px;
+  color: #6d7b8d;
+  font-size: 10px;
+}
+.secure-note svg {
+  margin-top: 2px;
+  color: #82a08f;
+}
+.login-help {
+  margin-top: 35px;
+  border-top: 1px solid var(--line);
+  padding-top: 23px;
+  color: #8c99ab;
+  font-size: 11px;
+}
+.login-help summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+}
+.login-help summary::-webkit-details-marker {
+  display: none;
+}
+.login-help p {
+  font-size: 11px;
+  margin-top: 13px;
+  line-height: 1.8;
+}

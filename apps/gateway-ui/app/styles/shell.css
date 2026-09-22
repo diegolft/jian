@@ -1,0 +1,211 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: Selectors are grouped by independent components; their descendant elements do not overlap. */
+
+/* The frame around every page: sidebar, profile switcher, navigation, topbar. */
+
+.app-shell {
+  min-height: 100dvh;
+}
+.sidebar {
+  width: 236px;
+  position: fixed;
+  z-index: 20;
+  inset: 0 auto 0 0;
+  background: var(--sidebar);
+  border-right: 1px solid var(--line);
+  padding: 31px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.sidebar .brand {
+  margin-left: 10px;
+  margin-bottom: 36px;
+}
+.profile-selector {
+  padding: 0 9px 20px;
+}
+.profile-selector > label {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 1.4px;
+  color: #6d7b8d;
+  margin-bottom: 10px;
+}
+.profile-selector > div {
+  display: flex;
+  align-items: center;
+  position: relative;
+  gap: 9px;
+}
+.profile-selector select {
+  border: 0;
+  background: transparent;
+  padding: 5px 15px 5px 0;
+  min-width: 0;
+  width: 100%;
+  font-size: 13px;
+  font-weight: 500;
+  appearance: none;
+}
+.profile-selector > div > svg {
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}
+.mini-avatar {
+  background: #e5eafa;
+  color: #5371b3;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.new-profile {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  font-size: 11px;
+  margin-top: 11px;
+  padding: 4px 0;
+}
+.nav-group {
+  margin-bottom: 20px;
+}
+.nav-label {
+  display: block;
+  color: #6d7b8d;
+  font-size: 9px;
+  letter-spacing: 1.3px;
+  padding: 0 11px;
+  margin-bottom: 8px;
+}
+.nav-group a {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 11px;
+  border: 0;
+  border-radius: 7px;
+  color: #68788c;
+  background: none;
+  margin: 2px 0;
+  font-size: 12px;
+  text-align: left;
+}
+.nav-group a:hover {
+  background: #ecf0f7;
+}
+.nav-group a.active {
+  background: #e7edfb;
+  color: #315cce;
+  font-weight: 500;
+}
+.nav-group a small {
+  margin-left: auto;
+  font-size: 10px;
+  background: #e5eaf2;
+  padding: 0 5px;
+  border-radius: 3px;
+}
+.sidebar-footer {
+  margin-top: auto;
+  padding: 20px 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 10px;
+  color: #7b8998;
+}
+.sidebar-footer > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sidebar-footer code {
+  margin-left: auto;
+  font-size: 9px;
+}
+.live-dot {
+  width: 5px;
+  height: 5px;
+  background: #5ba38a;
+  border-radius: 50%;
+}
+.sidebar-footer button {
+  border: 0;
+  background: none;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 0 0;
+  font-size: 11px;
+  color: #7b8998;
+}
+.workspace {
+  margin-left: 236px;
+}
+.topbar {
+  height: 72px;
+  padding: 0 42px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 11px;
+}
+.topbar > div {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.topbar strong {
+  font-weight: 500;
+}
+.breadcrumb-slash {
+  color: #c3cbd5;
+}
+.server-address {
+  color: #6d7b8d;
+  font-size: 10px;
+}
+.admin-avatar {
+  background: #edf0f6;
+  border: 1px solid #e2e8f1;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 10px;
+}
+.main-content {
+  max-width: 1350px;
+  margin: auto;
+  padding: 34px 46px 20px;
+}
+.page-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+  margin-bottom: 28px;
+}
+.section-heading p {
+  margin-top: 9px;
+  font-size: 13px;
+}
+.mobile-menu {
+  display: none;
+}
