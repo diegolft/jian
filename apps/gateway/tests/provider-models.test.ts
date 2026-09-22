@@ -248,3 +248,41 @@ it('takes the router listing as the whole truth about a model', async () => {
   expect(plain).toMatchObject({ known: true, contextWindow: 32_768 });
   expect(plain?.reasoningEfforts).toEqual([]);
 });
+
+it('reads a catalog that carries a malformed entry among the good ones', async () => {
+  const services = await testServices();
+  const profile = await services.profiles.createProfile({ name: 'Atlas', instructions: 'Help.' });
+
+  const provider = await services.providers.createProvider(profile.id, {
+    name: 'Anthropic',
+    kind: 'anthropic',
+    secret: 'synthetic-key',
+  });
+
+  // One provider with a null where a string belongs must not cost every other model its
+  // capabilities: nobody here reviews this source before it is used.
+  const catalog = new ModelCatalog(
+    (async () =>
+      Response.json({
+        broken: {
+          models: { 'bad-model': { reasoning_options: [{ type: 'effort', values: [null] }] } },
+        },
+        anthropic: {
+          models: {
+            'claude-sonnet-5': {
+              limit: { context: 1_000_000, output: 128_000 },
+              modalities: { input: ['text', 'image', 'pdf'] },
+              reasoning_options: [{ type: 'effort', values: ['low', 'high'] }],
+            },
+          },
+        },
+      })) as typeof globalThis.fetch,
+    () => 0,
+    'https://models.test/api.json',
+  );
+
+  const models = new ProviderModels(services, async () => listing('claude-sonnet-5'), { catalog });
+  const list = await models.list(profile.id, provider.id);
+
+  expect(list.models[0]).toMatchObject({ known: true, contextWindow: 1_000_000 });
+});

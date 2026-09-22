@@ -19,17 +19,39 @@ const TTL_MS = 4 * 60 * 60 * 1000;
 const effort = z.enum(['none', 'minimal', 'low', 'medium', 'high']);
 const modality = z.enum(['text', 'image', 'audio', 'video', 'pdf']);
 
-const entry = z.object({
-  id: z.string().optional(),
-  name: z.string().optional(),
-  limit: z.object({ context: z.number().optional(), output: z.number().optional() }).optional(),
-  modalities: z.object({ input: z.array(z.string()).optional() }).optional(),
+/**
+ * Read leniently, field by field. The catalog describes hundreds of providers and one of them
+ * having a null where a string belongs must not cost every other model its capabilities — the
+ * whole point of this source is that nobody here reviews it before it is used.
+ */
+const entry = z.looseObject({
+  name: z.string().optional().catch(undefined),
+  limit: z
+    .looseObject({
+      context: z.number().optional().catch(undefined),
+      output: z.number().optional().catch(undefined),
+    })
+    .optional()
+    .catch(undefined),
+  modalities: z
+    .looseObject({ input: z.array(z.string()).optional().catch(undefined) })
+    .optional()
+    .catch(undefined),
   reasoning_options: z
-    .array(z.object({ type: z.string(), values: z.array(z.string()).optional() }))
-    .optional(),
+    .array(
+      z.looseObject({
+        type: z.string().optional().catch(undefined),
+        values: z.array(z.string()).optional().catch(undefined),
+      }),
+    )
+    .optional()
+    .catch(undefined),
 });
 
-const catalog = z.record(z.string(), z.object({ models: z.record(z.string(), entry).optional() }));
+const catalog = z.record(
+  z.string(),
+  z.looseObject({ models: z.record(z.string(), z.unknown()).optional().catch(undefined) }),
+);
 
 export type CatalogEntry = {
   displayName?: string;
@@ -76,6 +98,8 @@ export class ModelCatalog {
     private readonly fetcher: typeof globalThis.fetch = fetch,
     private readonly clock: Clock = Date.now,
     private readonly url = CATALOG_URL,
+    private readonly report: (reason: string) => void = (reason) =>
+      console.error(`jian: não foi possível ler o catálogo de modelos (${reason})`),
   ) {}
 
   /** Never throws: a missing catalog is a gap to fall through, not a failure to report. */
@@ -124,6 +148,8 @@ export class ModelCatalog {
       });
 
       if (!response.ok) {
+        this.report(`o catálogo de modelos respondeu ${response.status}`);
+
         return undefined;
       }
 
@@ -134,14 +160,20 @@ export class ModelCatalog {
         const models = new Map<string, CatalogEntry>();
 
         for (const [id, model] of Object.entries(body.models ?? {})) {
-          models.set(id.toLowerCase(), toEntry(model));
+          const parsedModel = entry.safeParse(model);
+
+          if (parsedModel.success) {
+            models.set(id.toLowerCase(), toEntry(parsedModel.data));
+          }
         }
 
         byProvider.set(provider, models);
       }
 
       return { byProvider, fetchedAt: this.clock() };
-    } catch {
+    } catch (error) {
+      this.report(error instanceof Error ? error.message : 'erro desconhecido');
+
       return undefined;
     }
   }

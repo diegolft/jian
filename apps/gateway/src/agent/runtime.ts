@@ -341,6 +341,13 @@ export class AgentRuntime {
 
       await this.nameConversation(run, model, secrets);
     } catch (error) {
+      // The stored message stays generic because a provider error can echo a key back. The
+      // operator still needs the cause, so it goes to the log with the known secrets removed.
+      console.error(
+        `jian: execução ${runId} falhou —`,
+        redactText(error instanceof Error ? error.message : String(error), secrets),
+      );
+
       const current = await this.services.runs.run(profileId, runId);
 
       if (current.status === 'running' && current.leaseOwner === owner) {
