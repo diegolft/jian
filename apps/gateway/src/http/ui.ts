@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fastifyStatic from '@fastify/static';
@@ -13,45 +13,52 @@ declare module 'fastify' {
 
 const embeddedRoot = fileURLToPath(new URL('../../dist/ui/', import.meta.url));
 
-/** Static Next exports contain inline hydration scripts. Hash them instead of allowing arbitrary scripts. */
-function contentPolicies(root: string): Map<string, string> {
-  const policies = new Map<string, string>();
+const DIRECTIVES = [
+  "default-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+];
 
-  for (const file of readdirSync(root, { recursive: true })) {
-    if (typeof file !== 'string' || !file.endsWith('.html')) {
-      continue;
-    }
+/**
+ * A static Next export carries inline hydration scripts, so the policy names their hashes
+ * rather than allowing any inline script at all.
+ *
+ * The hashes have to come from the bytes this request is serving, not from the ones present
+ * when the process started: rebuilding the panel under a running gateway changes the page,
+ * and a policy computed once would then block the page it is attached to. The stamp is what
+ * makes that cheap — the file is re-read only when it has actually changed.
+ */
+function policyFor(path: string, cache: Map<string, { stamp: string; policy: string }>): string {
+  const file = statSync(path);
+  const stamp = `${file.mtimeMs}:${file.size}`;
+  const cached = cache.get(path);
 
-    const path = join(root, file);
-    const html = readFileSync(path, 'utf8');
-
-    const hashes = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
-      .filter((match) => match[1])
-      .map(
-        (match) =>
-          `'sha256-${createHash('sha256')
-            .update(match[1] as string)
-            .digest('base64')}'`,
-      );
-
-    policies.set(
-      path,
-      [
-        "default-src 'self'",
-        `script-src 'self' ${hashes.join(' ')}`,
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data:",
-        "font-src 'self'",
-        "connect-src 'self'",
-        "object-src 'none'",
-        "base-uri 'none'",
-        "frame-ancestors 'none'",
-        "form-action 'self'",
-      ].join('; '),
-    );
+  if (cached?.stamp === stamp) {
+    return cached.policy;
   }
 
-  return policies;
+  const html = readFileSync(path, 'utf8');
+
+  const hashes = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)]
+    .filter((match) => match[1])
+    .map(
+      (match) =>
+        `'sha256-${createHash('sha256')
+          .update(match[1] as string)
+          .digest('base64')}'`,
+    );
+
+  const policy = [`script-src 'self' ${hashes.join(' ')}`, ...DIRECTIVES].join('; ');
+
+  cache.set(path, { stamp, policy });
+
+  return policy;
 }
 
 export function registerGatewayUi(app: FastifyInstance, root = embeddedRoot) {
@@ -60,7 +67,7 @@ export function registerGatewayUi(app: FastifyInstance, root = embeddedRoot) {
     return;
   }
 
-  const policies = contentPolicies(root);
+  const policies = new Map<string, { stamp: string; policy: string }>();
 
   // The bare host is how people reach the panel; without this it answers 404.
   for (const path of ['/', '/ui']) {
@@ -81,12 +88,12 @@ export function registerGatewayUi(app: FastifyInstance, root = embeddedRoot) {
       dotfiles: 'deny',
       index: ['index.html'],
       setHeaders(reply, path) {
-        const policy = policies.get(path);
-
-        if (policy) {
-          reply.header('Content-Security-Policy', policy);
-          reply.header('Cache-Control', 'no-cache');
+        if (!path.endsWith('.html')) {
+          return;
         }
+
+        reply.header('Content-Security-Policy', policyFor(path, policies));
+        reply.header('Cache-Control', 'no-cache');
       },
     });
   });

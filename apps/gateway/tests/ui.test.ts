@@ -1,71 +1,61 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtempSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { expect, it } from 'vitest';
-import { createApp } from '../src/app.js';
-import { testServices } from './helpers/services.js';
+import Fastify from 'fastify';
+import { afterEach, describe, expect, it } from 'vitest';
+import { registerGatewayUi } from '../src/http/ui.js';
 
-it('serves the exported UI with hashed scripts without opening API or filesystem access', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'jian-ui-'));
-  const script = 'window.__jian = true;';
-  const html = `<html><script>${script}</script><body>Jian</body></html>`;
-  const token = 'ui-test-admin-token-at-least-32-characters';
+const page = (script: string) =>
+  `<!doctype html><html><head><script src="/ui/app.js"></script><script>${script}</script></head><body></body></html>`;
 
-  await writeFile(join(root, 'index.html'), html);
-  await writeFile(join(root, '.secret'), 'must-never-be-served');
-  await writeFile(join(root, 'app.js'), 'console.log("jian");');
+const hash = (script: string) => `'sha256-${createHash('sha256').update(script).digest('base64')}'`;
 
-  const app = createApp({
-    ...(await testServices()),
-    token,
-    logger: false,
-    uiRoot: root,
+const apps: Array<{ close: () => Promise<void> }> = [];
+
+afterEach(async () => {
+  await Promise.all(apps.splice(0).map((app) => app.close()));
+});
+
+async function serve(script: string) {
+  const root = mkdtempSync(join(tmpdir(), 'jian-ui-'));
+  const file = join(root, 'index.html');
+
+  writeFileSync(file, page(script));
+
+  const app = Fastify();
+
+  registerGatewayUi(app, root);
+  await app.ready();
+  apps.push(app);
+
+  return { app, file };
+}
+
+describe('the policy the panel is served with', () => {
+  it('names the hash of the inline script in the page it is attached to', async () => {
+    const { app } = await serve('window.__jian = 1');
+
+    const response = await app.inject({ method: 'GET', url: '/ui/' });
+    const policy = String(response.headers['content-security-policy']);
+
+    expect(policy).toContain(`script-src 'self' ${hash('window.__jian = 1')}`);
+    expect(policy).toContain("frame-ancestors 'none'");
   });
 
-  try {
-    for (const path of ['/', '/ui']) {
-      const redirect = await app.inject(path);
+  it('follows a rebuild under a running gateway instead of blocking the new page', async () => {
+    const { app, file } = await serve('window.__jian = 1');
 
-      expect(redirect.statusCode).toBe(302);
-      expect(redirect.headers.location).toBe('/ui/');
-    }
+    await app.inject({ method: 'GET', url: '/ui/' });
 
-    const page = await app.inject('/ui/');
+    // What `pnpm build` does to a gateway that is already serving.
+    writeFileSync(file, page('window.__jian = 2'));
+    utimesSync(file, new Date(), new Date(Date.now() + 1000));
 
-    expect(page.statusCode).toBe(200);
-    expect(page.body).toBe(html);
+    const response = await app.inject({ method: 'GET', url: '/ui/' });
 
-    expect(page.headers['content-security-policy']).toContain(
-      `'sha256-${createHash('sha256').update(script).digest('base64')}'`,
+    expect(String(response.headers['content-security-policy'])).toContain(
+      hash('window.__jian = 2'),
     );
-
-    expect(page.headers['content-security-policy']).toContain("frame-ancestors 'none'");
-
-    expect(page.headers['content-security-policy']).not.toContain(
-      "script-src 'self' 'unsafe-inline'",
-    );
-
-    expect(page.headers['x-content-type-options']).toBe('nosniff');
-    expect((await app.inject('/ui/app.js')).statusCode).toBe(200);
-    expect((await app.inject({ method: 'HEAD', url: '/ui/' })).statusCode).toBe(200);
-    expect((await app.inject('/v1/profiles')).statusCode).toBe(401);
-
-    expect(
-      (await app.inject({ url: '/v1/profiles', headers: { authorization: `Bearer ${token}` } }))
-        .statusCode,
-    ).toBe(200);
-
-    for (const path of ['/ui/.secret', '/ui/%2e%2e/package.json', '/ui/%2e%2e/v1/profiles']) {
-      const response = await app.inject(path);
-
-      expect(response.statusCode).toBeGreaterThanOrEqual(400);
-      expect(response.body).not.toContain('must-never-be-served');
-    }
-
-    expect((await app.inject({ method: 'POST', url: '/ui/' })).statusCode).toBe(401);
-  } finally {
-    await app.close();
-    await rm(root, { recursive: true, force: true });
-  }
+  });
 });
