@@ -5,13 +5,16 @@ import { assertFound, GatewayError } from '../core/errors.js';
 import type { Store } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
 import type { RunWriter } from '../runs/port.js';
-import type { Credentials } from '../security/credentials.js';
 import { issueToken, verifyToken } from '../security/tokens.js';
+import type { Vault } from '../security/vault.js';
 import type { SessionWriter } from '../sessions/port.js';
 import type { ChannelRequest, DeliveryOutcome, IncomingMessage } from './channel.js';
 import { ChannelRegistry } from './registry.js';
 
 export type ChannelRecord = z.infer<typeof channelSchema> & { tokenHash: string };
+
+/** Where a channel's bot token lives in the vault. Revoking the channel takes it with it. */
+export const channelSecret = (channelId: string) => `channel:${channelId}`;
 
 export type DeliveryRecord = z.infer<typeof deliverySchema> & { connectionGeneration?: number };
 
@@ -24,6 +27,7 @@ type ChannelServices = {
   sessions: SessionWriter;
   runs: RunWriter;
   store: Store;
+  vault: Vault;
 };
 
 export class Channels {
@@ -34,7 +38,6 @@ export class Channels {
 
   constructor(
     private readonly services: ChannelServices,
-    private readonly credentials: Credentials,
     private readonly fetcher: typeof fetch,
     private readonly registry = new ChannelRegistry(),
   ) {}
@@ -65,17 +68,13 @@ export class Channels {
   }
 
   async create(profileId: string, input: unknown) {
-    const data = channelInputSchema.parse(input);
+    const { token, ...data } = channelInputSchema.parse(input);
 
     await this.services.sessions.session(profileId, data.sessionId);
 
     const adapter = this.registry.get(data.type);
 
-    adapter.validateConfiguration?.(data);
-
-    if (data.credentialId) {
-      await this.credentials.resolve(profileId, data.credentialId, 'channel');
-    }
+    adapter.validateConfiguration?.({ ...data, token });
 
     const issued = issueToken();
 
@@ -88,6 +87,10 @@ export class Channels {
     };
 
     await this.services.store.transaction(profileId, async (tx) => {
+      if (token) {
+        await this.services.vault.put(profileId, channelSecret(record.id), token, tx);
+      }
+
       await tx.put('channel', record.id, profileId, record);
 
       await tx.event({
@@ -118,6 +121,7 @@ export class Channels {
       const record = { ...channel, revokedAt: new Date().toISOString() };
 
       await tx.put('channel', id, profileId, record);
+      await this.services.vault.discard(profileId, channelSecret(id), tx);
 
       const connection = await tx.get('channelConnection', id);
 
@@ -352,9 +356,10 @@ export class Channels {
 
       const adapter = this.registry.get(channel.type);
 
-      const credential = channel.credentialId
-        ? await this.credentials.resolve(delivery.profileId, channel.credentialId, 'channel')
-        : undefined;
+      const credential = await this.services.vault.read(
+        delivery.profileId,
+        channelSecret(channel.id),
+      );
 
       if (!adapter.send) {
         throw new Error('Channel does not support delivery');

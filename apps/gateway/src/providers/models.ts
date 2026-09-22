@@ -20,14 +20,14 @@ export function resolveModel(
     explicitKey ??
     (config.apiKeyEnv ? env[config.apiKeyEnv] : undefined) ??
     (config.apiKeyEnv ||
-    config.credentialId ||
+    config.providerId ||
     config.provider === 'openai-compatible' ||
     config.provider === 'openai-codex'
       ? undefined
       : env[providerEnvironment(config.provider, env) ?? '']);
 
   if (!apiKey) {
-    throw new Error('Provider credential is not configured');
+    throw new Error('Provider key is not configured');
   }
 
   switch (config.provider) {
@@ -37,7 +37,7 @@ export function resolveModel(
       return createCodexModel(apiKey, config.modelId, fetcher);
     case 'anthropic':
       return createAnthropic({
-        ...(config.credentialId ||
+        ...(config.providerId ||
         (config.apiKeyEnv ?? providerEnvironment('anthropic', env)) !== 'ANTHROPIC_API_TOKEN'
           ? { apiKey }
           : { authToken: apiKey }),

@@ -18,6 +18,8 @@ export interface Reader {
 
 export interface Transaction extends Reader {
   put<K extends Kind>(kind: K, id: string, profileId: string, value: Records[K]): Promise<void>;
+  // Removing what is already absent is not an error: a secret may never have been stored.
+  remove<K extends Kind>(kind: K, id: string, profileId: string): Promise<void>;
   event(event: Omit<GatewayEvent, 'id'>): Promise<void>;
 }
 

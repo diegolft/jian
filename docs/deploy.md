@@ -124,7 +124,7 @@ Fixe uma versão exata na imagem; `latest` faz um reinício qualquer trocar de c
 | `JIAN_BIND_ADDRESS` | só no Compose | `127.0.0.1` | Endereço do host onde a porta do Gateway é publicada. |
 | `JIAN_BIND_PORT` | só no Compose | `4310` | Porta do host onde o Gateway é publicado. |
 
-As chaves de provider, MCP e canal não ficam no ambiente: são guardadas no cofre, criptografadas com o keyring. Veja [segurança](security.md).
+As chaves de provider, MCP e canal não ficam no ambiente: são digitadas no painel e guardadas cifradas com o keyring. Veja [segurança](security.md).
 
 ## Etiquetas publicadas
 
@@ -172,7 +172,7 @@ Tudo que persiste está no PostgreSQL: perfis, sessões, histórico, memórias, 
 
 No Compose, o banco fica no volume nomeado `jian_postgres_data`; o banco de desenvolvimento fica em `jian-dev_postgres_data`. `make down` preserva o volume, `docker compose down -v` o apaga. `make db-reset` apaga o de desenvolvimento de propósito.
 
-O keyring `JIAN_MASTER_KEYS` fica fora do banco, no `.env` ou no gerenciador de segredos. Sem ele, um backup do banco é inútil: as credenciais do cofre não abrem. Guarde-o separado, e preserve as entradas antigas até toda credencial ter sido rotacionada.
+O keyring `JIAN_MASTER_KEYS` fica fora do banco, no `.env` ou no gerenciador de segredos. Sem ele, um backup do banco é inútil: os segredos do cofre não abrem. Guarde-o separado, e preserve as entradas antigas até todo segredo ter sido reenviado com a chave nova.
 
 ## Publicação
 

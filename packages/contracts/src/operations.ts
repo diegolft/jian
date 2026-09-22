@@ -19,7 +19,7 @@ import {
   pageQuerySchema,
 } from './coordination.js';
 import {
-  memorySchema,
+  memoryKeySchema,
   profilePatchSchema,
   profileSchema,
   sessionSchema,
@@ -43,24 +43,22 @@ import {
   runRecordSchema,
   sessionRecordSchema,
 } from './records.js';
-import {
-  credentialInputSchema,
-  credentialMetadataSchema,
-  keyInputSchema,
-  keyMetadataSchema,
-  panelSessionEndSchema,
-  panelSessionInputSchema,
-  panelSessionSchema,
-  type Scope,
-} from './security.js';
+import { panelSessionEndSchema, panelSessionInputSchema, panelSessionSchema } from './security.js';
 
+/**
+ * `access` is the whole authorization model: the host token opens everything marked `admin`,
+ * `public` routes carry their own proof in the body, and a webhook authenticates with the
+ * token of its own channel binding.
+ */
 export type Operation = {
   method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   path: string;
   operationId: string;
-  scope: Scope | 'admin' | 'public' | 'webhook';
+  access: 'admin' | 'public' | 'webhook';
   body?: z.ZodType;
   query?: z.ZodType;
+  // Path parameters are UUIDs unless an operation says otherwise.
+  params?: z.ZodType;
   response: z.ZodType;
   status?: number;
   stream?: boolean;
@@ -78,28 +76,28 @@ export const operations: Operation[] = [
     method: 'POST',
     path: `${profile}/providers/openai/oauth`,
     operationId: 'startCodexLogin',
-    scope: 'admin',
+    access: 'admin',
     response: codexLoginSchema,
   },
   {
     method: 'GET',
     path: `${profile}/providers/openai/oauth`,
     operationId: 'getCodexLogin',
-    scope: 'admin',
+    access: 'admin',
     response: codexLoginSchema,
   },
   {
     method: 'GET',
     path: `${profile}/providers`,
     operationId: 'listProviders',
-    scope: 'admin',
+    access: 'admin',
     response: z.array(providerRecordSchema),
   },
   {
     method: 'POST',
     path: `${profile}/providers`,
     operationId: 'createProvider',
-    scope: 'admin',
+    access: 'admin',
     body: providerInputSchema,
     response: providerRecordSchema,
     status: 201,
@@ -108,21 +106,21 @@ export const operations: Operation[] = [
     method: 'DELETE',
     path: `${profile}/providers/:providerId`,
     operationId: 'revokeProvider',
-    scope: 'admin',
+    access: 'admin',
     response: providerRecordSchema,
   },
   {
     method: 'GET',
     path: `${profile}/model-defaults`,
     operationId: 'getModelDefaults',
-    scope: 'admin',
+    access: 'admin',
     response: modelDefaultsRecordSchema,
   },
   {
     method: 'PUT',
     path: `${profile}/model-defaults`,
     operationId: 'setModelDefaults',
-    scope: 'admin',
+    access: 'admin',
     body: modelDefaultsInputSchema,
     response: modelDefaultsRecordSchema,
   },
@@ -130,21 +128,21 @@ export const operations: Operation[] = [
     method: 'GET',
     path: '/openapi.json',
     operationId: 'getOpenAPI',
-    scope: 'admin',
+    access: 'admin',
     response: z.record(z.string(), z.unknown()),
   },
   {
     method: 'GET',
     path: `${profile}/runs/:runId/checkpoints`,
     operationId: 'listRunCheckpoints',
-    scope: 'read',
+    access: 'admin',
     response: z.array(checkpointSchema),
   },
   {
     method: 'POST',
     path: `${profile}/runs/:runId/continue`,
     operationId: 'continueRun',
-    scope: 'chat',
+    access: 'admin',
     body: continuationSchema,
     response: runRecordSchema,
     status: 202,
@@ -153,7 +151,7 @@ export const operations: Operation[] = [
     method: 'POST',
     path: `${profile}/channels`,
     operationId: 'createChannel',
-    scope: 'admin',
+    access: 'admin',
     body: channelInputSchema,
     response: channelSchema.extend({ webhookToken: z.string() }),
     status: 201,
@@ -162,28 +160,28 @@ export const operations: Operation[] = [
     method: 'GET',
     path: `${profile}/channels`,
     operationId: 'listChannels',
-    scope: 'admin',
+    access: 'admin',
     response: z.array(channelSchema),
   },
   {
     method: 'DELETE',
     path: `${profile}/channels/:channelId`,
     operationId: 'revokeChannel',
-    scope: 'admin',
+    access: 'admin',
     response: channelSchema,
   },
   {
     method: 'GET',
     path: `${profile}/deliveries`,
     operationId: 'listDeliveries',
-    scope: 'read',
+    access: 'admin',
     response: z.array(deliverySchema),
   },
   {
     method: 'POST',
     path: `${profile}/channels/:channelId/connect`,
     operationId: 'connectChannel',
-    scope: 'admin',
+    access: 'admin',
     response: channelConnectionSchema,
     status: 202,
   },
@@ -191,21 +189,21 @@ export const operations: Operation[] = [
     method: 'GET',
     path: `${profile}/channels/:channelId/connection`,
     operationId: 'getChannelConnection',
-    scope: 'admin',
+    access: 'admin',
     response: channelConnectionSchema,
   },
   {
     method: 'GET',
     path: `${profile}/channels/:channelId/qr`,
     operationId: 'getChannelQr',
-    scope: 'admin',
+    access: 'admin',
     response: channelQrSchema,
   },
   {
     method: 'POST',
     path: `${profile}/channels/:channelId/disconnect`,
     operationId: 'disconnectChannel',
-    scope: 'admin',
+    access: 'admin',
     response: channelConnectionSchema,
     status: 202,
   },
@@ -213,7 +211,7 @@ export const operations: Operation[] = [
     method: 'POST',
     path: '/v1/ingress/:channelId',
     operationId: 'channelIngress',
-    scope: 'webhook',
+    access: 'webhook',
     body: ingressSchema,
     response: ingressResultSchema,
     status: 202,
@@ -222,7 +220,7 @@ export const operations: Operation[] = [
     method: 'POST',
     path: '/v1/telegram/:channelId',
     operationId: 'telegramIngress',
-    scope: 'webhook',
+    access: 'webhook',
     body: telegramUpdateSchema,
     response: ingressResultSchema,
   },
@@ -230,7 +228,7 @@ export const operations: Operation[] = [
     method: 'GET',
     path: `${profile}/sessions/:sessionId/history`,
     operationId: 'getHistory',
-    scope: 'read',
+    access: 'admin',
     query: pageQuerySchema,
     response: z.strictObject({
       items: z.array(messageRecordSchema),
@@ -241,7 +239,7 @@ export const operations: Operation[] = [
     method: 'GET',
     path: `${profile}/history`,
     operationId: 'searchHistory',
-    scope: 'read',
+    access: 'admin',
     query: pageQuerySchema,
     response: z.strictObject({
       items: z.array(messageRecordSchema),
@@ -252,7 +250,7 @@ export const operations: Operation[] = [
     method: 'GET',
     path: `${profile}/artifacts/:artifactId`,
     operationId: 'getArtifact',
-    scope: 'read',
+    access: 'admin',
     query: artifactQuerySchema,
     response: artifactPageSchema,
   },
@@ -260,7 +258,7 @@ export const operations: Operation[] = [
     method: 'POST',
     path: `${profile}/leases`,
     operationId: 'acquireResource',
-    scope: 'chat',
+    access: 'admin',
     body: leaseInputSchema,
     response: leaseSchema,
   },
@@ -268,7 +266,7 @@ export const operations: Operation[] = [
     method: 'POST',
     path: `${profile}/leases/release`,
     operationId: 'releaseResource',
-    scope: 'chat',
+    access: 'admin',
     body: leaseInputSchema
       .omit({ ttlSeconds: true })
       .extend({ fence: z.number().int().positive() }),
@@ -278,7 +276,7 @@ export const operations: Operation[] = [
     method: 'POST',
     path: `${profile}/mail`,
     operationId: 'sendSessionMail',
-    scope: 'chat',
+    access: 'admin',
     body: mailInputSchema,
     response: mailSchema,
   },
@@ -286,7 +284,7 @@ export const operations: Operation[] = [
     method: 'GET',
     path: `${session}/mail`,
     operationId: 'getSessionInbox',
-    scope: 'read',
+    access: 'admin',
     response: z.array(mailSchema),
   },
 
@@ -294,7 +292,7 @@ export const operations: Operation[] = [
     method: 'GET',
     path: '/health',
     operationId: 'health',
-    scope: 'public',
+    access: 'public',
     response: z.strictObject({ status: z.literal('ok'), service: z.literal('jian') }),
   },
   {
@@ -302,7 +300,7 @@ export const operations: Operation[] = [
     method: 'POST',
     path: '/v1/panel/session',
     operationId: 'startPanelSession',
-    scope: 'public',
+    access: 'public',
     body: panelSessionInputSchema,
     response: panelSessionSchema,
     status: 201,
@@ -311,21 +309,21 @@ export const operations: Operation[] = [
     method: 'DELETE',
     path: '/v1/panel/session',
     operationId: 'endPanelSession',
-    scope: 'admin',
+    access: 'admin',
     response: panelSessionEndSchema,
   },
   {
     method: 'GET',
     path: '/v1/profiles',
     operationId: 'listProfiles',
-    scope: 'admin',
+    access: 'admin',
     response: z.array(profileRecordSchema),
   },
   {
     method: 'POST',
     path: '/v1/profiles',
     operationId: 'createProfile',
-    scope: 'admin',
+    access: 'admin',
     body: profileSchema,
     response: profileRecordSchema,
     status: 201,
@@ -334,14 +332,14 @@ export const operations: Operation[] = [
     method: 'GET',
     path: profile,
     operationId: 'getProfile',
-    scope: 'read',
+    access: 'admin',
     response: profileRecordSchema,
   },
   {
     method: 'PATCH',
     path: profile,
     operationId: 'updateProfile',
-    scope: 'profile:write',
+    access: 'admin',
     body: profilePatchSchema,
     response: profileRecordSchema,
   },
@@ -349,21 +347,21 @@ export const operations: Operation[] = [
     method: 'GET',
     path: `${profile}/revisions`,
     operationId: 'listRevisions',
-    scope: 'read',
+    access: 'admin',
     response: z.array(revisionRecordSchema),
   },
   {
     method: 'GET',
     path: `${profile}/sessions`,
     operationId: 'listSessions',
-    scope: 'read',
+    access: 'admin',
     response: z.array(sessionRecordSchema),
   },
   {
     method: 'POST',
     path: `${profile}/sessions`,
     operationId: 'createSession',
-    scope: 'chat',
+    access: 'admin',
     body: sessionSchema,
     response: sessionRecordSchema,
     status: 201,
@@ -372,14 +370,14 @@ export const operations: Operation[] = [
     method: 'GET',
     path: `${session}/messages`,
     operationId: 'listMessages',
-    scope: 'read',
+    access: 'admin',
     response: z.array(messageRecordSchema),
   },
   {
     method: 'POST',
     path: `${session}/messages`,
     operationId: 'submitMessage',
-    scope: 'chat',
+    access: 'admin',
     body: submitSchema,
     response: runRecordSchema,
     status: 202,
@@ -388,43 +386,44 @@ export const operations: Operation[] = [
     method: 'GET',
     path: `${profile}/memories`,
     operationId: 'listMemories',
-    scope: 'read',
+    access: 'admin',
     response: z.array(memoryRecordSchema),
   },
   {
-    method: 'PUT',
-    path: `${profile}/memories`,
-    operationId: 'writeMemory',
-    scope: 'memory:write',
-    body: memorySchema,
+    // Only the agent writes a memory; the owner can read the shelf and take one off it.
+    method: 'DELETE',
+    path: `${profile}/memories/:memoryKey`,
+    operationId: 'forgetMemory',
+    access: 'admin',
+    params: z.strictObject({ profileId: z.uuid(), memoryKey: memoryKeySchema }),
     response: memoryRecordSchema,
   },
   {
     method: 'GET',
     path: `${profile}/activities`,
     operationId: 'listActivities',
-    scope: 'read',
+    access: 'admin',
     response: z.array(runRecordSchema),
   },
   {
     method: 'GET',
     path: `${profile}/runs/:runId`,
     operationId: 'getRun',
-    scope: 'read',
+    access: 'admin',
     response: runRecordSchema,
   },
   {
     method: 'POST',
     path: `${profile}/runs/:runId/cancel`,
     operationId: 'cancelRun',
-    scope: 'chat',
+    access: 'admin',
     response: runRecordSchema,
   },
   {
     method: 'GET',
     path: `${profile}/events`,
     operationId: 'listEvents',
-    scope: 'read',
+    access: 'admin',
     query: cursorSchema,
     response: z.array(eventSchema),
   },
@@ -432,65 +431,10 @@ export const operations: Operation[] = [
     method: 'GET',
     path: `${profile}/events/stream`,
     operationId: 'streamEvents',
-    scope: 'read',
+    access: 'admin',
     query: cursorSchema,
     response: z.string(),
     stream: true,
-  },
-  {
-    method: 'POST',
-    path: `${profile}/credentials`,
-    operationId: 'createCredential',
-    scope: 'admin',
-    body: credentialInputSchema,
-    response: credentialMetadataSchema,
-    status: 201,
-  },
-  {
-    method: 'GET',
-    path: `${profile}/credentials`,
-    operationId: 'listCredentials',
-    scope: 'admin',
-    response: z.array(credentialMetadataSchema),
-  },
-  {
-    method: 'DELETE',
-    path: `${profile}/credentials/:credentialId`,
-    operationId: 'revokeCredential',
-    scope: 'admin',
-    response: credentialMetadataSchema,
-  },
-  {
-    method: 'POST',
-    path: `${profile}/credentials/:credentialId/rotate`,
-    operationId: 'rotateCredential',
-    scope: 'admin',
-    response: credentialMetadataSchema,
-  },
-  {
-    method: 'POST',
-    path: `${profile}/keys`,
-    operationId: 'createAccessKey',
-    scope: 'admin',
-    body: keyInputSchema,
-    response: keyMetadataSchema.extend({
-      token: z.string().meta({ description: 'Returned only when created.' }),
-    }),
-    status: 201,
-  },
-  {
-    method: 'GET',
-    path: `${profile}/keys`,
-    operationId: 'listAccessKeys',
-    scope: 'admin',
-    response: z.array(keyMetadataSchema),
-  },
-  {
-    method: 'DELETE',
-    path: `${profile}/keys/:keyId`,
-    operationId: 'revokeAccessKey',
-    scope: 'admin',
-    response: keyMetadataSchema,
   },
 ];
 
@@ -509,18 +453,17 @@ export const errorSchema = {
 
 export function operationSchema(operation: Operation) {
   const names = [...operation.path.matchAll(/:([A-Za-z]+)/g)].map((match) => match[1] as string);
+  const params =
+    operation.params ??
+    (names.length
+      ? z.strictObject(Object.fromEntries(names.map((name) => [name, z.uuid()])))
+      : undefined);
 
   return {
     operationId: operation.operationId,
     ...(operation.body ? { body: jsonSchema(operation.body) } : {}),
     ...(operation.query ? { querystring: jsonSchema(operation.query) } : {}),
-    ...(names.length
-      ? {
-          params: jsonSchema(
-            z.strictObject(Object.fromEntries(names.map((name) => [name, z.uuid()]))),
-          ),
-        }
-      : {}),
+    ...(params ? { params: jsonSchema(params) } : {}),
     response: {
       [operation.status ?? 200]: jsonSchema(operation.response, 'output'),
       ...Object.fromEntries(
@@ -533,11 +476,11 @@ export function operationSchema(operation: Operation) {
 type RouteSchema = ReturnType<typeof operationSchema>;
 
 function securityRequirements(operation: Operation) {
-  if (operation.scope === 'public') {
+  if (operation.access === 'public') {
     return [];
   }
 
-  if (operation.scope === 'webhook') {
+  if (operation.access === 'webhook') {
     const scheme =
       operation.operationId === 'telegramIngress' ? 'telegramWebhook' : 'channelWebhook';
 
@@ -590,7 +533,7 @@ function openAPIOperation(operation: Operation) {
   return {
     operationId: operation.operationId,
     security: securityRequirements(operation),
-    description: `Required permission: ${operation.scope}.`,
+    description: `Required permission: ${operation.access}.`,
     parameters: openAPIParameters(schema),
     ...(schema.body
       ? {

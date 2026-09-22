@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { GatewayError } from '../../core/errors.js';
 import type { ProfileReader } from '../../profiles/port.js';
-import type { Credentials } from '../../security/credentials.js';
+import type { Vault } from '../../security/vault.js';
 import type { ProviderAdmin } from '../port.js';
+import { providerSecret } from '../service.js';
 
 const clientId = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const authOrigin = 'https://auth.openai.com';
@@ -26,7 +27,7 @@ export class CodexLogin {
 
   constructor(
     private readonly services: { profiles: ProfileReader; providers: ProviderAdmin },
-    private readonly credentials: Credentials,
+    private readonly vault: Vault,
     private readonly fetcher: typeof fetch = fetch,
   ) {}
 
@@ -41,15 +42,8 @@ export class CodexLogin {
     if (pending) return pending;
 
     const providers = await this.services.providers.providers(profileId);
-    const credentials = await this.credentials.list(profileId);
-    return providers.some(
-      (provider) =>
-        provider.authMode === 'codex' &&
-        !provider.revokedAt &&
-        credentials.some(
-          (credential) => credential.id === provider.credentialId && !credential.revokedAt,
-        ),
-    )
+
+    return providers.some((provider) => provider.authMode === 'codex' && !provider.revokedAt)
       ? { status: 'connected' }
       : { status: 'failed' };
   }
@@ -123,20 +117,8 @@ export class CodexLogin {
           .parse(await response.json());
         const tokens = await this.exchange(code.authorization_code, code.code_verifier);
         if (this.stopped) return;
-        const credential = await this.credentials.create(profileId, {
-          label: 'OpenAI · ChatGPT',
-          kind: 'provider',
-          secret: JSON.stringify(tokens),
-        });
-        const previous = (await this.services.providers.providers(profileId)).filter(
-          (provider) => provider.authMode === 'codex' && !provider.revokedAt,
-        );
-        await this.services.providers.configureCodexProvider(profileId, credential.id);
-        for (const provider of previous) {
-          if (provider.credentialId) {
-            await this.credentials.revoke(profileId, provider.credentialId).catch(() => {});
-          }
-        }
+        // Registering the provider revokes any previous one of the same vendor with its key.
+        await this.services.providers.configureCodexProvider(profileId, JSON.stringify(tokens));
         this.pending.delete(profileId);
         return;
       }
@@ -167,11 +149,11 @@ export class CodexLogin {
     return tokensSchema.parse(await response.json());
   }
 
-  async accessToken(profileId: string, credentialId: string) {
-    const secret = await this.credentials.transformSecret(
+  async accessToken(profileId: string, providerId: string) {
+    const secret = await this.vault.refresh(
       profileId,
-      credentialId,
-      async (current) => {
+      providerSecret(providerId),
+      async (current: string) => {
         const tokens = tokensSchema.parse(JSON.parse(current));
         const payload = JSON.parse(
           Buffer.from(tokens.access_token.split('.')[1] ?? '', 'base64url').toString('utf8'),

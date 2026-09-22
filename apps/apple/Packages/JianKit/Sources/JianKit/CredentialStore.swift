@@ -1,8 +1,8 @@
 import Foundation
 import Security
 
-/// Reads and writes the gateway credentials. The access key is a bearer token for the
-/// whole installation, so it never goes to UserDefaults and is never logged.
+/// Reads and writes the gateway credentials. The administrator token opens the whole
+/// installation, so it never goes to UserDefaults and is never logged.
 public protocol CredentialStore: Sendable {
   func load() throws -> GatewayCredentials?
   func save(_ credentials: GatewayCredentials) throws
@@ -39,19 +39,19 @@ public struct KeychainCredentialStore: CredentialStore {
 
     guard let attributes = item as? [String: Any],
       let data = attributes[kSecValueData as String] as? Data,
-      let accessKey = String(data: data, encoding: .utf8),
+      let adminToken = String(data: data, encoding: .utf8),
       let label = attributes[kSecAttrLabel as String] as? String,
       let serverURL = URL(string: label)
     else { throw CredentialStoreError.malformedServerURL }
 
-    return GatewayCredentials(serverURL: serverURL, accessKey: accessKey)
+    return GatewayCredentials(serverURL: serverURL, adminToken: adminToken)
   }
 
   public func save(_ credentials: GatewayCredentials) throws {
     try clear()
     var query = baseQuery
     query[kSecAttrLabel as String] = credentials.serverURL.absoluteString
-    query[kSecValueData as String] = Data(credentials.accessKey.utf8)
+    query[kSecValueData as String] = Data(credentials.adminToken.utf8)
     query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
     let status = SecItemAdd(query as CFDictionary, nil)
     guard status == errSecSuccess else { throw CredentialStoreError.keychain(status) }

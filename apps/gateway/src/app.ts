@@ -17,7 +17,6 @@ import { registerProfileRoutes } from './profiles/routes.js';
 import type { CodexLogin } from './providers/codex/login.js';
 import { registerProviderRoutes } from './providers/routes.js';
 import { registerRunRoutes } from './runs/routes.js';
-import type { Credentials } from './security/credentials.js';
 import { registerSecurityRoutes } from './security/routes.js';
 import type { Services } from './services.js';
 import { registerSessionRoutes } from './sessions/routes.js';
@@ -27,7 +26,6 @@ export function createApp(
     store: Store;
     token: string;
     logger?: boolean;
-    credentials?: Credentials;
     codexLogin?: CodexLogin;
     channels?: Channels;
     whatsapp?: WhatsAppConnections;
@@ -75,12 +73,12 @@ export function createApp(
     }
   });
 
-  const { isScopedRequest } = configureSecurity(app, options);
+  configureSecurity(app, options);
 
   registerProviderRoutes(app, options);
   registerMetaRoutes(app);
   registerSecurityRoutes(app, options);
-  registerProfileRoutes(app, { ...options, isScopedRequest });
+  registerProfileRoutes(app, options);
   registerSessionRoutes(app, { ...options, coordination });
   registerMemoryRoutes(app, options);
   registerRunRoutes(app, options);

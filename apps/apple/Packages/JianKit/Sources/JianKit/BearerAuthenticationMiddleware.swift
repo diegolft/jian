@@ -2,9 +2,9 @@ import Foundation
 import HTTPTypes
 import OpenAPIRuntime
 
-/// Attaches the scoped access key to every outbound request.
+/// Attaches the administrator token to every outbound request.
 struct BearerAuthenticationMiddleware: ClientMiddleware {
-  let accessKey: String
+  let adminToken: String
 
   func intercept(
     _ request: HTTPRequest,
@@ -14,7 +14,7 @@ struct BearerAuthenticationMiddleware: ClientMiddleware {
     next: (HTTPRequest, HTTPBody?, URL) async throws -> (HTTPResponse, HTTPBody?)
   ) async throws -> (HTTPResponse, HTTPBody?) {
     var request = request
-    request.headerFields[.authorization] = "Bearer \(accessKey)"
+    request.headerFields[.authorization] = "Bearer \(adminToken)"
     return try await next(request, body, baseURL)
   }
 }

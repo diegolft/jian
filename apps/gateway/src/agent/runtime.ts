@@ -4,6 +4,7 @@ import { stepCountIs, ToolLoopAgent, type ToolSet } from 'ai';
 import { fitPrompt, tokenCounter } from '../context/budget.js';
 import type { ContextSource } from '../context/port.js';
 import { resolveModel } from '../providers/models.js';
+import { providerSecret } from '../providers/service.js';
 import { createSafeFetch } from '../security/outbound.js';
 import { connectMcpTools } from './mcp.js';
 import { boundToolResult, redactOutput, redactText } from './results.js';
@@ -66,20 +67,16 @@ export class AgentRuntime {
       const config = run.model ?? run.profile.model;
       let providerKey: string | undefined;
 
-      if (config.provider === 'openai-codex' && config.credentialId) {
+      if (config.provider === 'openai-codex' && config.providerId) {
         if (!this.options.codexLogin) throw new Error('ChatGPT login is unavailable');
-        providerKey = await this.options.codexLogin.accessToken(profileId, config.credentialId);
+        providerKey = await this.options.codexLogin.accessToken(profileId, config.providerId);
         secrets.add(providerKey);
-      } else if (config.credentialId) {
-        if (!this.options.credentials) {
-          throw new Error('Provider credential is not configured');
-        }
+      } else if (config.providerId) {
+        providerKey = await this.options.vault?.read(profileId, providerSecret(config.providerId));
 
-        providerKey = await this.options.credentials.resolve(
-          profileId,
-          config.credentialId,
-          'provider',
-        );
+        if (!providerKey) {
+          throw new Error('Provider key is not configured');
+        }
 
         secrets.add(providerKey);
       }
@@ -95,7 +92,7 @@ export class AgentRuntime {
       const model = await this.model(config, process.env, outbound.fetch, providerKey);
       const tools = profileTools(this.services, run);
       const { mcpToolNames, selectedMcpTools } = await connectMcpTools(run, tools, {
-        credentials: this.options.credentials,
+        vault: this.options.vault,
         secrets,
         clients,
         fetcher: outbound.fetch,
@@ -342,5 +339,5 @@ function executionFailureMessage(error: unknown, uncertain: boolean, aborted: bo
     return 'Context or run token budget exceeded. Reduce context or tool selection before retrying.';
   }
 
-  return 'Agent execution failed. Check provider credentials, model access and MCP configuration.';
+  return 'Agent execution failed. Check the provider key, model access and MCP configuration.';
 }

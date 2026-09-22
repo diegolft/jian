@@ -12,9 +12,9 @@ import { createWhatsAppDeviceFactory } from './channels/whatsapp/driver.js';
 import { Coordination } from './coordination/service.js';
 import { CodexLogin } from './providers/codex/login.js';
 import { RunQueue } from './runs/queue.js';
-import { Credentials } from './security/credentials.js';
 import { SecretBox } from './security/crypto.js';
 import { createSafeFetch } from './security/outbound.js';
+import { Vault } from './security/vault.js';
 import { buildServices } from './services.js';
 import { type StartupStage, startupFailure } from './startup.js';
 import { PostgresStore } from './storage/postgres.js';
@@ -42,8 +42,6 @@ if (!config.success) {
 }
 
 const store = new PostgresStore(config.data.DATABASE_URL);
-// The store rides along: several consumers read records no single area owns.
-const services = { ...buildServices({ store }), store };
 let box: SecretBox;
 
 try {
@@ -62,8 +60,10 @@ try {
   process.exit(1);
 }
 
-const credentials = new Credentials(services, box);
-const codexLogin = new CodexLogin(services, credentials);
+const vault = new Vault(store, box);
+// The store rides along: several consumers read records no single area owns.
+const services = { ...buildServices({ store, vault }), store };
+const codexLogin = new CodexLogin(services, vault);
 
 const outbound = createSafeFetch({
   allowPrivateOrigins: config.data.JIAN_ALLOW_PRIVATE_ORIGINS.split(',')
@@ -78,10 +78,10 @@ const channelRegistry = new ChannelRegistry([
   new TelegramChannel(),
   new WhatsAppChannel(whatsapp),
 ]);
-const channels = new Channels(services, credentials, outbound.fetch, channelRegistry);
+const channels = new Channels(services, outbound.fetch, channelRegistry);
 
 const runtime = new AgentRuntime(services, undefined, {
-  credentials,
+  vault,
   codexLogin,
   outbound,
   storeArtifact: (run, toolName, output) => coordination.storeArtifact(run, toolName, output),
@@ -96,7 +96,6 @@ const app =
   config.data.JIAN_ROLE !== 'worker'
     ? createApp({
         ...services,
-        credentials,
         codexLogin,
         channels,
         whatsapp,

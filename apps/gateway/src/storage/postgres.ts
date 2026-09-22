@@ -190,6 +190,16 @@ export class PostgresStore extends PostgresReader implements Store {
             throw new Error('Record profile mismatch');
           }
         },
+        remove: async (kind, id, ownerId) => {
+          if (ownerId !== profileId) {
+            throw new Error('Transaction profile mismatch');
+          }
+
+          await client.query(
+            'DELETE FROM jian_records WHERE kind = $1 AND id = $2 AND profile_id = $3',
+            [kind, id, ownerId],
+          );
+        },
         event: async (event) => {
           if (event.profileId !== profileId) {
             throw new Error('Event profile mismatch');

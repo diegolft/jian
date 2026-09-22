@@ -95,7 +95,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["listRunCheckpoints"];
         put?: never;
         post?: never;
@@ -114,7 +114,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Required permission: chat. */
+        /** @description Required permission: admin. */
         post: operations["continueRun"];
         delete?: never;
         options?: never;
@@ -164,7 +164,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["listDeliveries"];
         put?: never;
         post?: never;
@@ -283,7 +283,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["getHistory"];
         put?: never;
         post?: never;
@@ -300,7 +300,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["searchHistory"];
         put?: never;
         post?: never;
@@ -317,7 +317,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["getArtifact"];
         put?: never;
         post?: never;
@@ -336,7 +336,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Required permission: chat. */
+        /** @description Required permission: admin. */
         post: operations["acquireResource"];
         delete?: never;
         options?: never;
@@ -353,7 +353,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Required permission: chat. */
+        /** @description Required permission: admin. */
         post: operations["releaseResource"];
         delete?: never;
         options?: never;
@@ -370,7 +370,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Required permission: chat. */
+        /** @description Required permission: admin. */
         post: operations["sendSessionMail"];
         delete?: never;
         options?: never;
@@ -385,7 +385,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["getSessionInbox"];
         put?: never;
         post?: never;
@@ -455,14 +455,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["getProfile"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** @description Required permission: profile:write. */
+        /** @description Required permission: admin. */
         patch: operations["updateProfile"];
         trace?: never;
     };
@@ -473,7 +473,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["listRevisions"];
         put?: never;
         post?: never;
@@ -490,10 +490,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["listSessions"];
         put?: never;
-        /** @description Required permission: chat. */
+        /** @description Required permission: admin. */
         post: operations["createSession"];
         delete?: never;
         options?: never;
@@ -508,10 +508,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["listMessages"];
         put?: never;
-        /** @description Required permission: chat. */
+        /** @description Required permission: admin. */
         post: operations["submitMessage"];
         delete?: never;
         options?: never;
@@ -526,12 +526,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["listMemories"];
-        /** @description Required permission: memory:write. */
-        put: operations["writeMemory"];
+        put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/profiles/{profileId}/memories/{memoryKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Required permission: admin. */
+        delete: operations["forgetMemory"];
         options?: never;
         head?: never;
         patch?: never;
@@ -544,7 +560,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["listActivities"];
         put?: never;
         post?: never;
@@ -561,7 +577,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["getRun"];
         put?: never;
         post?: never;
@@ -580,7 +596,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Required permission: chat. */
+        /** @description Required permission: admin. */
         post: operations["cancelRun"];
         delete?: never;
         options?: never;
@@ -595,7 +611,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["listEvents"];
         put?: never;
         post?: never;
@@ -612,98 +628,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Required permission: read. */
+        /** @description Required permission: admin. */
         get: operations["streamEvents"];
         put?: never;
         post?: never;
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/profiles/{profileId}/credentials": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Required permission: admin. */
-        get: operations["listCredentials"];
-        put?: never;
-        /** @description Required permission: admin. */
-        post: operations["createCredential"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/profiles/{profileId}/credentials/{credentialId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** @description Required permission: admin. */
-        delete: operations["revokeCredential"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/profiles/{profileId}/credentials/{credentialId}/rotate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** @description Required permission: admin. */
-        post: operations["rotateCredential"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/profiles/{profileId}/keys": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Required permission: admin. */
-        get: operations["listAccessKeys"];
-        put?: never;
-        /** @description Required permission: admin. */
-        post: operations["createAccessKey"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/profiles/{profileId}/keys/{keyId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** @description Required permission: admin. */
-        delete: operations["revokeAccessKey"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1003,8 +932,6 @@ export interface operations {
                             contextWindow: number;
                             maxOutputTokens: number;
                         }[];
-                        /** Format: uuid */
-                        credentialId?: string;
                         apiKeyEnv?: string;
                         /** @enum {string} */
                         authMode?: "api" | "codex";
@@ -1135,8 +1062,7 @@ export interface operations {
                     name: string;
                     /** @enum {string} */
                     kind: "openai" | "anthropic" | "google";
-                    /** Format: uuid */
-                    credentialId: string;
+                    secret: string;
                     models: {
                         id: string;
                         contextWindow: number;
@@ -1161,8 +1087,6 @@ export interface operations {
                             contextWindow: number;
                             maxOutputTokens: number;
                         }[];
-                        /** Format: uuid */
-                        credentialId?: string;
                         apiKeyEnv?: string;
                         /** @enum {string} */
                         authMode?: "api" | "codex";
@@ -1305,8 +1229,6 @@ export interface operations {
                             contextWindow: number;
                             maxOutputTokens: number;
                         }[];
-                        /** Format: uuid */
-                        credentialId?: string;
                         apiKeyEnv?: string;
                         /** @enum {string} */
                         authMode?: "api" | "codex";
@@ -2023,7 +1945,7 @@ export interface operations {
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
-                            credentialId?: string;
+                            providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
                         };
@@ -2178,8 +2100,6 @@ export interface operations {
                         actorIds: string[];
                         chatIds: string[];
                         /** Format: uuid */
-                        credentialId?: string;
-                        /** Format: uuid */
                         id: string;
                         /** Format: uuid */
                         profileId: string;
@@ -2310,8 +2230,7 @@ export interface operations {
                     sessionId: string;
                     actorIds: string[];
                     chatIds: string[];
-                    /** Format: uuid */
-                    credentialId?: string;
+                    token?: string;
                 };
             };
         };
@@ -2330,8 +2249,6 @@ export interface operations {
                         sessionId: string;
                         actorIds: string[];
                         chatIds: string[];
-                        /** Format: uuid */
-                        credentialId?: string;
                         /** Format: uuid */
                         id: string;
                         /** Format: uuid */
@@ -2471,8 +2388,6 @@ export interface operations {
                         sessionId: string;
                         actorIds: string[];
                         chatIds: string[];
-                        /** Format: uuid */
-                        credentialId?: string;
                         /** Format: uuid */
                         id: string;
                         /** Format: uuid */
@@ -4910,7 +4825,7 @@ export interface operations {
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
-                            credentialId?: string;
+                            providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
                         };
@@ -4970,8 +4885,7 @@ export interface operations {
                             name: string;
                             /** Format: uri */
                             url: string;
-                            /** Format: uuid */
-                            credentialId?: string;
+                            bearerToken?: string;
                             bearerTokenEnv?: string;
                             allowedTools: string[];
                         }[];
@@ -5114,7 +5028,7 @@ export interface operations {
                         modelId: string;
                         apiKeyEnv?: string;
                         /** Format: uuid */
-                        credentialId?: string;
+                        providerId?: string;
                         /** Format: uri */
                         baseURL?: string;
                     };
@@ -5174,8 +5088,7 @@ export interface operations {
                         name: string;
                         /** Format: uri */
                         url: string;
-                        /** Format: uuid */
-                        credentialId?: string;
+                        bearerToken?: string;
                         bearerTokenEnv?: string;
                         allowedTools: string[];
                     }[];
@@ -5208,7 +5121,7 @@ export interface operations {
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
-                            credentialId?: string;
+                            providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
                         };
@@ -5268,8 +5181,7 @@ export interface operations {
                             name: string;
                             /** Format: uri */
                             url: string;
-                            /** Format: uuid */
-                            credentialId?: string;
+                            bearerToken?: string;
                             bearerTokenEnv?: string;
                             allowedTools: string[];
                         }[];
@@ -5420,7 +5332,7 @@ export interface operations {
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
-                            credentialId?: string;
+                            providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
                         };
@@ -5480,8 +5392,7 @@ export interface operations {
                             name: string;
                             /** Format: uri */
                             url: string;
-                            /** Format: uuid */
-                            credentialId?: string;
+                            bearerToken?: string;
                             bearerTokenEnv?: string;
                             allowedTools: string[];
                         }[];
@@ -5619,7 +5530,7 @@ export interface operations {
                         modelId: string;
                         apiKeyEnv?: string;
                         /** Format: uuid */
-                        credentialId?: string;
+                        providerId?: string;
                         /** Format: uri */
                         baseURL?: string;
                     };
@@ -5658,8 +5569,7 @@ export interface operations {
                         name: string;
                         /** Format: uri */
                         url: string;
-                        /** Format: uuid */
-                        credentialId?: string;
+                        bearerToken?: string;
                         bearerTokenEnv?: string;
                         allowedTools: string[];
                     }[];
@@ -5692,7 +5602,7 @@ export interface operations {
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
-                            credentialId?: string;
+                            providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
                         };
@@ -5752,8 +5662,7 @@ export interface operations {
                             name: string;
                             /** Format: uri */
                             url: string;
-                            /** Format: uuid */
-                            credentialId?: string;
+                            bearerToken?: string;
                             bearerTokenEnv?: string;
                             allowedTools: string[];
                         }[];
@@ -5908,7 +5817,7 @@ export interface operations {
                                 modelId: string;
                                 apiKeyEnv?: string;
                                 /** Format: uuid */
-                                credentialId?: string;
+                                providerId?: string;
                                 /** Format: uri */
                                 baseURL?: string;
                             };
@@ -5968,8 +5877,7 @@ export interface operations {
                                 name: string;
                                 /** Format: uri */
                                 url: string;
-                                /** Format: uuid */
-                                credentialId?: string;
+                                bearerToken?: string;
                                 bearerTokenEnv?: string;
                                 allowedTools: string[];
                             }[];
@@ -6555,7 +6463,7 @@ export interface operations {
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
-                            credentialId?: string;
+                            providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
                         };
@@ -6816,24 +6724,17 @@ export interface operations {
             };
         };
     };
-    writeMemory: {
+    forgetMemory: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 profileId: string;
+                memoryKey: string;
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": {
-                    key: string;
-                    content: string;
-                    expectedVersion: number;
-                };
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Success */
             200: {
@@ -7003,7 +6904,7 @@ export interface operations {
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
-                            credentialId?: string;
+                            providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
                         };
@@ -7180,7 +7081,7 @@ export interface operations {
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
-                            credentialId?: string;
+                            providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
                         };
@@ -7357,7 +7258,7 @@ export interface operations {
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
-                            credentialId?: string;
+                            providerId?: string;
                             /** Format: uri */
                             baseURL?: string;
                         };
@@ -7639,982 +7540,6 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": string;
-                };
-            };
-            /** @description Error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-        };
-    };
-    listCredentials: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                profileId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        label: string;
-                        /** @enum {string} */
-                        kind: "provider" | "mcp" | "channel";
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        profileId: string;
-                        version: number;
-                        keyId: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** Format: date-time */
-                        revokedAt?: string;
-                    }[];
-                };
-            };
-            /** @description Error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-        };
-    };
-    createCredential: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                profileId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    label: string;
-                    /** @enum {string} */
-                    kind: "provider" | "mcp" | "channel";
-                    secret: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        label: string;
-                        /** @enum {string} */
-                        kind: "provider" | "mcp" | "channel";
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        profileId: string;
-                        version: number;
-                        keyId: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** Format: date-time */
-                        revokedAt?: string;
-                    };
-                };
-            };
-            /** @description Error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-        };
-    };
-    revokeCredential: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                profileId: string;
-                credentialId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        label: string;
-                        /** @enum {string} */
-                        kind: "provider" | "mcp" | "channel";
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        profileId: string;
-                        version: number;
-                        keyId: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** Format: date-time */
-                        revokedAt?: string;
-                    };
-                };
-            };
-            /** @description Error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-        };
-    };
-    rotateCredential: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                profileId: string;
-                credentialId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        label: string;
-                        /** @enum {string} */
-                        kind: "provider" | "mcp" | "channel";
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        profileId: string;
-                        version: number;
-                        keyId: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** Format: date-time */
-                        revokedAt?: string;
-                    };
-                };
-            };
-            /** @description Error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-        };
-    };
-    listAccessKeys: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                profileId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        label: string;
-                        scopes: ("read" | "chat" | "memory:write" | "profile:write")[];
-                        /** Format: date-time */
-                        expiresAt: string;
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        profileId: string;
-                        prefix: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        revokedAt?: string;
-                    }[];
-                };
-            };
-            /** @description Error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-        };
-    };
-    createAccessKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                profileId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    label: string;
-                    scopes: ("read" | "chat" | "memory:write" | "profile:write")[];
-                    /** Format: date-time */
-                    expiresAt: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        label: string;
-                        scopes: ("read" | "chat" | "memory:write" | "profile:write")[];
-                        /** Format: date-time */
-                        expiresAt: string;
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        profileId: string;
-                        prefix: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        revokedAt?: string;
-                        /** @description Returned only when created. */
-                        token: string;
-                    };
-                };
-            };
-            /** @description Error */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-            /** @description Error */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                    };
-                };
-            };
-        };
-    };
-    revokeAccessKey: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                profileId: string;
-                keyId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        label: string;
-                        scopes: ("read" | "chat" | "memory:write" | "profile:write")[];
-                        /** Format: date-time */
-                        expiresAt: string;
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        profileId: string;
-                        prefix: string;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        revokedAt?: string;
-                    };
                 };
             };
             /** @description Error */

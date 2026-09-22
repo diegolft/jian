@@ -1,20 +1,16 @@
 import { timingSafeEqual } from 'node:crypto';
 import { operations } from '@jian/contracts';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { ZodError } from 'zod';
 import { GatewayError } from '../core/errors.js';
-import type { Credentials } from '../security/credentials.js';
 import { authorizesPanel } from '../security/panel-session.js';
 
-interface SecurityOptions {
-  token: string;
-  credentials?: Credentials;
-}
-
-/** Unknown routes require admin access; webhook adapters authenticate their own secrets. */
-export function configureSecurity(app: FastifyInstance, options: SecurityOptions) {
-  const scopedRequests = new WeakSet<FastifyRequest>();
-
+/**
+ * The host token is the only API credential: it opens the whole installation. Unknown routes
+ * require it, public routes carry their own proof, and webhook adapters authenticate the
+ * secret of their own channel binding.
+ */
+export function configureSecurity(app: FastifyInstance, options: { token: string }) {
   app.addHook('onRequest', async (request, reply) => {
     // Only the static-file plugin sets this flag; API routes still require bearer authentication.
     if (request.routeOptions.config.publicUiAsset && ['GET', 'HEAD'].includes(request.method)) {
@@ -25,7 +21,7 @@ export function configureSecurity(app: FastifyInstance, options: SecurityOptions
       (item) => item.path === request.routeOptions.url && item.method === request.method,
     );
 
-    if (operation?.scope === 'public' || operation?.scope === 'webhook') {
+    if (operation?.access === 'public' || operation?.access === 'webhook') {
       return;
     }
 
@@ -47,22 +43,7 @@ export function configureSecurity(app: FastifyInstance, options: SecurityOptions
       return;
     }
 
-    if (!authorization.startsWith('Bearer ') || !options.credentials) {
-      return reply.code(401).send({ error: 'Unauthorized' });
-    }
-
-    const profileId = (request.params as { profileId?: string }).profileId;
-
-    await options.credentials.authorize(
-      authorization.slice(7),
-      profileId,
-      operation?.scope ?? 'admin',
-    );
-
-    // A profile editor can change identity, but cannot delegate host authority.
-    if (operation?.operationId === 'updateProfile') {
-      scopedRequests.add(request);
-    }
+    return reply.code(401).send({ error: 'Unauthorized' });
   });
 
   app.setErrorHandler((error, _request, reply) => {
@@ -90,6 +71,4 @@ export function configureSecurity(app: FastifyInstance, options: SecurityOptions
 
     return reply.code(500).send({ error: 'Internal server error' });
   });
-
-  return { isScopedRequest: (request: FastifyRequest) => scopedRequests.has(request) };
 }

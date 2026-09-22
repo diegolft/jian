@@ -6,12 +6,12 @@ Uma ligação associa um canal a uma sessão existente. O administrador define o
 
 ## Entrada genérica
 
-Envie `actorId`, `chatId`, `text` e `requestKey` a `POST /v1/ingress/{channelId}`, usando `X-Jian-Channel-Token`. O adapter que chama essa rota deve autenticar a identidade externa antes de preencher os IDs; quem possui o token pode representar atores permitidos. O retorno contém o ID do run. Consulte resultados com uma chave separada de escopo `read`.
+Envie `actorId`, `chatId`, `text` e `requestKey` a `POST /v1/ingress/{channelId}`, usando `X-Jian-Channel-Token`. O adapter que chama essa rota deve autenticar a identidade externa antes de preencher os IDs; quem possui o token pode representar atores permitidos. O retorno contém o ID do run. Consulte resultados pela API administrativa.
 
 ## Telegram
 
 1. Cadastre o token do bot no cofre com `kind: "channel"`.
-2. Crie uma ligação `type: "telegram"`, informando a referência `credentialId`, sessão e IDs permitidos.
+2. Crie uma ligação `type: "telegram"`, informando `token` (o token do BotFather), sessão e IDs permitidos. O token é cifrado no cofre e nunca é devolvido.
 3. Configure no Telegram o webhook HTTPS `/v1/telegram/{channelId}`, passando o `webhookToken` como `secret_token` e limitando `allowed_updates` a `message`.
 
 O Gateway valida `X-Telegram-Bot-Api-Secret-Token`, ator e chat antes de aceitar mensagens. Reentregas de um mesmo update recuperam o mesmo run. A resposta final é enviada em partes de até 4.000 caracteres, sem modo de interpretação HTML/Markdown. As configurações seguem a [API oficial do Telegram](https://core.telegram.org/bots/api#setwebhook).
@@ -40,7 +40,7 @@ O vínculo fixo foi escolhido para tornar o acesso explícito e evitar que o rem
 
 O worker fala o protocolo multi-dispositivo direto por WebSocket, sem navegador. Cada ligação abre um socket próprio; não há executável externo a instalar nem variável de ambiente a configurar. Processos que executam somente a API não abrem socket algum.
 
-Crie uma ligação usando `type: "whatsapp"`, a sessão existente e os contatos autorizados em `actorIds` e `chatIds`. Para conversas diretas, ambos usam o mesmo JID, como `5511999999999@c.us`. O driver resolve identificadores LID para telefone quando o WhatsApp fornece esse mapeamento; IDs `@lid` também podem ser autorizados explicitamente. Não informe `credentialId`: a credencial é criada pelo pareamento. O `webhookToken` do contrato comum não é usado pelo WhatsApp; o canal não aceita entrada HTTP pública.
+Crie uma ligação usando `type: "whatsapp"`, a sessão existente e os contatos autorizados em `actorIds` e `chatIds`. Para conversas diretas, ambos usam o mesmo JID, como `5511999999999@c.us`. O driver resolve identificadores LID para telefone quando o WhatsApp fornece esse mapeamento; IDs `@lid` também podem ser autorizados explicitamente. Não informe `token`: a sessão do aparelho é criada pelo pareamento. O `webhookToken` do contrato comum não é usado pelo WhatsApp; o canal não aceita entrada HTTP pública.
 
 Exemplo de corpo para `POST /v1/profiles/{profileId}/channels`:
 

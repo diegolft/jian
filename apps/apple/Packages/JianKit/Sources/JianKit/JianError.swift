@@ -1,9 +1,9 @@
 import Foundation
 
 public enum JianError: Error, Equatable {
-  /// The access key is missing, expired or revoked; the caller should sign in again.
+  /// The token is missing or no longer the host's; the caller should sign in again.
   case unauthorized
-  /// The key is valid but lacks the scope for this operation.
+  /// The gateway refused this operation for a reason of its own, such as a channel binding.
   case forbidden
   case rateLimited
   case gateway(status: Int, message: String)
@@ -12,9 +12,9 @@ public enum JianError: Error, Equatable {
 extension JianError: LocalizedError {
   public var errorDescription: String? {
     switch self {
-    case .unauthorized: "The access key was rejected. Sign in again."
-    case .forbidden: "This access key does not have permission for that."
-    case .rateLimited: "The gateway is rate limiting this key. Try again shortly."
+    case .unauthorized: "The administrator token was rejected. Sign in again."
+    case .forbidden: "The gateway refused that operation."
+    case .rateLimited: "The gateway is rate limiting this client. Try again shortly."
     case let .gateway(status, message): "The gateway returned \(status): \(message)"
     }
   }

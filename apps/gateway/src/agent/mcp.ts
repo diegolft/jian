@@ -3,10 +3,11 @@ import { createMCPClient, type MCPClient } from '@ai-sdk/mcp';
 import type { Run } from '@jian/contracts';
 import { type ToolSet, tool } from 'ai';
 import { z } from 'zod';
+import { mcpSecret } from '../profiles/service.js';
 import type { RuntimeOptions } from './types.js';
 
 interface McpContext {
-  credentials: RuntimeOptions['credentials'];
+  vault: RuntimeOptions['vault'];
   secrets: Set<string>;
   clients: MCPClient[];
   fetcher: typeof globalThis.fetch;
@@ -21,18 +22,15 @@ export async function connectMcpTools(run: Run, tools: ToolSet, context: McpCont
   for (const config of run.profile.mcpServers) {
     let token: string | undefined;
 
-    if (config.credentialId) {
-      if (!context.credentials) {
-        throw new Error('MCP credential missing');
-      }
-
-      token = await context.credentials.resolve(run.profileId, config.credentialId, 'mcp');
-    } else if (config.bearerTokenEnv) {
+    if (config.bearerTokenEnv) {
       token = process.env[config.bearerTokenEnv];
-    }
 
-    if ((config.credentialId || config.bearerTokenEnv) && !token) {
-      throw new Error('MCP credential missing');
+      if (!token) {
+        throw new Error('MCP token missing');
+      }
+    } else {
+      // The token was typed with the server and lives in the vault under its name.
+      token = await context.vault?.read(run.profileId, mcpSecret(config.name));
     }
 
     if (token) {

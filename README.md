@@ -22,11 +22,11 @@ connected.
   tool schemas loaded on demand instead of flooding the prompt.
 - **Channels.** WhatsApp, Telegram and HTTP webhooks, each with explicit allowlists, so no
   channel inherits the owner's privileges.
-- **A vault, not a config file.** Provider, MCP and channel credentials encrypted with
-  AES-256-GCM. Client keys are scoped, expiring and revocable.
+- **A vault, not a config file.** Provider, MCP and channel secrets are typed where the
+  thing is configured and stored encrypted with AES-256-GCM, never read back.
 - **A typed contract.** OpenAPI 3.1 generated from the schemas the server validates
   against, with a TypeScript SDK and a Swift client generated from the same document.
-- **A web panel** for profiles, usage, memories, skills, MCP servers, credentials and keys.
+- **A web panel** for profiles, usage, memories, skills, MCP servers and channels.
 
 Isolation is per profile. One installation serves one trusted owner; it is not a
 multi-tenant SaaS.

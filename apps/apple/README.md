@@ -25,8 +25,12 @@ make apple-test           # JianKit unit tests, no network, no gateway
 ## Scope
 
 One sign-in screen and a profile list, enough to prove the contract, the transport and the
-stored credential work end to end. The gateway URL and the scoped access key live in the
+stored credential work end to end. The gateway URL and the administrator token live in the
 Keychain, never in UserDefaults and never in logs.
+
+The gateway has one API credential and it opens the whole installation, so a device holding
+it holds everything. Per-device pairing is the right answer for a native app and is not built
+yet; until then, sign in only from a device you trust.
 
 Generated types nest a full copy of every schema inside each operation, because the OpenAPI
 document inlines schemas instead of referencing shared components. `JianKit` maps them to

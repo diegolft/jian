@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { secretSchema } from './security.js';
 
 export const channelInputSchema = z.strictObject({
   name: z.string().trim().min(1).max(100),
@@ -6,10 +7,11 @@ export const channelInputSchema = z.strictObject({
   sessionId: z.uuid(),
   actorIds: z.array(z.string().min(1).max(100)).min(1).max(100),
   chatIds: z.array(z.string().min(1).max(100)).min(1).max(100),
-  credentialId: z.uuid().optional(),
+  // The bot token of a channel that has one. Stored encrypted and never read back.
+  token: secretSchema.optional(),
 });
 
-export const channelSchema = channelInputSchema.extend({
+export const channelSchema = channelInputSchema.omit({ token: true }).extend({
   id: z.uuid(),
   profileId: z.uuid(),
   createdAt: z.iso.datetime(),

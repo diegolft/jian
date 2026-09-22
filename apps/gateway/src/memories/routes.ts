@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type { ProfileParams } from '../http/params.js';
+import type { MemoryParams, ProfileParams } from '../http/params.js';
 import type { MemoryWriter } from './port.js';
 
 export function registerMemoryRoutes(app: FastifyInstance, deps: { memories: MemoryWriter }): void {
@@ -7,7 +7,8 @@ export function registerMemoryRoutes(app: FastifyInstance, deps: { memories: Mem
     deps.memories.memories(request.params.profileId),
   );
 
-  app.put<{ Params: ProfileParams }>('/v1/profiles/:profileId/memories', async (request) =>
-    deps.memories.remember(request.params.profileId, request.body),
+  app.delete<{ Params: MemoryParams }>(
+    '/v1/profiles/:profileId/memories/:memoryKey',
+    async (request) => deps.memories.forget(request.params.profileId, request.params.memoryKey),
   );
 }

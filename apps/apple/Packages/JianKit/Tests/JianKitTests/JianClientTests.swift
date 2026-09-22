@@ -6,7 +6,7 @@ import Testing
 
 private let credentials = GatewayCredentials(
   serverURL: URL(string: "https://gateway.example")!,
-  accessKey: "jian_test_key"
+  adminToken: "jian_test_admin_token"
 )
 
 @Test func listProfilesMapsTheGeneratedPayload() async throws {
@@ -27,7 +27,7 @@ private let credentials = GatewayCredentials(
   #expect(profiles[0].version == 3)
 }
 
-@Test func everyRequestCarriesTheAccessKey() async throws {
+@Test func everyRequestCarriesTheAdministratorToken() async throws {
   let recorder = RequestRecorder()
   let client = JianClient(
     credentials: credentials,
@@ -40,15 +40,15 @@ private let credentials = GatewayCredentials(
   _ = try await client.listProfiles()
 
   let sent = await recorder.requests
-  #expect(sent.first?.headerFields[.authorization] == "Bearer jian_test_key")
+  #expect(sent.first?.headerFields[.authorization] == "Bearer jian_test_admin_token")
 }
 
-@Test func revokedKeySurfacesAsUnauthorized() async throws {
+@Test func rejectedTokenSurfacesAsUnauthorized() async throws {
   let recorder = RequestRecorder()
   let client = JianClient(
     credentials: credentials,
     transport: StubTransport(
-      respond: { _ in jsonResponse(status: 401, #"{"error":"revoked"}"#) },
+      respond: { _ in jsonResponse(status: 401, #"{"error":"Unauthorized"}"#) },
       recorder: recorder
     )
   )

@@ -1,13 +1,14 @@
 import Foundation
 
-/// Where the gateway lives and the scoped access key used to reach it.
+/// Where the gateway lives and the administrator token used to reach it. The gateway has one
+/// API credential and it opens the whole installation, so this device holds everything.
 public struct GatewayCredentials: Sendable, Equatable {
   public let serverURL: URL
-  public let accessKey: String
+  public let adminToken: String
 
-  public init(serverURL: URL, accessKey: String) {
+  public init(serverURL: URL, adminToken: String) {
     self.serverURL = serverURL
-    self.accessKey = accessKey
+    self.adminToken = adminToken
   }
 }
 

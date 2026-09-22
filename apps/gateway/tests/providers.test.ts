@@ -30,7 +30,7 @@ describe('providers', () => {
         { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_MISSING' },
         { OPENAI_API_KEY: 'other-profile-secret' },
       ),
-    ).toThrow('Provider credential is not configured');
+    ).toThrow('Provider key is not configured');
   });
 });
 
@@ -48,7 +48,7 @@ it('accepts an explicitly resolved vault key without consulting host environment
     {
       provider: 'openai',
       modelId: 'chosen-model',
-      credentialId: '00000000-0000-4000-8000-000000000001',
+      providerId: '00000000-0000-4000-8000-000000000001',
     },
     {},
     undefined,

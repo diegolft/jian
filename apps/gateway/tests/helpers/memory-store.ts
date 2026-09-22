@@ -79,6 +79,13 @@ export class MemoryStore implements Store {
           put: async (kind, id, profileId, value) => {
             this.records.set(`${kind}:${id}`, { kind, profileId, data: structuredClone(value) });
           },
+          remove: async (kind, id, profileId) => {
+            const key = `${kind}:${id}`;
+
+            if (this.records.get(key)?.profileId === profileId) {
+              this.records.delete(key);
+            }
+          },
           event: async (event) => {
             this.log.push({ ...structuredClone(event), id: this.log.length + 1 });
           },

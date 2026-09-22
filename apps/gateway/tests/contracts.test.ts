@@ -1,11 +1,8 @@
-import { randomBytes } from 'node:crypto';
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { createOpenAPI, operations } from '@jian/contracts';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { Channels } from '../src/channels/service.js';
-import { Credentials } from '../src/security/credentials.js';
-import { SecretBox } from '../src/security/crypto.js';
 import { testServices } from './helpers/services.js';
 
 const token = 'synthetic-admin-token-with-32-characters';
@@ -14,16 +11,11 @@ const admin = { authorization: `Bearer ${token}` };
 async function setup() {
   const services = testServices();
 
-  const credentials = new Credentials(
-    services,
-    new SecretBox({ activeKeyId: 'v1', keys: { v1: randomBytes(32) } }),
-  );
-
-  const channels = new Channels(services, credentials, async () => {
+  const channels = new Channels(services, async () => {
     throw new Error('Network forbidden in test');
   });
 
-  const app = createApp({ ...services, credentials, channels, token, logger: false });
+  const app = createApp({ ...services, channels, token, logger: false });
 
   await app.ready();
 
@@ -33,7 +25,15 @@ async function setup() {
     model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
   });
 
-  return { app, services, credentials, profile };
+  return { app, services, profile };
+}
+
+/** A path every parameter of which is filled in, so only authentication decides the answer. */
+function address(path: string, profileId: string) {
+  return path
+    .replace(':profileId', profileId)
+    .replace(':memoryKey', 'sample')
+    .replace(/:[A-Za-z]+/g, '00000000-0000-4000-8000-000000000002');
 }
 
 describe('public API contracts', () => {
@@ -47,63 +47,73 @@ describe('public API contracts', () => {
     );
   });
 
-  it('enforces scoped profile isolation, prevents capability escalation and immediately revokes keys', async () => {
-    const { app, services, credentials, profile } = await setup();
+  it('answers every administrative route only to the host token', async () => {
+    const { app, profile } = await setup();
+    const administrative = operations.filter((operation) => operation.access === 'admin');
 
     try {
-      const key = await credentials.issueKey(profile.id, {
-        label: 'Mac',
-        scopes: ['read', 'profile:write'],
-        expiresAt: new Date(Date.now() + 60000).toISOString(),
-      });
+      expect(administrative.length).toBeGreaterThan(20);
 
-      const headers = { authorization: `Bearer ${key.token}` };
-      const path = `/v1/profiles/${profile.id}`;
+      for (const operation of administrative) {
+        const request = {
+          method: operation.method,
+          url: address(operation.path, profile.id),
+          ...(operation.body ? { payload: {} } : {}),
+        };
 
-      expect((await app.inject({ url: path, headers })).statusCode).toBe(200);
-      expect((await app.inject({ url: `${path}/credentials`, headers })).statusCode).toBe(403);
+        const anonymous = await app.inject(request);
+        const wrong = await app.inject({
+          ...request,
+          headers: { authorization: `Bearer ${token}-wrong` },
+        });
+        expect([operation.operationId, anonymous.statusCode]).toEqual([operation.operationId, 401]);
+        expect([operation.operationId, wrong.statusCode]).toEqual([operation.operationId, 401]);
 
+        // An event stream answers by staying open, so only its refusals are injectable.
+        if (operation.stream) {
+          continue;
+        }
+
+        const authorized = await app.inject({ ...request, headers: admin });
+
+        expect([operation.operationId, authorized.statusCode]).not.toEqual([
+          operation.operationId,
+          401,
+        ]);
+      }
+
+      // Only liveness and the sign-in that verifies the token itself answer without one.
       expect(
-        (
-          await app.inject({
-            method: 'PATCH',
-            url: path,
-            headers,
-            payload: { expectedVersion: 1, allowSelfManagement: true },
-          })
-        ).statusCode,
-      ).toBe(403);
-
-      const other = await services.profiles.createProfile({
-        name: 'Other',
-        instructions: 'Help',
-        model: profile.model,
-      });
-
-      expect((await app.inject({ url: `/v1/profiles/${other.id}`, headers })).statusCode).toBe(401);
-      await credentials.revokeKey(profile.id, key.id);
-      expect((await app.inject({ url: path, headers })).statusCode).toBe(401);
+        operations
+          .filter((operation) => operation.access === 'public')
+          .map((operation) => operation.operationId),
+      ).toEqual(['health', 'startPanelSession']);
     } finally {
       await app.close();
     }
   });
 
-  it('does not expose credential envelopes or worker snapshots in public responses', async () => {
+  it('does not expose provider secrets or worker snapshots in public responses', async () => {
     const { app, profile } = await setup();
 
     try {
       const prefix = `/v1/profiles/${profile.id}`;
 
-      const credential = await app.inject({
+      const provider = await app.inject({
         method: 'POST',
-        url: `${prefix}/credentials`,
+        url: `${prefix}/providers`,
         headers: admin,
-        payload: { kind: 'provider', label: 'Test', secret: 'synthetic-secret' },
+        payload: {
+          name: 'OpenAI',
+          kind: 'openai',
+          secret: 'synthetic-secret',
+          models: [{ id: 'sample', contextWindow: 16_000, maxOutputTokens: 2048 }],
+        },
       });
 
-      expect(credential.statusCode).toBe(201);
-      expect(credential.body).not.toContain('synthetic-secret');
-      expect(credential.body).not.toContain('ciphertext');
+      expect(provider.statusCode).toBe(201);
+      expect(provider.body).not.toContain('synthetic-secret');
+      expect(provider.body).not.toContain('ciphertext');
 
       const session = await app.inject({
         method: 'POST',

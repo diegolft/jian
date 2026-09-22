@@ -10,7 +10,6 @@ import type {
   DeviceFactory,
   DeviceSessionStore,
 } from '../src/channels/whatsapp/types.js';
-import { Credentials } from '../src/security/credentials.js';
 import { SecretBox } from '../src/security/crypto.js';
 import { testServices } from './helpers/services.js';
 
@@ -24,7 +23,6 @@ async function setup(send?: (chatId: string, text: string) => Promise<string>) {
   const services = testServices();
   const store = services.store;
   const box = new SecretBox({ activeKeyId: 'v1', keys: { v1: randomBytes(32) } });
-  const credentials = new Credentials(services, box);
   const devices: Array<{ callbacks: DeviceCallbacks; store: DeviceSessionStore }> = [];
   const sent: Array<{ chatId: string; text: string }> = [];
 
@@ -44,7 +42,7 @@ async function setup(send?: (chatId: string, text: string) => Promise<string>) {
   const connection = () => new WhatsAppConnections(store, box, factory, () => now);
   const whatsapp = connection();
   const registry = new ChannelRegistry([new WhatsAppChannel(whatsapp)]);
-  const channels = new Channels(services, credentials, fetch, registry);
+  const channels = new Channels(services, fetch, registry);
   const receive = (id: string, input: typeof message, generation: number) =>
     channels.receiveLinked(id, input, generation);
   const profile = await services.profiles.createProfile({
@@ -63,7 +61,7 @@ async function setup(send?: (chatId: string, text: string) => Promise<string>) {
     actorIds: [actorId],
     chatIds: [actorId],
   });
-  const app = createApp({ ...services, credentials, channels, whatsapp, token, logger: false });
+  const app = createApp({ ...services, channels, whatsapp, token, logger: false });
   const base = `/v1/profiles/${profile.id}/channels/${binding.id}`;
 
   return {
@@ -71,7 +69,6 @@ async function setup(send?: (chatId: string, text: string) => Promise<string>) {
     store,
     devices,
     sent,
-    credentials,
     whatsapp,
     channels,
     receive,
@@ -87,20 +84,15 @@ async function setup(send?: (chatId: string, text: string) => Promise<string>) {
 }
 
 describe('WhatsApp linked device', () => {
-  it('restricts linking and short-lived QR codes to administrators without exposing secrets in status', async () => {
+  it('restricts linking and short-lived QR codes to the host token without exposing secrets in status', async () => {
     const f = await setup();
 
     try {
-      const key = await f.credentials.issueKey(f.profile.id, {
-        label: 'Reader',
-        scopes: ['read'],
-        expiresAt: new Date(Date.now() + 60_000).toISOString(),
-      });
-      const restricted = { authorization: `Bearer ${key.token}` };
+      const restricted = { authorization: `Bearer ${token}-wrong` };
       expect(
         (await f.app.inject({ method: 'POST', url: `${f.base}/connect`, headers: restricted }))
           .statusCode,
-      ).toBe(403);
+      ).toBe(401);
       expect(
         (await f.app.inject({ method: 'POST', url: `${f.base}/connect`, headers: admin }))
           .statusCode,
@@ -117,7 +109,7 @@ describe('WhatsApp linked device', () => {
       expect(qr.headers['cache-control']).toBe('no-store');
       expect(qr.json().qr).toBe('synthetic-sensitive-qr');
       expect((await f.app.inject({ url: `${f.base}/qr`, headers: restricted })).statusCode).toBe(
-        403,
+        401,
       );
 
       const status = await f.app.inject({ url: `${f.base}/connection`, headers: admin });

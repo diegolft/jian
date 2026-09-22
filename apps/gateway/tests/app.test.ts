@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict';
-import { randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
-import { Credentials } from '../src/security/credentials.js';
-import { SecretBox } from '../src/security/crypto.js';
 import { testServices } from './helpers/services.js';
 
 const token = 'test-token-that-is-at-least-32-characters';
@@ -32,29 +29,15 @@ afterEach(async () => {
 });
 
 describe('HTTP services', () => {
-  it('keeps provider setup admin-only while scoped chat can use a registered model', async () => {
-    const services = testServices();
-    const credentials = new Credentials(
-      services,
-      new SecretBox({
-        activeKeyId: 'test',
-        keys: { test: randomBytes(32) },
-      }),
-    );
-    const app = createApp({ ...services, credentials, token, logger: false });
-    apps.push(app);
+  it('registers a provider from a typed key, runs with it and never echoes the secret', async () => {
+    const { app, services } = setup();
 
     const profile = await services.profiles.createProfile({ name: 'New', instructions: 'Help.' });
-    const secret = await credentials.create(profile.id, {
-      label: 'Test',
-      kind: 'provider',
-      secret: 'synthetic-secret',
-    });
     const base = `/v1/profiles/${profile.id}`;
     const payload = {
       name: 'OpenAI',
       kind: 'openai',
-      credentialId: secret.id,
+      secret: 'synthetic-secret',
       models: [{ id: 'sample', contextWindow: 16_000, maxOutputTokens: 2048 }],
     };
     const created = await app.inject({
@@ -67,6 +50,10 @@ describe('HTTP services', () => {
     expect(created.statusCode).toBe(201);
     expect(created.body).not.toContain('synthetic-secret');
 
+    const listed = await app.inject({ url: `${base}/providers`, headers });
+
+    expect(listed.body).not.toContain('synthetic-secret');
+
     const chosen = { providerId: created.json().id, modelId: 'sample' };
     const configured = await app.inject({
       method: 'PUT',
@@ -76,34 +63,61 @@ describe('HTTP services', () => {
     });
     expect(configured.statusCode).toBe(200);
 
-    const key = await credentials.issueKey(profile.id, {
-      label: 'Chat',
-      scopes: ['chat'],
-      expiresAt: new Date(Date.now() + 60_000).toISOString(),
-    });
-    const scoped = { authorization: `Bearer ${key.token}` };
-
-    expect((await app.inject({ url: `${base}/providers`, headers: scoped })).statusCode).toBe(403);
-    expect(
-      (await app.inject({ method: 'POST', url: `${base}/providers`, headers: scoped, payload }))
-        .statusCode,
-    ).toBe(403);
-    expect(
-      (await app.inject({ method: 'POST', url: `${base}/providers/openai/oauth`, headers: scoped }))
-        .statusCode,
-    ).toBe(403);
-
     const session = await services.sessions.createSession(profile.id, { title: 'Chat' });
     const response = await app.inject({
       method: 'POST',
       url: `${base}/sessions/${session.id}/messages`,
-      headers: scoped,
+      headers,
       payload: { text: 'Hello', requestKey: 'once' },
     });
 
     expect(response.statusCode).toBe(202);
     expect(response.json().model.modelId).toBe('sample');
     expect(response.body).not.toContain('synthetic-secret');
+  });
+
+  it('lists what the agent remembered and forgets one entry on request', async () => {
+    const { app, services } = setup();
+    const profile = await services.profiles.createProfile(input);
+    const base = `/v1/profiles/${profile.id}`;
+
+    await services.memories.remember(profile.id, {
+      key: 'deploy-window',
+      content: 'Fridays are frozen.',
+      expectedVersion: 0,
+    });
+
+    expect((await app.inject({ url: `${base}/memories`, headers })).json()).toHaveLength(1);
+
+    const removed = await app.inject({
+      method: 'DELETE',
+      url: `${base}/memories/deploy-window`,
+      headers,
+    });
+
+    expect(removed.statusCode).toBe(200);
+    expect(removed.json().key).toBe('deploy-window');
+    expect((await app.inject({ url: `${base}/memories`, headers })).json()).toEqual([]);
+
+    const missing = await app.inject({
+      method: 'DELETE',
+      url: `${base}/memories/deploy-window`,
+      headers,
+    });
+
+    expect(missing.statusCode).toBe(404);
+
+    // The panel cannot write one back: the agent owns what it keeps.
+    expect(
+      (
+        await app.inject({
+          method: 'PUT',
+          url: `${base}/memories`,
+          headers,
+          payload: { key: 'deploy-window', content: 'Back', expectedVersion: 0 },
+        })
+      ).statusCode,
+    ).toBe(404);
   });
   it('protects profiles and events while exposing liveness', async () => {
     const { app } = setup();

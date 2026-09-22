@@ -2,26 +2,28 @@
 
 ## Fronteira de confiança
 
-Uma instalação pertence a um dono confiável. O token `JIAN_API_TOKEN` é administrativo: mantenha-o no host e use chaves com escopos nos clientes. Todas as sessões de um perfil compartilham o mesmo acesso aos dados e ferramentas daquele perfil. Não conecte públicos com permissões diferentes ao mesmo perfil.
+Uma instalação pertence a um dono confiável. `JIAN_API_TOKEN` é a única credencial da API e abre a instalação inteira: mantenha-o no host e só o entregue a aparelhos em que você confia. Não há chaves de cliente com permissão reduzida — quem tem o token pode tudo. Todas as sessões de um perfil compartilham o mesmo acesso aos dados e ferramentas daquele perfil. Não conecte públicos com permissões diferentes ao mesmo perfil.
 
-As chaves de clientes são aleatórias, têm 256 bits de entropia e são persistidas como hash SHA-256, com perfil, escopos e expiração. Revogação é verificada a cada requisição e durante streams. Chaves de provider/MCP/canal são criptografadas e nunca retornadas em consultas do cofre.
+Cada operação do contrato é `admin`, `public` ou `webhook`. Só `/health` e a troca do token por um cookie de painel respondem sem autenticação; um webhook autentica o token da própria ligação de canal, que é aleatório, tem 256 bits de entropia e é persistido como hash SHA-256. Todo o resto exige o token do host ou o cookie do painel assinado com ele.
+
+Chaves de provider, tokens de MCP e de canal são digitados onde a coisa é configurada, cifrados por perfil e nunca devolvidos em leitura alguma.
 
 ## Criptografia e rotação
 
 `JIAN_MASTER_KEYS` é um objeto JSON de identificadores para chaves de 32 bytes em Base64. `JIAN_ACTIVE_KEY_ID` escolhe a chave usada para novas gravações. O setup cria um keyring em `.env` com permissão `0600`; na hospedagem, injete-o por um gerenciador de segredos. Não coloque esse keyring no banco, no Git ou no mesmo backup do banco.
 
-AES-256-GCM usa nonce aleatório por gravação. Os dados autenticados vinculam cada ciphertext ao ID, perfil e propósito da credencial, impedindo a troca de envelopes entre registros. Essa proteção cobre vazamento isolado do banco; um processo worker comprometido também pode acessar as chaves em memória.
+AES-256-GCM usa nonce aleatório por gravação. Os dados autenticados vinculam cada ciphertext ao perfil e ao dono do segredo — `provider:<id>`, `mcp:<nome>`, `channel:<id>` —, impedindo a troca de envelopes entre registros ou entre perfis. Essa proteção cobre vazamento isolado do banco; um processo worker comprometido também pode acessar as chaves em memória.
 
 Para rotacionar:
 
 1. Gere outra chave aleatória de 32 bytes e adicione-a ao keyring com outro ID.
 2. Distribua o keyring completo a todas as APIs/workers e altere o ID ativo.
-3. Chame `POST /v1/profiles/{profileId}/credentials/{credentialId}/rotate` para cada credencial.
-4. Confira o `keyId` dos metadados antes de remover a chave antiga. Backups antigos continuam dependendo dela.
+3. Reenvie cada segredo pela tela que o configura: um provider cifra a chave nova com o ID ativo, e o mesmo vale para o token de um servidor MCP ou de um canal.
+4. Só remova a chave antiga do keyring depois disso. Backups antigos continuam dependendo dela.
 
-Rotação do envelope não troca a chave no provider. Para trocar a credencial externa, crie outra credencial no cofre, atualize o perfil com controle de versão e revogue a anterior. Runs enfileirados guardam a configuração antiga; cancele-os se a revogação for urgente.
+Reenviar a chave no cofre não troca a chave no provider. Para trocar a chave externa, digite a nova na tela de Providers: o gateway revoga o provider anterior e descarta o segredo dele. Runs enfileirados guardam a configuração antiga; cancele-os se a troca for urgente.
 
-O token administrativo legado fica no ambiente, separado do banco. Troque-o no host e reinicie API/workers; a troca também invalida os cookies de sessão do painel, que são assinados com ele. Nunca envie segredos em parâmetros de URL; use HTTPS e armazene tokens do cliente no cofre do sistema operacional.
+O token administrativo fica no ambiente, separado do banco. Troque-o no host e reinicie API/workers; a troca também invalida os cookies de sessão do painel, que são assinados com ele. Nunca envie segredos em parâmetros de URL; use HTTPS e armazene tokens do cliente no cofre do sistema operacional.
 
 ## Rede e limites
 
@@ -31,7 +33,7 @@ A API limita o corpo a 256 KiB, aplica rate limit por endereço de conexão e li
 
 Inputs desconhecidos são rejeitados nos contratos administrativos. Logs não incluem corpos, cabeçalhos de autenticação ou exceções de providers. Memórias, mensagens e artefatos são dados do usuário e permanecem em texto no banco: criptografia de credenciais não significa criptografia integral das conversas. Restrinja acesso ao banco e aos backups.
 
-Skills e resultados de ferramentas são instruções/dados não confiáveis. As listas permitidas e escopos reduzem capacidades; elas não eliminam prompt injection. Habilite apenas as ferramentas que o perfil pode realmente exercer e use credenciais externas de menor privilégio.
+Skills e resultados de ferramentas são instruções/dados não confiáveis. As listas de ferramentas permitidas reduzem capacidades; elas não eliminam prompt injection. Habilite apenas as ferramentas que o perfil pode realmente exercer e use credenciais externas de menor privilégio.
 
 ## Falhas e efeitos externos
 
@@ -47,6 +49,6 @@ Não publique credenciais ou provas com dados privados em issues. Antes de dispo
 
 ## Dispositivos WhatsApp
 
-Parear por QR concede acesso à conta. Conexão, estado e QR exigem token de administrador; o QR é criptografado no banco, expira e usa `Cache-Control: no-store`. Backups da sessão são criptografados e isolados por perfil/canal. Callbacks de gerações ou posses antigas não podem regravar credenciais após desconexão/revogação.
+Parear por QR concede acesso à conta. Conexão, estado e QR exigem o token do host; o QR é criptografado no banco, expira e usa `Cache-Control: no-store`. Backups da sessão são criptografados e isolados por perfil/canal. Callbacks de gerações ou posses antigas não podem regravar credenciais após desconexão/revogação.
 
 A sessão em texto claro existe somente na memória do worker; nada é escrito em disco. O worker abre um WebSocket direto para o WhatsApp: aplique controles de saída também a ele. A integração não é uma API oficial da Meta.

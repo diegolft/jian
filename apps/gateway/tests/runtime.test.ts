@@ -1,9 +1,6 @@
-import { randomBytes } from 'node:crypto';
 import { MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it } from 'vitest';
 import { AgentRuntime } from '../src/agent/runtime.js';
-import { Credentials } from '../src/security/credentials.js';
-import { SecretBox } from '../src/security/crypto.js';
 import { testServices } from './helpers/services.js';
 
 const input = {
@@ -155,20 +152,16 @@ it('resolves a provider key from the profile vault and keeps it out of durable e
   const { services, profile } = await fixture();
   const vaultSecret = 'vault"\\\nsecret';
 
-  const credentials = new Credentials(
-    services,
-    new SecretBox({ activeKeyId: 'test', keys: { test: randomBytes(32) } }),
-  );
-
-  const credential = await credentials.create(profile.id, {
-    label: 'Model',
-    kind: 'provider',
+  const provider = await services.providers.createProvider(profile.id, {
+    name: 'Model',
+    kind: 'openai',
     secret: vaultSecret,
+    models: [{ id: 'test', contextWindow: 16_000, maxOutputTokens: 2048 }],
   });
 
   const updated = await services.profiles.updateProfile(profile.id, {
     expectedVersion: profile.version,
-    model: { provider: 'openai', modelId: 'test', credentialId: credential.id },
+    model: { provider: 'openai', modelId: 'test', providerId: provider.id },
   });
 
   const session = await services.sessions.createSession(updated.id, { title: 'Vault' });
@@ -186,7 +179,7 @@ it('resolves a provider key from the profile vault and keeps it out of durable e
 
       return model;
     },
-    { credentials },
+    { vault: services.vault },
   ).execute(updated.id, run.id);
 
   expect(resolvedKey).toBe(vaultSecret);
@@ -507,7 +500,7 @@ it('redacts an escaped host credential from tool prompts, artifacts, checkpoints
   }
 });
 
-it('creates a child profile without inheriting provider credential access', async () => {
+it('creates a child profile without inheriting provider access', async () => {
   const services = testServices();
   const profile = await services.profiles.createProfile({ ...input, allowSelfManagement: true });
   const session = await services.sessions.createSession(profile.id, { title: 'Parent' });
@@ -550,7 +543,7 @@ it('creates a child profile without inheriting provider credential access', asyn
   );
 
   expect(child?.model.apiKeyEnv).toBeUndefined();
-  expect(child?.model.credentialId).toBeUndefined();
+  expect(child?.model.providerId).toBeUndefined();
   expect(child?.allowSelfManagement).toBe(false);
 });
 

@@ -2,7 +2,14 @@
 
 import { Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { GatewayApi, ModelSelection, Mutation, Profile, ProfileData } from '../lib/api';
+import {
+  date,
+  type GatewayApi,
+  type ModelSelection,
+  type Mutation,
+  type Profile,
+  type ProfileData,
+} from '../lib/api';
 import { Badge, Button, Empty, Field, SectionHeading } from './ui';
 
 type Props = {
@@ -36,14 +43,7 @@ const providers = [
 
 export const availableModels = (data: ProfileData) =>
   data.providers
-    .filter(
-      (provider) =>
-        !provider.revokedAt &&
-        (provider.apiKeyEnv ||
-          data.credentials.some(
-            (credential) => credential.id === provider.credentialId && !credential.revokedAt,
-          )),
-    )
+    .filter((provider) => !provider.revokedAt)
     .flatMap((provider) => provider.models.map((model) => ({ provider, model })));
 
 const keyOf = (value: ModelSelection | null) =>
@@ -99,13 +99,7 @@ export function Providers({ profile, data, api, mutate, busy }: Props) {
       <div className="resource-list">
         {providers.map((entry) => {
           const configured = data.providers.find(
-            (provider) =>
-              provider.kind === entry.kind &&
-              !provider.revokedAt &&
-              (provider.apiKeyEnv ||
-                data.credentials.some(
-                  (credential) => credential.id === provider.credentialId && !credential.revokedAt,
-                )),
+            (provider) => provider.kind === entry.kind && !provider.revokedAt,
           );
           return (
             <div className="settings-section" key={entry.kind}>
@@ -117,9 +111,13 @@ export function Providers({ profile, data, api, mutate, busy }: Props) {
                     ? configured.authMode === 'codex'
                       ? 'ChatGPT conectado'
                       : 'Configurado'
-                    : 'Sem credencial'}
+                    : 'Sem chave'}
                 </Badge>
-                {configured?.apiKeyEnv && <p>Variável: {configured.apiKeyEnv}</p>}
+                {configured?.apiKeyEnv ? (
+                  <p>Variável: {configured.apiKeyEnv}</p>
+                ) : (
+                  configured && <p>Chave guardada em {date(configured.createdAt)}</p>
+                )}
               </div>
               <form
                 className="settings-fields"
@@ -134,25 +132,17 @@ export function Providers({ profile, data, api, mutate, busy }: Props) {
                     setFormError(`Informe a chave de ${entry.name}.`);
                     return;
                   }
-                  const ok = await mutate(async () => {
-                    const credential = await api.createCredential(profile.id, {
-                      label: entry.name,
-                      kind: 'provider',
-                      secret,
-                    });
-                    await api.createProvider(profile.id, {
-                      name: entry.name,
-                      kind: entry.kind,
-                      credentialId: credential.id,
-                      models: [...entry.models],
-                    });
-                    if (configured && !configured.apiKeyEnv) {
-                      await api.revokeProvider(profile.id, configured.id);
-                      if (configured.credentialId) {
-                        await api.revokeCredential(profile.id, configured.credentialId);
-                      }
-                    }
-                  }, `${entry.name} configurado.`);
+                  // Registering replaces the provider of this vendor, key included.
+                  const ok = await mutate(
+                    () =>
+                      api.createProvider(profile.id, {
+                        name: entry.name,
+                        kind: entry.kind,
+                        secret,
+                        models: [...entry.models],
+                      }),
+                    `${entry.name} configurado.`,
+                  );
                   if (ok) element.reset();
                 }}
               >
@@ -173,12 +163,10 @@ export function Providers({ profile, data, api, mutate, busy }: Props) {
                       variant="quiet"
                       disabled={busy}
                       onClick={() =>
-                        void mutate(async () => {
-                          await api.revokeProvider(profile.id, configured.id);
-                          if (configured.credentialId) {
-                            await api.revokeCredential(profile.id, configured.credentialId);
-                          }
-                        }, `${entry.name} desconectado.`)
+                        void mutate(
+                          () => api.revokeProvider(profile.id, configured.id),
+                          `${entry.name} desconectado.`,
+                        )
                       }
                     >
                       <Trash2 size={16} />

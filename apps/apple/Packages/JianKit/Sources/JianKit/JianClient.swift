@@ -3,7 +3,7 @@ import Foundation
 import OpenAPIRuntime
 import OpenAPIURLSession
 
-/// Talks to one Jian gateway installation with one scoped access key.
+/// Talks to one Jian gateway installation with its administrator token.
 public struct JianClient: Sendable {
   private let generated: JianAPI.Client
 
@@ -15,7 +15,7 @@ public struct JianClient: Sendable {
       serverURL: credentials.serverURL,
       configuration: Configuration(dateTranscoder: GatewayDateTranscoder()),
       transport: transport,
-      middlewares: [BearerAuthenticationMiddleware(accessKey: credentials.accessKey)]
+      middlewares: [BearerAuthenticationMiddleware(adminToken: credentials.adminToken)]
     )
   }
 

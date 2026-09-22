@@ -17,8 +17,8 @@ export class TelegramChannel implements Channel {
   readonly webhookHeader = 'x-telegram-bot-api-secret-token';
 
   validateConfiguration(configuration: ChannelConfiguration): void {
-    if (!configuration.credentialId) {
-      throw new GatewayError(400, 'Telegram requires a channel credential');
+    if (!configuration.token) {
+      throw new GatewayError(400, 'Telegram requires the bot token');
     }
   }
 

@@ -1,8 +1,6 @@
-import { randomBytes } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CodexLogin } from '../src/providers/codex/login.js';
-import { Credentials } from '../src/security/credentials.js';
-import { SecretBox } from '../src/security/crypto.js';
+import { providerSecret } from '../src/providers/service.js';
 import { testServices } from './helpers/services.js';
 
 afterEach(() => vi.useRealTimers());
@@ -11,13 +9,6 @@ it('connects ChatGPT through device login without exposing tokens', async () => 
   vi.useFakeTimers();
   const services = testServices();
   const profile = await services.profiles.createProfile({ name: 'OAuth', instructions: 'Help.' });
-  const credentials = new Credentials(
-    services,
-    new SecretBox({
-      activeKeyId: 'test',
-      keys: { test: randomBytes(32) },
-    }),
-  );
   const token = `a.${Buffer.from(JSON.stringify({ exp: 4_000_000_000 })).toString('base64url')}.b`;
   const fetcher = vi.fn<typeof fetch>(async (input) => {
     const url = String(input);
@@ -29,7 +20,7 @@ it('connects ChatGPT through device login without exposing tokens', async () => 
     }
     return Response.json({ access_token: token, refresh_token: 'synthetic-refresh' });
   });
-  const login = new CodexLogin(services, credentials, fetcher);
+  const login = new CodexLogin(services, services.vault, fetcher);
 
   const [first, second] = await Promise.all([login.start(profile.id), login.start(profile.id)]);
   expect(first).toMatchObject({ status: 'pending', userCode: 'ABCD-1234' });
@@ -40,9 +31,9 @@ it('connects ChatGPT through device login without exposing tokens', async () => 
   const provider = (await services.providers.providers(profile.id)).find(
     (item) => item.authMode === 'codex',
   );
-  expect(provider?.credentialId).toBeDefined();
+  expect(provider?.id).toBeDefined();
   expect(JSON.stringify(provider)).not.toContain('synthetic-refresh');
-  expect(await login.accessToken(profile.id, provider?.credentialId ?? '')).toBe(token);
+  expect(await login.accessToken(profile.id, provider?.id ?? '')).toBe(token);
   const session = await services.sessions.createSession(profile.id, { title: 'ChatGPT' });
   const run = await services.runs.submit(profile.id, session.id, {
     text: 'Hello',
@@ -54,30 +45,25 @@ it('connects ChatGPT through device login without exposing tokens', async () => 
 it('renews a rotating OAuth token once for concurrent runs', async () => {
   const services = testServices();
   const profile = await services.profiles.createProfile({ name: 'Refresh', instructions: 'Help.' });
-  const credentials = new Credentials(
-    services,
-    new SecretBox({ activeKeyId: 'test', keys: { test: randomBytes(32) } }),
-  );
   const expired = `a.${Buffer.from(JSON.stringify({ exp: 1 })).toString('base64url')}.b`;
   const fresh = `a.${Buffer.from(JSON.stringify({ exp: 4_000_000_000 })).toString('base64url')}.b`;
-  const credential = await credentials.create(profile.id, {
-    label: 'ChatGPT',
-    kind: 'provider',
-    secret: JSON.stringify({ access_token: expired, refresh_token: 'first-refresh' }),
-  });
+  const provider = await services.providers.configureCodexProvider(
+    profile.id,
+    JSON.stringify({ access_token: expired, refresh_token: 'first-refresh' }),
+  );
   const fetcher = vi.fn<typeof fetch>(async () =>
     Response.json({ access_token: fresh, refresh_token: 'second-refresh' }),
   );
-  const login = new CodexLogin(services, credentials, fetcher);
+  const login = new CodexLogin(services, services.vault, fetcher);
 
   expect(
     await Promise.all([
-      login.accessToken(profile.id, credential.id),
-      login.accessToken(profile.id, credential.id),
+      login.accessToken(profile.id, provider.id),
+      login.accessToken(profile.id, provider.id),
     ]),
   ).toEqual([fresh, fresh]);
   expect(fetcher).toHaveBeenCalledTimes(1);
-  expect(await credentials.resolve(profile.id, credential.id, 'provider')).toContain(
+  expect(await services.vault.read(profile.id, providerSecret(provider.id))).toContain(
     'second-refresh',
   );
 });

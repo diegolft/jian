@@ -358,7 +358,7 @@ export function Channels({
                   sessionId: String(form.get('session')),
                   actorIds: normalize(String(form.get('actors'))),
                   chatIds: normalize(String(form.get('chats'))),
-                  ...(type === 'telegram' ? { credentialId: String(form.get('credential')) } : {}),
+                  ...(type === 'telegram' ? { token: String(form.get('token')) } : {}),
                 });
 
                 if (type === 'whatsapp') {
@@ -407,21 +407,10 @@ export function Channels({
             </Field>
             {type === 'telegram' && (
               <Field
-                label="Credencial do bot"
-                hint="Cadastre o token do BotFather em Credenciais, com uso Canal."
+                label="Token do bot"
+                hint="O token do BotFather. Fica criptografado no Gateway e não aparece novamente."
               >
-                <select name="credential" required defaultValue="">
-                  <option value="" disabled>
-                    Selecionar credencial
-                  </option>
-                  {data.credentials
-                    .filter((item) => item.kind === 'channel' && !item.revokedAt)
-                    .map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.label}
-                      </option>
-                    ))}
-                </select>
+                <input name="token" type="password" required autoComplete="off" maxLength={16000} />
               </Field>
             )}
             <Field
@@ -457,7 +446,7 @@ export function Channels({
             )}
             {failed && (
               <p role="alert" className="form-error">
-                Não foi possível criar. Confira a sessão, os IDs permitidos e a credencial.
+                Não foi possível criar. Confira a sessão, os IDs permitidos e o token.
               </p>
             )}
             <footer>

@@ -1,8 +1,11 @@
+import { randomBytes } from 'node:crypto';
 import { MockLanguageModelV4 } from 'ai/test';
 import { PgBoss } from 'pg-boss';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AgentRuntime } from '../src/agent/runtime.js';
 import { RunQueue } from '../src/runs/queue.js';
+import { SecretBox } from '../src/security/crypto.js';
+import { Vault } from '../src/security/vault.js';
 import { buildServices } from '../src/services.js';
 import { PostgresStore } from '../src/storage/postgres.js';
 
@@ -13,8 +16,9 @@ if (!databaseUrl) {
 }
 
 const connectionString = databaseUrl;
+const box = new SecretBox({ activeKeyId: 'test', keys: { test: randomBytes(32) } });
 const store = new PostgresStore(connectionString);
-const services = { ...buildServices({ store }), store };
+const services = { ...buildServices({ store, vault: new Vault(store, box) }), store };
 
 const input = {
   name: 'CI',
@@ -47,7 +51,9 @@ describe('PostgreSQL durability', () => {
     const second = new PostgresStore(connectionString);
 
     try {
-      expect((await buildServices({ store: second }).profiles.profile(profile.id)).name).toBe('CI');
+      const reopened = buildServices({ store: second, vault: new Vault(second, box) });
+
+      expect((await reopened.profiles.profile(profile.id)).name).toBe('CI');
     } finally {
       await second.close();
     }

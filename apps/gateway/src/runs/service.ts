@@ -92,17 +92,10 @@ export class Runs {
           selection = null;
         }
       }
-      if (!chosen && !profile.model.apiKeyEnv && !profile.model.credentialId) {
+      if (!chosen && !profile.model.apiKeyEnv && !profile.model.providerId) {
         const stored = await tx.list('provider', { profileId, limit: 100 });
-        const credentials = await tx.list('credential', { profileId, limit: 100 });
         const configured = [
-          ...stored.filter(
-            (item) =>
-              !item.revokedAt &&
-              credentials.some(
-                (credential) => credential.id === item.credentialId && !credential.revokedAt,
-              ),
-          ),
+          ...stored.filter((item) => !item.revokedAt),
           ...(Object.keys(providerCatalog) as ProviderKind[])
             .map((kind) => environmentProvider(profileId, kind))
             .filter((item) => item !== null),
@@ -115,8 +108,8 @@ export class Runs {
         }
       }
 
-      if (!chosen && !profile.model.apiKeyEnv && !profile.model.credentialId) {
-        throw new GatewayError(409, 'Configure a provider credential before starting a run');
+      if (!chosen && !profile.model.apiKeyEnv && !profile.model.providerId) {
+        throw new GatewayError(409, 'Configure a provider key before starting a run');
       }
 
       const queued = await tx.list('run', { profileId, where: { status: 'queued' }, limit: 33 });

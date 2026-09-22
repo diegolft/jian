@@ -14,7 +14,7 @@ export class WhatsAppChannel implements Channel {
   constructor(private readonly connections: WhatsAppConnections) {}
 
   validateConfiguration(configuration: ChannelConfiguration) {
-    if (configuration.credentialId) {
+    if (configuration.token) {
       throw new GatewayError(400, 'WhatsApp uses a linked device, not a bot token');
     }
 

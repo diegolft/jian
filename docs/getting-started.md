@@ -47,8 +47,8 @@ and both halves must share the database and the keyring.
 `apps/gateway/dist/ui`; there is no Next.js server in production. `pnpm start` then serves
 it at `http://localhost:4310/ui/`. Sign in with the server's `JIAN_API_TOKEN`.
 
-The panel keeps that token in the tab's memory only, so a reload asks again. Provider keys
-go to the gateway's encrypted vault, never to browser storage.
+The panel trades that token for a signed cookie, so a reload keeps the session. Provider
+keys go to the gateway's encrypted vault, never to browser storage.
 
 While developing the panel, use `http://localhost:3000/ui/`, which reloads on edit and
 forwards `/v1` to the gateway. Port 4310 serves the copy from the last `pnpm build`.
@@ -64,11 +64,12 @@ Every administrative call needs `Authorization: Bearer <JIAN_API_TOKEN>`, includ
    `OPENAI_API_KEY` in the gateway environment, or enter a key on the Providers screen.
    OpenAI also accepts a ChatGPT/Codex login there. No provider registration or model
    allowlist is required.
-3. Issue a client key with `POST /v1/profiles/{profileId}/keys`, passing `label`, `scopes`
-   and `expiresAt`. Keep the returned token; it is never shown again.
-4. Create a session and post to
+3. Create a session and post to
    `POST /v1/profiles/{profileId}/sessions/{sessionId}/messages` with `text` and a
    `requestKey` per message. The configured provider is selected automatically.
+
+The host token is the only API credential and it opens the whole installation. Keep it on
+the host and on devices you trust; there are no scoped client keys.
 
 The Providers screen has fixed Anthropic, Gemini and OpenAI settings. It detects
 `ANTHROPIC_API_KEY`, `ANTHROPIC_API_TOKEN`, `GEMINI_API_TOKEN` and `OPENAI_API_KEY`
@@ -80,9 +81,10 @@ Repeating a `requestKey` with the same text returns the existing run; different 
 returns `409`. A profile allows up to 32 active or queued runs, one per session, and each
 worker process executes four at a time.
 
-Client scopes are `read`, `chat`, `memory:write` and `profile:write`. The last edits
-identity, skills and limits; it does not grant providers, MCP servers or self-management.
-The vault, channels and key issuance stay administrative.
+A secret is typed where the thing that uses it is configured: the provider key on the
+Providers screen, the MCP token with its server, the bot token with its channel. The
+gateway encrypts it per profile and never returns it; replacing it means sending another,
+and removing it means removing the thing that owns it.
 
 ## Using the SDK
 
@@ -104,17 +106,17 @@ The generator package pins TypeScript 5.9, because the compiler API `openapi-typ
 needs does not exist in the native TypeScript 7 compiler the gateway uses.
 
 `/v1/profiles/{profileId}/events/stream` streams run events, not individual tokens.
-Reconnect with `Last-Event-ID`. Slow clients are throttled, and a revoked key loses the
-stream at the next check.
+Reconnect with `Last-Event-ID`. Slow clients are throttled and disconnected.
 
 ## Memory, tools and identity
 
 `identity` separates role, tone, goals and boundaries from the general instructions.
 Changes carry an `expectedVersion`, and each run pins one version. `allowSelfManagement`
 lets an agent edit its name, instructions and skills and derive new profiles **without
-inherited credentials**; it can never grant itself new permissions.
+inherited provider access**; it can never grant itself new permissions.
 
-Explicit memories carry a key, content, origin and version. Context retrieval picks
+Memories carry a key, content, origin and version, and only the agent writes them: the
+API lists them and removes one, it does not create or edit. Context retrieval picks
 candidates from a text index and injects only relevant matches within the budget, while
 the full history stays in the database and is read page by page. This is lexical search:
 embeddings and model-written summaries are not implemented.

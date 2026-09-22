@@ -1,6 +1,6 @@
-import { type Memory, memorySchema } from '@jian/contracts';
+import { type Memory, memoryKeySchema, memorySchema } from '@jian/contracts';
 import { type Clock, nowIso } from '../core/clock.js';
-import { GatewayError } from '../core/errors.js';
+import { assertFound, GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
 import type { Store } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
@@ -52,6 +52,31 @@ export class Memories {
         key: memory.key,
         version: memory.version,
         sourceSessionId,
+      });
+
+      return memory;
+    });
+  }
+
+  /**
+   * The owner cannot write a memory, but must be able to take a wrong one off the shelf: an
+   * agent that keeps reading it repeats the same mistake in every new session.
+   */
+  async forget(profileId: string, key: unknown) {
+    const memoryKey = memoryKeySchema.parse(key);
+
+    return this.store.transaction(profileId, async (tx) => {
+      await this.profiles.profile(profileId, tx);
+
+      const id = `${profileId}:${memoryKey}`;
+      const stored = await tx.get('memory', id);
+      const memory = assertFound(stored?.profileId === profileId ? stored : null, 'Memory');
+
+      await tx.remove('memory', id, profileId);
+
+      await recordEvent(tx, this.clock, profileId, 'memory.forgotten', {
+        key: memory.key,
+        version: memory.version,
       });
 
       return memory;

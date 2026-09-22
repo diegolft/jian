@@ -66,4 +66,17 @@ export const migrations = [
         ALTER TABLE IF EXISTS jian_records RENAME CONSTRAINT elos_records_kind_check TO jian_records_kind_check;
 `,
   },
+  {
+    // Access keys were removed and the credential vault became internal storage addressed by
+    // its owner, so both record shapes are unreadable by this gateway. They are deleted here
+    // rather than left behind: a dead ciphertext still holds a live secret from a provider.
+    version: 6,
+    sql: `
+        DELETE FROM jian_records WHERE kind IN ('accessKey','credential');
+        DROP INDEX IF EXISTS jian_records_access_key_hash;
+        ALTER TABLE jian_records DROP CONSTRAINT IF EXISTS jian_records_kind_check;
+        ALTER TABLE jian_records ADD CONSTRAINT jian_records_kind_check
+          CHECK (kind IN ('profile','revision','session','message','memory','run','secret','artifact','lease','mail','channel','delivery','checkpoint','channelConnection','channelAuth','channelInbox','provider','modelDefault'));
+`,
+  },
 ];

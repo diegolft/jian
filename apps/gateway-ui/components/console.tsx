@@ -9,7 +9,6 @@ import {
   CircleHelp,
   Cpu,
   Fingerprint,
-  KeyRound,
   LayoutDashboard,
   LoaderCircle,
   LockKeyhole,
@@ -30,7 +29,7 @@ import { Avatar } from './avatar-field';
 import { Channels } from './channels';
 import { NewProfileDialog, ProfileEditor } from './profile-editor';
 import { ModelDefaults, Providers } from './provider-settings';
-import { AccessKeys, Capabilities, Credentials, Memories } from './resources';
+import { Capabilities, Memories } from './resources';
 import { Sessions } from './sessions';
 import { Badge, Button, Empty, Field, Mark, SectionHeading } from './ui';
 
@@ -44,8 +43,6 @@ const navigation = [
   { id: 'memories', label: 'Memórias', icon: BookOpen, group: 'capabilities' },
   { id: 'skills', label: 'Skills', icon: Sparkles, group: 'capabilities' },
   { id: 'mcps', label: 'Servidores MCP', icon: Plug, group: 'capabilities' },
-  { id: 'credentials', label: 'Credenciais', icon: LockKeyhole, group: 'security' },
-  { id: 'keys', label: 'Chaves de acesso', icon: KeyRound, group: 'security' },
 ] as const;
 
 type Section = (typeof navigation)[number]['id'];
@@ -155,8 +152,8 @@ function Login({ connected }: { connected: (profiles: Profile[]) => void }) {
               Onde encontro meu token?
             </summary>
             <p>
-              Use o valor de <code>JIAN_API_TOKEN</code> definido na configuração do servidor.
-              Chaves de perfil não permitem administrar o Gateway.
+              Use o valor de <code>JIAN_API_TOKEN</code> definido na configuração do servidor. É o
+              único token que o Gateway aceita.
             </p>
           </details>
         </form>
@@ -176,10 +173,7 @@ function Overview({
 }) {
   const connected = data.channels.filter((item) => !item.revokedAt);
 
-  const providerReady =
-    data.providers.some((item) => !item.revokedAt) ||
-    !!profile.model.apiKeyEnv ||
-    !!profile.model.credentialId;
+  const providerReady = data.providers.some((item) => !item.revokedAt) || !!profile.model.apiKeyEnv;
 
   const steps = [
     {
@@ -369,39 +363,18 @@ function Overview({
 }
 
 async function profileData(api: GatewayApi, id: string): Promise<ProfileData> {
-  const [
-    sessions,
-    channels,
-    credentials,
-    keys,
-    memories,
-    activities,
-    deliveries,
-    providers,
-    modelDefaults,
-  ] = await Promise.all([
-    api.sessions(id),
-    api.channels(id),
-    api.credentials(id),
-    api.keys(id),
-    api.memories(id),
-    api.activities(id),
-    api.deliveries(id),
-    api.providers(id),
-    api.modelDefaults(id),
-  ]);
+  const [sessions, channels, memories, activities, deliveries, providers, modelDefaults] =
+    await Promise.all([
+      api.sessions(id),
+      api.channels(id),
+      api.memories(id),
+      api.activities(id),
+      api.deliveries(id),
+      api.providers(id),
+      api.modelDefaults(id),
+    ]);
 
-  return {
-    sessions,
-    channels,
-    credentials,
-    keys,
-    memories,
-    activities,
-    deliveries,
-    providers,
-    modelDefaults,
-  };
+  return { sessions, channels, memories, activities, deliveries, providers, modelDefaults };
 }
 
 function Workspace({
@@ -578,14 +551,10 @@ function Workspace({
           </button>
         </div>
         <nav aria-label="Navegação principal">
-          {(['workspace', 'capabilities', 'security'] as const).map((group) => (
+          {(['workspace', 'capabilities'] as const).map((group) => (
             <div className="nav-group" key={group}>
               <span className="nav-label">
-                {
-                  { workspace: 'WORKSPACE', capabilities: 'CAPACIDADES', security: 'SEGURANÇA' }[
-                    group
-                  ]
-                }
+                {{ workspace: 'WORKSPACE', capabilities: 'CAPACIDADES' }[group]}
               </span>
               {navigation
                 .filter((item) => item.group === group)
@@ -708,8 +677,6 @@ function Workspace({
               {section === 'memories' && <Memories {...props} />}
               {section === 'skills' && <Capabilities kind="skills" {...props} />}
               {section === 'mcps' && <Capabilities kind="mcpServers" {...props} />}
-              {section === 'credentials' && <Credentials {...props} />}
-              {section === 'keys' && <AccessKeys {...props} />}
             </div>
           ) : (
             <div className="loading-state" role="status">

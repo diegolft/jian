@@ -4,7 +4,7 @@ import type { ContextPolicy } from './service.js';
 
 export interface ProviderAdmin {
   providers(profileId: string): Promise<ProviderRecord[]>;
-  configureCodexProvider(profileId: string, credentialId: string): Promise<ProviderRecord>;
+  configureCodexProvider(profileId: string, secret: string): Promise<ProviderRecord>;
 }
 
 export interface ProviderSelection {

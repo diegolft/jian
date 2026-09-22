@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { secretSchema } from './security.js';
 
 export const providerModelSchema = z.strictObject({
   id: z.string().trim().min(1).max(160),
@@ -6,15 +7,15 @@ export const providerModelSchema = z.strictObject({
   maxOutputTokens: z.number().int().min(256).max(128_000),
 });
 
+/** The key travels once, on the way in. `createdAt` is the only thing said about it afterwards. */
 export const providerInputSchema = z.strictObject({
   name: z.string().trim().min(1).max(100),
   kind: z.enum(['openai', 'anthropic', 'google']),
-  credentialId: z.uuid(),
+  secret: secretSchema,
   models: z.array(providerModelSchema).min(1).max(30),
 });
 
-export const providerRecordSchema = providerInputSchema.omit({ credentialId: true }).extend({
-  credentialId: z.uuid().optional(),
+export const providerRecordSchema = providerInputSchema.omit({ secret: true }).extend({
   apiKeyEnv: z.string().optional(),
   authMode: z.enum(['api', 'codex']).optional(),
   id: z.uuid(),

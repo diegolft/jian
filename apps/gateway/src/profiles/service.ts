@@ -8,11 +8,17 @@ import {
 import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound, GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
-import type { Reader, Store } from '../core/store.js';
+import type { Reader, Store, Transaction } from '../core/store.js';
+import { environmentProvider, type ProviderKind, providerCatalog } from '../providers/catalog.js';
+import type { Vault } from '../security/vault.js';
+
+/** Where an MCP server's bearer token lives in the vault, addressed by the server's name. */
+export const mcpSecret = (name: string) => `mcp:${name}`;
 
 export class Profiles {
   constructor(
     private readonly store: Store,
+    private readonly vault: Vault,
     private readonly clock: Clock = Date.now,
   ) {}
 
@@ -37,28 +43,61 @@ export class Profiles {
       updatedAt: nowIso(this.clock),
     };
 
-    await this.store.transaction(profile.id, async (tx) => {
-      await this.validateCredentials(profile, tx);
-      await tx.put('profile', profile.id, profile.id, profile);
+    return this.store.transaction(profile.id, async (tx) => {
+      await this.validateReferences(profile, tx);
+      const stored = await this.storeMcpTokens(profile, undefined, tx);
 
-      await tx.put('revision', `${profile.id}:1`, profile.id, {
-        id: `${profile.id}:1`,
-        profileId: profile.id,
-        profile,
+      await tx.put('profile', stored.id, stored.id, stored);
+
+      await tx.put('revision', `${stored.id}:1`, stored.id, {
+        id: `${stored.id}:1`,
+        profileId: stored.id,
+        profile: stored,
         createdAt: nowIso(this.clock),
       });
 
-      await recordEvent(tx, this.clock, profile.id, 'profile.created', {
-        profileId: profile.id,
+      await recordEvent(tx, this.clock, stored.id, 'profile.created', {
+        profileId: stored.id,
         version: 1,
       });
-    });
 
-    return profile;
+      return stored;
+    });
   }
 
-  /** A profile may only name credentials of its own, unrevoked and of the matching kind. */
-  private async validateCredentials(profile: Profile, reader: Reader) {
+  /**
+   * An MCP token is typed with its server and kept out of the profile document, which is
+   * readable by every client and versioned into revisions. A patch that omits the token keeps
+   * the stored one; dropping the server drops its token.
+   */
+  private async storeMcpTokens(
+    profile: Profile,
+    previous: Profile | undefined,
+    tx: Transaction,
+  ): Promise<Profile> {
+    const mcpServers = [];
+
+    for (const server of profile.mcpServers) {
+      const { bearerToken, ...rest } = server;
+
+      if (bearerToken) {
+        await this.vault.put(profile.id, mcpSecret(rest.name), bearerToken, tx);
+      }
+
+      mcpServers.push(rest);
+    }
+
+    for (const stale of previous?.mcpServers ?? []) {
+      if (!mcpServers.some((server) => server.name === stale.name)) {
+        await this.vault.discard(profile.id, mcpSecret(stale.name), tx);
+      }
+    }
+
+    return { ...profile, mcpServers };
+  }
+
+  /** A profile may only name its own live provider, and one capability per name. */
+  private async validateReferences(profile: Profile, reader: Reader) {
     for (const names of [
       profile.skills.map((skill) => skill.name),
       profile.mcpServers.map((server) => server.name),
@@ -68,26 +107,23 @@ export class Profiles {
       }
     }
 
-    const references = [
-      { id: profile.model.credentialId, kind: 'provider' },
-      ...profile.mcpServers.map((server) => ({ id: server.credentialId, kind: 'mcp' })),
-    ];
+    const providerId = profile.model.providerId;
 
-    for (const reference of references) {
-      if (!reference.id) {
-        continue;
-      }
+    if (!providerId) {
+      return;
+    }
 
-      const credential = await reader.get('credential', reference.id);
+    const provider = await reader.get('provider', providerId);
 
-      if (
-        !credential ||
-        credential.profileId !== profile.id ||
-        credential.kind !== reference.kind ||
-        credential.revokedAt
-      ) {
-        throw new GatewayError(400, 'Credential reference is not available to this profile');
-      }
+    const fromEnvironment = (Object.keys(providerCatalog) as ProviderKind[]).some(
+      (kind) => environmentProvider(profile.id, kind)?.id === providerId,
+    );
+
+    if (
+      !fromEnvironment &&
+      (!provider || provider.profileId !== profile.id || provider.revokedAt)
+    ) {
+      throw new GatewayError(400, 'Provider reference is not available to this profile');
     }
   }
 
@@ -101,14 +137,16 @@ export class Profiles {
         throw new GatewayError(409, 'Profile version changed; reload before editing');
       }
 
-      const profile: Profile = {
+      const patched: Profile = {
         ...current,
         ...patch,
         version: current.version + 1,
         updatedAt: nowIso(this.clock),
       };
 
-      await this.validateCredentials(profile, tx);
+      await this.validateReferences(patched, tx);
+      const profile = await this.storeMcpTokens(patched, current, tx);
+
       await tx.put('profile', id, id, profile);
 
       const revision = {

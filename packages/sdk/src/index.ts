@@ -4,7 +4,7 @@ import type { paths } from './generated.js';
 export type { components, operations, paths } from './generated.js';
 
 /**
- * Keep credentials in the caller's secure storage; each client belongs to one access key.
+ * Keep the host token in the caller's secure storage; it opens the whole installation.
  * A caller that authenticates by cookie, such as the panel, passes headers and no token.
  */
 export function createJianClient(options: {

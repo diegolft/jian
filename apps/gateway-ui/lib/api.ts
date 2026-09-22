@@ -11,12 +11,9 @@ export type Session = JsonResponse<'listSessions', 200>[number];
 
 export type Channel = JsonResponse<'listChannels', 200>[number];
 
-export type Credential = JsonResponse<'listCredentials', 200>[number];
 export type Provider = JsonResponse<'listProviders', 200>[number];
 export type ModelDefaults = JsonResponse<'getModelDefaults', 200>;
 export type ModelSelection = NonNullable<ModelDefaults['conversation']>;
-
-export type AccessKey = JsonResponse<'listAccessKeys', 200>[number];
 
 export type Memory = JsonResponse<'listMemories', 200>[number];
 
@@ -33,12 +30,8 @@ export type ProfilePatch =
 
 export type NewChannel = operations['createChannel']['requestBody']['content']['application/json'];
 
-export type NewCredential =
-  operations['createCredential']['requestBody']['content']['application/json'];
 export type NewProvider =
   operations['createProvider']['requestBody']['content']['application/json'];
-
-export type NewKey = operations['createAccessKey']['requestBody']['content']['application/json'];
 
 async function result<T>(
   request: Promise<{ data?: T; error?: unknown; response: Response }>,
@@ -60,8 +53,8 @@ async function result<T>(
 
     if (response.status === 409) {
       const message =
-        detail?.error === 'Configure a provider credential before starting a run'
-          ? 'Configure uma credencial em Providers antes de conversar.'
+        detail?.error === 'Configure a provider key before starting a run'
+          ? 'Configure uma chave em Providers antes de conversar.'
           : 'O estado mudou ou a sessão está ocupada. Atualize e tente novamente.';
 
       throw new Error(message);
@@ -192,11 +185,10 @@ export function gatewayApi() {
       result(client.GET('/v1/profiles/{profileId}/activities', { params: profile(profileId) })),
     memories: (profileId: string) =>
       result(client.GET('/v1/profiles/{profileId}/memories', { params: profile(profileId) })),
-    remember: (profileId: string, key: string, content: string, expectedVersion: number) =>
+    forget: (profileId: string, memoryKey: string) =>
       result(
-        client.PUT('/v1/profiles/{profileId}/memories', {
-          params: profile(profileId),
-          body: { key, content, expectedVersion },
+        client.DELETE('/v1/profiles/{profileId}/memories/{memoryKey}', {
+          params: { path: { profileId, memoryKey } },
         }),
       ),
     channels: (profileId: string) =>
@@ -237,34 +229,6 @@ export function gatewayApi() {
           params: channel(profileId, channelId),
         }),
       ),
-    credentials: (profileId: string) =>
-      result(client.GET('/v1/profiles/{profileId}/credentials', { params: profile(profileId) })),
-    createCredential: (profileId: string, body: NewCredential) =>
-      result(
-        client.POST('/v1/profiles/{profileId}/credentials', { params: profile(profileId), body }),
-      ),
-    revokeCredential: (profileId: string, credentialId: string) =>
-      result(
-        client.DELETE('/v1/profiles/{profileId}/credentials/{credentialId}', {
-          params: { path: { profileId, credentialId } },
-        }),
-      ),
-    rotateCredential: (profileId: string, credentialId: string) =>
-      result(
-        client.POST('/v1/profiles/{profileId}/credentials/{credentialId}/rotate', {
-          params: { path: { profileId, credentialId } },
-        }),
-      ),
-    keys: (profileId: string) =>
-      result(client.GET('/v1/profiles/{profileId}/keys', { params: profile(profileId) })),
-    issueKey: (profileId: string, body: NewKey) =>
-      result(client.POST('/v1/profiles/{profileId}/keys', { params: profile(profileId), body })),
-    revokeKey: (profileId: string, keyId: string) =>
-      result(
-        client.DELETE('/v1/profiles/{profileId}/keys/{keyId}', {
-          params: { path: { profileId, keyId } },
-        }),
-      ),
   };
 }
 
@@ -275,8 +239,6 @@ export type ProfileData = {
   modelDefaults: ModelDefaults;
   sessions: Session[];
   channels: Channel[];
-  credentials: Credential[];
-  keys: AccessKey[];
   memories: Memory[];
   activities: Run[];
   deliveries: Delivery[];

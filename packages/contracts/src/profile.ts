@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { modelSelectionSchema } from './providers.js';
+import { secretSchema } from './security.js';
 
 const endpointSchema = z.url().refine((value) => {
   const url = new URL(value);
@@ -22,12 +23,12 @@ export const modelSchema = z
         /^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$/,
       )
       .optional(),
-    credentialId: z.uuid().optional(),
+    providerId: z.uuid().optional(),
     baseURL: endpointSchema.optional(),
   })
   .superRefine((value, ctx) => {
-    if (value.apiKeyEnv && value.credentialId) {
-      ctx.addIssue({ code: 'custom', message: 'Configure at most one credential reference' });
+    if (value.apiKeyEnv && value.providerId) {
+      ctx.addIssue({ code: 'custom', message: 'Configure at most one provider reference' });
     }
 
     if (value.provider === 'openai-compatible' && !value.baseURL) {
@@ -48,7 +49,8 @@ export const skillSchema = z.strictObject({
 export const mcpSchema = z.strictObject({
   name: z.string().regex(/^[a-z0-9_]{1,30}$/),
   url: endpointSchema,
-  credentialId: z.uuid().optional(),
+  // Sent to replace the stored token; absent keeps whatever the vault already holds.
+  bearerToken: secretSchema.optional(),
   bearerTokenEnv: z
     .string()
     .regex(/^JIAN_MCP_[A-Z0-9_]+$/)
@@ -134,8 +136,10 @@ export const submitSchema = z.strictObject({
   model: modelSelectionSchema.optional(),
 });
 
+export const memoryKeySchema = z.string().regex(/^[a-z0-9_-]{1,100}$/);
+
 export const memorySchema = z.strictObject({
-  key: z.string().regex(/^[a-z0-9_-]{1,100}$/),
+  key: memoryKeySchema,
   content: z.string().trim().min(1).max(4_000),
   expectedVersion: z.number().int().nonnegative(),
 });

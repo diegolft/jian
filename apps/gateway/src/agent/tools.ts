@@ -192,7 +192,7 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
   if (run.profile.allowSelfManagement) {
     tools.update_skills = tool({
       description:
-        'Version your skill instructions for future runs. Cannot change MCPs, credentials or permissions.',
+        'Version your skill instructions for future runs. Cannot change MCPs, keys or permissions.',
       inputSchema: z.object({
         expectedVersion: z.number().int().positive(),
         skills: z.array(skillSchema).max(20),
@@ -213,7 +213,7 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
 
     tools.update_identity = tool({
       description:
-        'Version an update to your own identity. Applies to new runs. Cannot change permissions, credentials or providers.',
+        'Version an update to your own identity. Applies to new runs. Cannot change permissions, keys or providers.',
       inputSchema: z.object({
         expectedVersion: z.number().int().positive(),
         name: z.string().min(1).max(100).optional(),
@@ -256,7 +256,7 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
 
     tools.create_profile = tool({
       description:
-        'Create a separate profile without credential access. An administrator must configure its provider credential before it can run.',
+        'Create a separate profile without provider access. An administrator must configure its provider key before it can run.',
       inputSchema: z.object({
         name: z.string().min(1).max(100),
         instructions: z.string().min(1).max(8000),
@@ -266,7 +266,7 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
           throw new GatewayError(403, 'Self-management is disabled');
         }
 
-        const { apiKeyEnv: _env, credentialId: _credential, ...model } = run.profile.model;
+        const { apiKeyEnv: _env, providerId: _provider, ...model } = run.profile.model;
         const created = await services.profiles.createProfile({ ...input, model });
 
         return { id: created.id, name: created.name };

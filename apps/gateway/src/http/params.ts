@@ -7,6 +7,4 @@ export type RunParams = ProfileParams & { runId: string };
 
 export type ChannelParams = ProfileParams & { channelId: string };
 
-export type CredentialParams = ProfileParams & { credentialId: string };
-
-export type KeyParams = ProfileParams & { keyId: string };
+export type MemoryParams = ProfileParams & { memoryKey: string };

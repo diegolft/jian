@@ -1,7 +1,4 @@
-import { randomBytes } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
-import { Credentials } from '../src/security/credentials.js';
-import { SecretBox } from '../src/security/crypto.js';
 import { testServices } from './helpers/services.js';
 
 const profileInput = {
@@ -45,26 +42,16 @@ it('uses host provider credentials without manual registration or a model defaul
   });
 });
 
-it('replaces one provider credential and ignores an obsolete model default', async () => {
+it('replaces one provider key and ignores an obsolete model default', async () => {
   const services = testServices();
   const profile = await services.profiles.createProfile({ name: 'Replace', instructions: 'Help.' });
-  const credentials = new Credentials(
-    services,
-    new SecretBox({ activeKeyId: 'test', keys: { test: randomBytes(32) } }),
-  );
-  const add = async (name: string) => {
-    const credential = await credentials.create(profile.id, {
-      label: name,
-      kind: 'provider',
-      secret: `synthetic-${name}`,
-    });
-    return services.providers.createProvider(profile.id, {
+  const add = (name: string) =>
+    services.providers.createProvider(profile.id, {
       name,
       kind: 'openai',
-      credentialId: credential.id,
+      secret: `synthetic-${name}`,
       models: [{ id: name, contextWindow: 16_000, maxOutputTokens: 2048 }],
     });
-  };
   const old = await add('old');
   await services.providers.setModelDefaults(profile.id, {
     conversation: { providerId: old.id, modelId: 'old' },
@@ -89,22 +76,10 @@ it('replaces one provider credential and ignores an obsolete model default', asy
 
 it('isolates providers and freezes the chosen model and its context budget per run', async () => {
   const { services, profile, session } = await setup();
-  const vault = new Credentials(
-    services,
-    new SecretBox({
-      activeKeyId: 'test',
-      keys: { test: randomBytes(32) },
-    }),
-  );
-  const credential = await vault.create(profile.id, {
-    label: 'OpenAI',
-    kind: 'provider',
-    secret: 'synthetic-api-key',
-  });
   const provider = await services.providers.createProvider(profile.id, {
     name: 'Personal',
     kind: 'openai',
-    credentialId: credential.id,
+    secret: 'synthetic-api-key',
     models: [
       { id: 'small', contextWindow: 16_000, maxOutputTokens: 2048 },
       { id: 'large', contextWindow: 64_000, maxOutputTokens: 8192 },

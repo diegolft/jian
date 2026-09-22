@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { GatewayError } from '../core/errors.js';
 import type { Store } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
-import type { Credentials } from '../security/credentials.js';
 
 type ProfileParams = { profileId: string };
 
@@ -11,7 +10,6 @@ interface EventOptions {
   profiles: ProfileReader;
   store: Store;
   token: string;
-  credentials?: Credentials;
   maxStreams?: number;
 }
 
@@ -77,15 +75,6 @@ export function registerEventRoutes(app: FastifyInstance, options: EventOptions)
             reply.raw.end();
 
             return;
-          }
-
-          // Long-lived streams must stop after their access key expires or is revoked.
-          if (options.credentials && request.headers.authorization !== `Bearer ${options.token}`) {
-            await options.credentials.authorize(
-              (request.headers.authorization ?? '').slice(7),
-              profileId,
-              'read',
-            );
           }
 
           if (reply.raw.writableNeedDrain) {
