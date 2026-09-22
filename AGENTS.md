@@ -18,15 +18,22 @@ Products share contracts, never each other's internals.
 
 ## Commands
 
+The Makefile is the entry point; `make` alone lists every target. It delegates — pnpm owns
+the Node work, Docker the containers, Xcode the Apple side.
+
 ```bash
-pnpm install --frozen-lockfile
-pnpm setup          # writes .env (0600) with local credentials; never prints secrets
-pnpm db:up          # PostgreSQL on 127.0.0.1:5432
-pnpm dev            # gateway on :4310 and the panel with hot reload on :3000
-pnpm check          # lint, typecheck, unit tests, build, contract drift
-pnpm apple:test     # JianKit unit tests
-pnpm apple:lint     # SwiftLint, strict
+make install     # pnpm install --frozen-lockfile
+make setup       # writes .env (0600) with local credentials; never prints secrets
+make db-up       # development PostgreSQL on 127.0.0.1:5432
+make dev         # gateway on :4310 and the panel with hot reload on :3000
+make check       # lint, typecheck, unit tests, build, contract drift
+make up          # production stack: published image plus its own PostgreSQL
+make apple-test  # JianKit unit tests
+make apple-lint  # SwiftLint, strict
 ```
+
+`package.json` keeps only the Node scripts. Anything that shells out to Docker or Xcode
+lives in the Makefile, so there is one place to look and one place to change.
 
 ## Generated code
 

@@ -4,7 +4,7 @@ Native SwiftUI client for a self-hosted Jian gateway. One target builds for both
 macOS. Open `Jian.xcodeproj` in Xcode 27 or later.
 
 The first build asks you to trust the OpenAPI generator plugin ("Trust & Enable"). From the
-command line, pass `-skipPackagePluginValidation` instead — `pnpm apple:build` already does.
+command line, pass `-skipPackagePluginValidation` instead — `make apple-build` already does.
 
 ## Where the types come from
 
@@ -19,7 +19,7 @@ regenerating breaks the build rather than the app at runtime.
 
 ```bash
 pnpm contracts:generate   # after changing packages/contracts
-pnpm apple:test           # JianKit unit tests, no network, no gateway
+make apple-test           # JianKit unit tests, no network, no gateway
 ```
 
 ## Scope
@@ -39,14 +39,14 @@ files before each commit, the same way Biome guards the TypeScript side, so it m
 installed (`brew install swiftlint`) to commit Swift changes.
 
 ```bash
-pnpm apple:lint       # fails on any violation
-pnpm apple:lint:fix   # rewrites what can be fixed automatically
+make apple-lint       # fails on any violation
+make apple-lint-fix   # rewrites what can be fixed automatically
 ```
 
 ## Editing outside Xcode
 
 Editors that use sourcekit-lsp understand Swift packages, not Xcode targets, so the files
-under `Jian/` show phantom errors even when the build is clean. `pnpm apple:index`
+under `Jian/` show phantom errors even when the build is clean. `make apple-index`
 writes a bridge (`buildServer.json` plus a compile database) that hands sourcekit-lsp the
 real compiler arguments for the app target. Both files hold absolute paths, so they stay out
 of git; rerun the command after adding a file or changing build settings, then reload the
