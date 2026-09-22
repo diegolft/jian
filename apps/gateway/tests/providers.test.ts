@@ -1,7 +1,7 @@
 import { modelSchema } from '@elos/contracts';
 import { generateText } from 'ai';
 import { describe, expect, it } from 'vitest';
-import { resolveModel } from '../src/providers.js';
+import { resolveModel } from '../src/providers/models.js';
 
 describe('providers', () => {
   it.each(['openai', 'anthropic', 'google', 'openai-compatible'] as const)(

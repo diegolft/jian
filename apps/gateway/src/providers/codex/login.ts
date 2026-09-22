@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { GatewayError } from '../core/errors.js';
-import type { Gateway } from '../gateway.js';
-import type { Credentials } from './credentials.js';
+import { GatewayError } from '../../core/errors.js';
+import type { Gateway } from '../../gateway.js';
+import type { Credentials } from '../../services/credentials.js';
 
 const clientId = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const authOrigin = 'https://auth.openai.com';

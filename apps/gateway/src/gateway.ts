@@ -22,7 +22,7 @@ import {
 import { buildContext } from './context/build.js';
 import { assertFound, GatewayError } from './core/errors.js';
 import type { Reader, Store, Transaction } from './core/store.js';
-import { environmentProvider, type ProviderKind, providerCatalog } from './provider-catalog.js';
+import { environmentProvider, type ProviderKind, providerCatalog } from './providers/catalog.js';
 
 const active = (run: Run) => run.status === 'running' || run.status === 'queued';
 

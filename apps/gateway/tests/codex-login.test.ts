@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
 import { Gateway } from '../src/gateway.js';
+import { CodexLogin } from '../src/providers/codex/login.js';
 import { SecretBox } from '../src/security/crypto.js';
-import { CodexLogin } from '../src/services/codex-login.js';
 import { Credentials } from '../src/services/credentials.js';
 import { MemoryStore } from './helpers/memory-store.js';
 

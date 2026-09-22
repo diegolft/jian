@@ -4,9 +4,9 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { ModelConfig } from '@elos/contracts';
 import type { LanguageModel } from 'ai';
-import { createCodexModel } from './codex-model.js';
-import { providerEnvironment } from './provider-catalog.js';
-import { createSafeFetch } from './security/outbound.js';
+import { createSafeFetch } from '../security/outbound.js';
+import { providerEnvironment } from './catalog.js';
+import { createCodexModel } from './codex/model.js';
 
 const defaultOutbound = createSafeFetch();
 

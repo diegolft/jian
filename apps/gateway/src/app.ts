@@ -10,8 +10,8 @@ import { registerEventRoutes } from './http/events.js';
 import { closePanelSession, openPanelSession } from './http/panel-session.js';
 import { configureSecurity } from './http/security.js';
 import { registerGatewayUi } from './http/ui.js';
+import type { CodexLogin } from './providers/codex/login.js';
 import type { Channels } from './services/channels.js';
-import type { CodexLogin } from './services/codex-login.js';
 import { Coordination } from './services/coordination.js';
 import type { Credentials } from './services/credentials.js';
 

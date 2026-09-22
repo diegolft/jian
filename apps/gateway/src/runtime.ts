@@ -3,7 +3,7 @@ import type { MCPClient } from '@ai-sdk/mcp';
 import { stepCountIs, ToolLoopAgent, type ToolSet } from 'ai';
 import { fitPrompt, tokenCounter } from './context/budget.js';
 import type { Gateway } from './gateway.js';
-import { resolveModel } from './providers.js';
+import { resolveModel } from './providers/models.js';
 import { connectMcpTools } from './runtime/mcp.js';
 import { boundToolResult, redactOutput, redactText } from './runtime/results.js';
 import type { ModelResolver, RuntimeOptions } from './runtime/types.js';

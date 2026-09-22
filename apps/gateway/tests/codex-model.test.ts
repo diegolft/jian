@@ -1,7 +1,7 @@
 import { generateText } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createCodexModel } from '../src/codex-model.js';
+import { createCodexModel } from '../src/providers/codex/model.js';
 
 describe('ChatGPT Codex model adapter', () => {
   it('keeps Elos instructions and returns a Responses result', async () => {
