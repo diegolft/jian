@@ -2,21 +2,24 @@ import { randomUUID } from 'node:crypto';
 import type { MCPClient } from '@ai-sdk/mcp';
 import { stepCountIs, ToolLoopAgent, type ToolSet } from 'ai';
 import { fitPrompt, tokenCounter } from './context/budget.js';
-import type { Gateway } from './gateway.js';
+import type { Contexts } from './context/service.js';
 import { resolveModel } from './providers/models.js';
 import { connectMcpTools } from './runtime/mcp.js';
 import { boundToolResult, redactOutput, redactText } from './runtime/results.js';
 import type { ModelResolver, RuntimeOptions } from './runtime/types.js';
 import { createSafeFetch } from './security/outbound.js';
-import { profileTools } from './tools.js';
+import { profileTools, type ToolServices } from './tools.js';
 
 export type { RuntimeOptions } from './runtime/types.js';
+
+/** The run services the runtime drives, plus what it hands to the tool set it builds. */
+export type RuntimeServices = ToolServices & { contexts: Contexts };
 
 export class AgentRuntime {
   private controllers = new Map<string, AbortController>();
 
   constructor(
-    private gateway: Gateway,
+    private services: RuntimeServices,
     private model: ModelResolver = resolveModel,
     private options: RuntimeOptions = {},
   ) {}
@@ -33,7 +36,7 @@ export class AgentRuntime {
 
   async execute(profileId: string, runId: string) {
     const owner = randomUUID();
-    const run = await this.gateway.claim(runId, profileId, owner);
+    const run = await this.services.lifecycle.claim(runId, profileId, owner);
 
     if (!run) {
       return;
@@ -51,7 +54,9 @@ export class AgentRuntime {
     let externalUncertain = false;
 
     const pulse = setInterval(() => {
-      void this.gateway.heartbeat(profileId, runId, owner).catch(() => controller.abort());
+      void this.services.lifecycle
+        .heartbeat(profileId, runId, owner)
+        .catch(() => controller.abort());
     }, 10_000);
 
     pulse.unref();
@@ -88,7 +93,7 @@ export class AgentRuntime {
       }
 
       const model = await this.model(config, process.env, outbound.fetch, providerKey);
-      const tools = profileTools(this.gateway, run);
+      const tools = profileTools(this.services, run);
       const { mcpToolNames, selectedMcpTools } = await connectMcpTools(run, tools, {
         credentials: this.options.credentials,
         secrets,
@@ -128,9 +133,9 @@ export class AgentRuntime {
               }
 
               signal.throwIfAborted();
-              await this.gateway.heartbeat(profileId, runId, owner);
+              await this.services.lifecycle.heartbeat(profileId, runId, owner);
 
-              await this.gateway.checkpoint(profileId, runId, owner, {
+              await this.services.lifecycle.checkpoint(profileId, runId, owner, {
                 phase: 'tool-started',
                 toolName: name,
                 toolCallId: options.toolCallId,
@@ -147,7 +152,7 @@ export class AgentRuntime {
                   'isError' in output &&
                   output.isError === true
                 ) {
-                  await this.gateway.checkpoint(profileId, runId, owner, {
+                  await this.services.lifecycle.checkpoint(profileId, runId, owner, {
                     phase: 'tool-uncertain',
                     toolName: name,
                     toolCallId: options.toolCallId,
@@ -175,7 +180,7 @@ export class AgentRuntime {
         };
       }
 
-      const context = await this.gateway.context(run);
+      const context = await this.services.contexts.context(run);
       let usedTokens = 0;
       let preparedInputTokens = 0;
 
@@ -192,13 +197,13 @@ export class AgentRuntime {
           }
 
           signal.throwIfAborted();
-          await this.gateway.heartbeat(profileId, runId, owner);
+          await this.services.lifecycle.heartbeat(profileId, runId, owner);
 
           if (usedTokens >= policy.maxRunTokens) {
             throw new Error('Run token budget exceeded');
           }
 
-          const refreshed = await this.gateway.context(run);
+          const refreshed = await this.services.contexts.context(run);
 
           const activeNames = Object.keys(guarded).filter(
             (name) => !mcpToolNames.includes(name) || selectedMcpTools.has(name),
@@ -245,13 +250,13 @@ export class AgentRuntime {
 
           usedTokens += inputTokens + outputTokens;
 
-          await this.gateway.recordUsage(profileId, runId, owner, {
+          await this.services.lifecycle.recordUsage(profileId, runId, owner, {
             inputTokens,
             outputTokens,
             steps: 1,
           });
 
-          await this.gateway.checkpoint(profileId, runId, owner, {
+          await this.services.lifecycle.checkpoint(profileId, runId, owner, {
             phase: 'step-completed',
             finishReason,
             usage: { inputTokens, outputTokens },
@@ -288,7 +293,7 @@ export class AgentRuntime {
         throw new Error('Agent stopped without a complete final response');
       }
 
-      await this.gateway.finish(
+      await this.services.lifecycle.finish(
         profileId,
         runId,
         owner,
@@ -296,10 +301,10 @@ export class AgentRuntime {
         redactText(result.text, secrets),
       );
     } catch (error) {
-      const current = await this.gateway.run(profileId, runId);
+      const current = await this.services.runs.run(profileId, runId);
 
       if (current.status === 'running' && current.leaseOwner === owner) {
-        await this.gateway
+        await this.services.lifecycle
           .finish(
             profileId,
             runId,

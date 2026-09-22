@@ -4,8 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
-import { Gateway } from '../src/gateway.js';
-import { MemoryStore } from './helpers/memory-store.js';
+import { testServices } from './helpers/services.js';
 
 it('serves the exported UI with hashed scripts without opening API or filesystem access', async () => {
   const root = await mkdtemp(join(tmpdir(), 'elos-ui-'));
@@ -18,7 +17,7 @@ it('serves the exported UI with hashed scripts without opening API or filesystem
   await writeFile(join(root, 'app.js'), 'console.log("elos");');
 
   const app = createApp({
-    gateway: new Gateway(new MemoryStore()),
+    ...testServices(),
     token,
     logger: false,
     uiRoot: root,

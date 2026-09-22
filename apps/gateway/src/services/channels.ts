@@ -4,8 +4,11 @@ import type { z } from 'zod';
 import type { ChannelRequest, DeliveryOutcome, IncomingMessage } from '../channels/channel.js';
 import { ChannelRegistry } from '../channels/registry.js';
 import { assertFound, GatewayError } from '../core/errors.js';
-import type { Gateway } from '../gateway.js';
+import type { Store } from '../core/store.js';
+import type { Profiles } from '../profiles/service.js';
+import type { Runs } from '../runs/service.js';
 import { issueToken, verifyToken } from '../security/tokens.js';
+import type { Sessions } from '../sessions/service.js';
 import type { Credentials } from './credentials.js';
 
 export type ChannelRecord = z.infer<typeof channelSchema> & { tokenHash: string };
@@ -16,6 +19,13 @@ const DISPATCH_INTERVAL_MS = 2000;
 const UNCERTAIN_DELIVERY_AFTER_MS = 10 * 60_000;
 
 /** Owns access checks and durable delivery state, independently of each protocol adapter. */
+type ChannelServices = {
+  profiles: Profiles;
+  sessions: Sessions;
+  runs: Runs;
+  store: Store;
+};
+
 export class Channels {
   private timer?: ReturnType<typeof setTimeout>;
   private stopped = false;
@@ -23,7 +33,7 @@ export class Channels {
   private readonly abort = new AbortController();
 
   constructor(
-    private readonly gateway: Gateway,
+    private readonly services: ChannelServices,
     private readonly credentials: Credentials,
     private readonly fetcher: typeof fetch,
     private readonly registry = new ChannelRegistry(),
@@ -57,7 +67,7 @@ export class Channels {
   async create(profileId: string, input: unknown) {
     const data = channelInputSchema.parse(input);
 
-    await this.gateway.session(profileId, data.sessionId);
+    await this.services.sessions.session(profileId, data.sessionId);
 
     const adapter = this.registry.get(data.type);
 
@@ -77,7 +87,7 @@ export class Channels {
       createdAt: new Date().toISOString(),
     };
 
-    await this.gateway.store.transaction(profileId, async (tx) => {
+    await this.services.store.transaction(profileId, async (tx) => {
       await tx.put('channel', record.id, profileId, record);
 
       await tx.event({
@@ -94,15 +104,15 @@ export class Channels {
   }
 
   async list(profileId: string) {
-    await this.gateway.profile(profileId);
+    await this.services.profiles.profile(profileId);
 
-    return (await this.gateway.store.list('channel', { profileId })).map(
+    return (await this.services.store.list('channel', { profileId })).map(
       ({ tokenHash: _hash, ...metadata }) => metadata,
     );
   }
 
   async revoke(profileId: string, id: string) {
-    return this.gateway.store.transaction(profileId, async (tx) => {
+    return this.services.store.transaction(profileId, async (tx) => {
       const value = await tx.get('channel', id);
       const channel = assertFound(value?.profileId === profileId ? value : null, 'Channel');
       const record = { ...channel, revokedAt: new Date().toISOString() };
@@ -137,7 +147,7 @@ export class Channels {
     }
 
     const token = request.headers[adapter.webhookHeader];
-    const channel = await this.gateway.store.get('channel', id);
+    const channel = await this.services.store.get('channel', id);
 
     if (
       !channel ||
@@ -164,10 +174,10 @@ export class Channels {
 
   /** Called only by the worker that owns an authenticated linked-device connection. */
   async receiveLinked(id: string, input: unknown, generation: number) {
-    const channel = assertFound(await this.gateway.store.get('channel', id), 'Channel');
+    const channel = assertFound(await this.services.store.get('channel', id), 'Channel');
     const adapter = this.registry.get(channel.type);
 
-    const connection = await this.gateway.store.get('channelConnection', id);
+    const connection = await this.services.store.get('channelConnection', id);
 
     if (
       channel.revokedAt ||
@@ -200,7 +210,7 @@ export class Channels {
     }
 
     // The binding, not the inbound payload, chooses the profile and session.
-    const run = await this.gateway.submit(
+    const run = await this.services.runs.submit(
       channel.profileId,
       channel.sessionId,
       {
@@ -214,7 +224,7 @@ export class Channels {
     );
 
     if (adapter.send) {
-      await this.gateway.store.transaction(channel.profileId, async (tx) => {
+      await this.services.store.transaction(channel.profileId, async (tx) => {
         if (await tx.get('delivery', run.id)) {
           return;
         }
@@ -240,15 +250,15 @@ export class Channels {
   }
 
   async deliveries(profileId: string) {
-    await this.gateway.profile(profileId);
+    await this.services.profiles.profile(profileId);
 
-    return this.gateway.store.list('delivery', { profileId, limit: 100, descending: true });
+    return this.services.store.list('delivery', { profileId, limit: 100, descending: true });
   }
 
   async dispatch() {
     await this.recoverUncertainDeliveries();
 
-    const deliveries = await this.gateway.store.list('delivery', {
+    const deliveries = await this.services.store.list('delivery', {
       where: { status: 'pending' },
       limit: 20,
     });
@@ -258,18 +268,18 @@ export class Channels {
         return;
       }
 
-      const run = await this.gateway.run(delivery.profileId, delivery.runId);
+      const run = await this.services.runs.run(delivery.profileId, delivery.runId);
 
       if (run.status === 'queued' || run.status === 'running') {
         continue;
       }
 
-      const channel = await this.gateway.store.get('channel', delivery.channelId);
+      const channel = await this.services.store.get('channel', delivery.channelId);
       const adapter = channel ? this.registry.get(channel.type) : undefined;
 
       const generationChanged =
         delivery.connectionGeneration !== undefined &&
-        (await this.gateway.store.get('channelConnection', delivery.channelId))?.generation !==
+        (await this.services.store.get('channelConnection', delivery.channelId))?.generation !==
           delivery.connectionGeneration;
 
       // A linked device can only send from its owning worker. Offline deliveries stay pending.
@@ -291,7 +301,7 @@ export class Channels {
         run.output ?? 'The agent could not complete this request. Check the gateway for details.';
       const outcome = await this.deliver(delivery, text);
 
-      await this.gateway.store.transaction(delivery.profileId, async (tx) => {
+      await this.services.store.transaction(delivery.profileId, async (tx) => {
         const current = assertFound(await tx.get('delivery', delivery.id), 'Delivery');
 
         await tx.put('delivery', delivery.id, delivery.profileId, {
@@ -304,7 +314,7 @@ export class Channels {
   }
 
   private async claimDelivery(delivery: DeliveryRecord): Promise<boolean> {
-    return this.gateway.store.transaction(delivery.profileId, async (tx) => {
+    return this.services.store.transaction(delivery.profileId, async (tx) => {
       const current = await tx.get('delivery', delivery.id);
 
       if (current?.status !== 'pending') {
@@ -326,14 +336,14 @@ export class Channels {
     let attemptedSend = false;
 
     try {
-      const channel = await this.gateway.store.get('channel', delivery.channelId);
+      const channel = await this.services.store.get('channel', delivery.channelId);
 
       if (!channel || channel.revokedAt) {
         throw new Error('Channel unavailable');
       }
 
       if (delivery.connectionGeneration !== undefined) {
-        const connection = await this.gateway.store.get('channelConnection', delivery.channelId);
+        const connection = await this.services.store.get('channelConnection', delivery.channelId);
 
         if (!connection?.desired || connection.generation !== delivery.connectionGeneration) {
           throw new Error('Delivery belongs to a disconnected device');
@@ -369,7 +379,7 @@ export class Channels {
   }
 
   private async recoverUncertainDeliveries(): Promise<void> {
-    const sending = await this.gateway.store.list('delivery', {
+    const sending = await this.services.store.list('delivery', {
       where: { status: 'sending' },
       limit: 100,
     });
@@ -379,7 +389,7 @@ export class Channels {
         continue;
       }
 
-      await this.gateway.store.transaction(delivery.profileId, async (tx) => {
+      await this.services.store.transaction(delivery.profileId, async (tx) => {
         const current = await tx.get('delivery', delivery.id);
 
         // Recheck under the profile lock: another worker may have confirmed this delivery.

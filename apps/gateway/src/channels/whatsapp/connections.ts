@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { assertFound, GatewayError } from '../../core/errors.js';
-import type { Transaction } from '../../core/store.js';
-import type { Gateway } from '../../gateway.js';
+import type { Store, Transaction } from '../../core/store.js';
 import type { SecretBox } from '../../security/crypto.js';
 import type { DeliveryOutcome, IncomingMessage, OutgoingMessage } from '../channel.js';
 import type { ConnectionRecord, DeviceFactory, DeviceSessionStore, LinkedDevice } from './types.js';
@@ -24,7 +23,7 @@ export class WhatsAppConnections {
   private stopped = false;
 
   constructor(
-    private readonly gateway: Gateway,
+    private readonly store: Store,
     private readonly box: SecretBox,
     private readonly factory: DeviceFactory,
     private readonly clock = Date.now,
@@ -34,7 +33,7 @@ export class WhatsAppConnections {
     return new Date(this.clock()).toISOString();
   }
 
-  private async binding(profileId: string, id: string, tx = this.gateway.store) {
+  private async binding(profileId: string, id: string, tx = this.store) {
     const value = await tx.get('channel', id);
     const channel = assertFound(value?.profileId === profileId ? value : null, 'Channel');
 
@@ -48,7 +47,7 @@ export class WhatsAppConnections {
   async connect(profileId: string, id: string) {
     await this.binding(profileId, id);
 
-    await this.gateway.store.transaction(profileId, async (tx) => {
+    await this.store.transaction(profileId, async (tx) => {
       const current = await tx.get('channelConnection', id);
 
       if (current?.desired) {
@@ -74,7 +73,7 @@ export class WhatsAppConnections {
   async disconnect(profileId: string, id: string) {
     await this.binding(profileId, id);
 
-    await this.gateway.store.transaction(profileId, async (tx) => {
+    await this.store.transaction(profileId, async (tx) => {
       const current = await tx.get('channelConnection', id);
 
       // Incrementing the generation fences every callback and backup from the old browser.
@@ -94,7 +93,7 @@ export class WhatsAppConnections {
 
   async status(profileId: string, id: string) {
     await this.binding(profileId, id);
-    const current = await this.gateway.store.get('channelConnection', id);
+    const current = await this.store.get('channelConnection', id);
     const stale = current?.desired && (current.leaseUntil ?? 0) <= this.clock();
 
     return {
@@ -109,7 +108,7 @@ export class WhatsAppConnections {
 
   async qr(profileId: string, id: string) {
     await this.binding(profileId, id);
-    const current = await this.gateway.store.get('channelConnection', id);
+    const current = await this.store.get('channelConnection', id);
 
     if (
       !current?.desired ||
@@ -147,7 +146,7 @@ export class WhatsAppConnections {
   }
 
   private async update(record: ConnectionRecord, patch: Partial<ConnectionRecord>) {
-    await this.gateway.store.transaction(record.profileId, async (tx) => {
+    await this.store.transaction(record.profileId, async (tx) => {
       const current = await this.owned(tx, record);
       await tx.put('channelConnection', record.id, record.profileId, {
         ...current,
@@ -163,7 +162,7 @@ export class WhatsAppConnections {
 
     return {
       load: () =>
-        this.gateway.store.transaction(record.profileId, async (tx) => {
+        this.store.transaction(record.profileId, async (tx) => {
           await this.owned(tx, record);
           const auth = await tx.get('channelAuth', record.id);
 
@@ -192,7 +191,7 @@ export class WhatsAppConnections {
           ),
         );
 
-        await this.gateway.store.transaction(record.profileId, async (tx) => {
+        await this.store.transaction(record.profileId, async (tx) => {
           const current = await this.owned(tx, record);
           await tx.put('channelAuth', record.id, record.profileId, {
             id: record.id,
@@ -207,7 +206,7 @@ export class WhatsAppConnections {
         });
       },
       clear: () =>
-        this.gateway.store.transaction(record.profileId, async (tx) => {
+        this.store.transaction(record.profileId, async (tx) => {
           await this.owned(tx, record);
           await tx.put('channelAuth', record.id, record.profileId, {
             id: record.id,
@@ -219,7 +218,7 @@ export class WhatsAppConnections {
   }
 
   private async enqueue(record: ConnectionRecord, message: IncomingMessage) {
-    await this.gateway.store.transaction(record.profileId, async (tx) => {
+    await this.store.transaction(record.profileId, async (tx) => {
       await this.owned(tx, record);
       const channel = assertFound(await tx.get('channel', record.id), 'Channel');
 
@@ -269,7 +268,7 @@ export class WhatsAppConnections {
           qrExpiresAt: this.clock() + QR_LIFETIME_MS,
         }),
       ready: async (accountId) => {
-        await this.gateway.store.transaction(record.profileId, async (tx) => {
+        await this.store.transaction(record.profileId, async (tx) => {
           const current = await this.owned(tx, record);
 
           // A different phone requires an explicit disconnect, which invalidates queued replies.
@@ -335,10 +334,10 @@ export class WhatsAppConnections {
   }
 
   async tick(receive: Receiver) {
-    const records = await this.gateway.store.list('channelConnection', { limit: 1000 });
+    const records = await this.store.list('channelConnection', { limit: 1000 });
 
     for (const record of records) {
-      const channel = await this.gateway.store.get('channel', record.id);
+      const channel = await this.store.get('channel', record.id);
       const local = this.devices.get(record.id);
       const lostOwnership = record.owner !== this.owner || (record.leaseUntil ?? 0) <= this.clock();
 
@@ -366,7 +365,7 @@ export class WhatsAppConnections {
         continue;
       }
 
-      const claimed = await this.gateway.store.transaction(record.profileId, async (tx) => {
+      const claimed = await this.store.transaction(record.profileId, async (tx) => {
         const current = assertFound(await tx.get('channelConnection', record.id), 'Connection');
 
         if (
@@ -404,7 +403,7 @@ export class WhatsAppConnections {
         });
       }
 
-      const inbox = await this.gateway.store.list('channelInbox', {
+      const inbox = await this.store.list('channelInbox', {
         profileId: record.profileId,
         where: { channelId: record.id, status: 'pending' },
         limit: 20,
@@ -414,7 +413,7 @@ export class WhatsAppConnections {
         let status: 'submitted' | 'discarded' = 'submitted';
 
         try {
-          await this.gateway.store.transaction(record.profileId, (tx) => this.owned(tx, claimed));
+          await this.store.transaction(record.profileId, (tx) => this.owned(tx, claimed));
 
           if (item.generation !== claimed.generation) {
             status = 'discarded';
@@ -430,7 +429,7 @@ export class WhatsAppConnections {
           }
         }
 
-        await this.gateway.store.transaction(record.profileId, async (tx) => {
+        await this.store.transaction(record.profileId, async (tx) => {
           await this.owned(tx, claimed);
           await tx.put('channelInbox', item.id, record.profileId, {
             ...item,
@@ -443,7 +442,7 @@ export class WhatsAppConnections {
   }
 
   async canSend(id: string, generation?: number) {
-    const current = await this.gateway.store.get('channelConnection', id);
+    const current = await this.store.get('channelConnection', id);
     const local = this.devices.get(id);
 
     return !!(
@@ -517,12 +516,12 @@ export class WhatsAppConnections {
     await Promise.allSettled([...this.devices.values()].map((local) => local.device.stop(false)));
     this.devices.clear();
 
-    const records = await this.gateway.store.list('channelConnection', {
+    const records = await this.store.list('channelConnection', {
       where: { owner: this.owner },
       limit: 1000,
     });
     for (const record of records) {
-      await this.gateway.store.transaction(record.profileId, async (tx) => {
+      await this.store.transaction(record.profileId, async (tx) => {
         const current = await tx.get('channelConnection', record.id);
         if (current?.owner !== this.owner) return;
 

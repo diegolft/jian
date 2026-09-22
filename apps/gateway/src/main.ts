@@ -7,7 +7,6 @@ import { TelegramChannel } from './channels/telegram.js';
 import { WhatsAppChannel } from './channels/whatsapp/adapter.js';
 import { WhatsAppConnections } from './channels/whatsapp/connections.js';
 import { createWhatsAppDeviceFactory } from './channels/whatsapp/driver.js';
-import { Gateway } from './gateway.js';
 import { PostgresStore } from './postgres.js';
 import { CodexLogin } from './providers/codex/login.js';
 import { RunQueue } from './queue.js';
@@ -17,6 +16,7 @@ import { createSafeFetch } from './security/outbound.js';
 import { Channels } from './services/channels.js';
 import { Coordination } from './services/coordination.js';
 import { Credentials } from './services/credentials.js';
+import { buildServices } from './services.js';
 import { type StartupStage, startupFailure } from './startup.js';
 
 const config = z
@@ -43,7 +43,8 @@ if (!config.success) {
 }
 
 const store = new PostgresStore(config.data.DATABASE_URL);
-const gateway = new Gateway(store);
+// The store rides along: several consumers read records no single area owns.
+const services = { ...buildServices({ store }), store };
 let box: SecretBox;
 
 try {
@@ -62,8 +63,8 @@ try {
   process.exit(1);
 }
 
-const credentials = new Credentials(gateway, box);
-const codexLogin = new CodexLogin(gateway, credentials);
+const credentials = new Credentials(services, box);
+const codexLogin = new CodexLogin(services, credentials);
 
 const outbound = createSafeFetch({
   allowPrivateOrigins: config.data.ELOS_ALLOW_PRIVATE_ORIGINS.split(',')
@@ -71,9 +72,9 @@ const outbound = createSafeFetch({
     .filter(Boolean),
 });
 
-const coordination = new Coordination(gateway);
+const coordination = new Coordination(services);
 const whatsapp = new WhatsAppConnections(
-  gateway,
+  store,
   box,
   createWhatsAppDeviceFactory(config.data.ELOS_WHATSAPP_CHROMIUM),
 );
@@ -82,9 +83,9 @@ const channelRegistry = new ChannelRegistry([
   new TelegramChannel(),
   new WhatsAppChannel(whatsapp),
 ]);
-const channels = new Channels(gateway, credentials, outbound.fetch, channelRegistry);
+const channels = new Channels(services, credentials, outbound.fetch, channelRegistry);
 
-const runtime = new AgentRuntime(gateway, undefined, {
+const runtime = new AgentRuntime(services, undefined, {
   credentials,
   codexLogin,
   outbound,
@@ -93,13 +94,13 @@ const runtime = new AgentRuntime(gateway, undefined, {
 
 const queue =
   config.data.ELOS_ROLE !== 'api'
-    ? new RunQueue(new PgBoss(config.data.DATABASE_URL), gateway, runtime)
+    ? new RunQueue(new PgBoss(config.data.DATABASE_URL), services, runtime)
     : undefined;
 
 const app =
   config.data.ELOS_ROLE !== 'worker'
     ? createApp({
-        gateway,
+        ...services,
         credentials,
         codexLogin,
         channels,

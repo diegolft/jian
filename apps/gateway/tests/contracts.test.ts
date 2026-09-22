@@ -3,38 +3,37 @@ import SwaggerParser from '@apidevtools/swagger-parser';
 import { createOpenAPI, operations } from '@elos/contracts';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
-import { Gateway } from '../src/gateway.js';
 import { SecretBox } from '../src/security/crypto.js';
 import { Channels } from '../src/services/channels.js';
 import { Credentials } from '../src/services/credentials.js';
-import { MemoryStore } from './helpers/memory-store.js';
+import { testServices } from './helpers/services.js';
 
 const token = 'synthetic-admin-token-with-32-characters';
 const admin = { authorization: `Bearer ${token}` };
 
 async function setup() {
-  const gateway = new Gateway(new MemoryStore());
+  const services = testServices();
 
   const credentials = new Credentials(
-    gateway,
+    services,
     new SecretBox({ activeKeyId: 'v1', keys: { v1: randomBytes(32) } }),
   );
 
-  const channels = new Channels(gateway, credentials, async () => {
+  const channels = new Channels(services, credentials, async () => {
     throw new Error('Network forbidden in test');
   });
 
-  const app = createApp({ gateway, credentials, channels, token, logger: false });
+  const app = createApp({ ...services, credentials, channels, token, logger: false });
 
   await app.ready();
 
-  const profile = await gateway.createProfile({
+  const profile = await services.profiles.createProfile({
     name: 'P',
     instructions: 'Help',
     model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
   });
 
-  return { app, gateway, credentials, profile };
+  return { app, services, credentials, profile };
 }
 
 describe('public API contracts', () => {
@@ -49,7 +48,7 @@ describe('public API contracts', () => {
   });
 
   it('enforces scoped profile isolation, prevents capability escalation and immediately revokes keys', async () => {
-    const { app, gateway, credentials, profile } = await setup();
+    const { app, services, credentials, profile } = await setup();
 
     try {
       const key = await credentials.issueKey(profile.id, {
@@ -75,7 +74,7 @@ describe('public API contracts', () => {
         ).statusCode,
       ).toBe(403);
 
-      const other = await gateway.createProfile({
+      const other = await services.profiles.createProfile({
         name: 'Other',
         instructions: 'Help',
         model: profile.model,
@@ -133,10 +132,10 @@ describe('public API contracts', () => {
   });
 
   it('validates ingress using only its binding token and rejects unapproved actors', async () => {
-    const { app, gateway, profile } = await setup();
+    const { app, services, profile } = await setup();
 
     try {
-      const session = await gateway.createSession(profile.id, { title: 'External' });
+      const session = await services.sessions.createSession(profile.id, { title: 'External' });
 
       const created = await app.inject({
         method: 'POST',

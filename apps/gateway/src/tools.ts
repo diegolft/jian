@@ -2,11 +2,26 @@ import { memorySchema, type Run, skillSchema } from '@elos/contracts';
 import { type ToolSet, tool } from 'ai';
 import { z } from 'zod';
 import { GatewayError } from './core/errors.js';
-import type { Gateway } from './gateway.js';
+import type { Store } from './core/store.js';
+import type { Memories } from './memories/service.js';
+import type { Profiles } from './profiles/service.js';
+import type { RunLifecycle } from './runs/lifecycle.js';
+import type { Runs } from './runs/service.js';
 import { Coordination } from './services/coordination.js';
+import type { Sessions } from './sessions/service.js';
 
-export function profileTools(gateway: Gateway, run: Run): ToolSet {
-  const coordination = new Coordination(gateway);
+/** What the tool set reaches for on the profile's behalf during a run. */
+export type ToolServices = {
+  profiles: Profiles;
+  memories: Memories;
+  sessions: Sessions;
+  runs: Runs;
+  lifecycle: RunLifecycle;
+  store: Store;
+};
+
+export function profileTools(services: ToolServices, run: Run): ToolSet {
+  const coordination = new Coordination(services);
 
   const artifactPageChars = Math.max(
     1,
@@ -18,7 +33,7 @@ export function profileTools(gateway: Gateway, run: Run): ToolSet {
       description: 'Read the actual queued/running tasks across this profile’s sessions.',
       inputSchema: z.object({}),
       execute: async () =>
-        (await gateway.activities(run.profileId)).map((r) => ({
+        (await services.runs.activities(run.profileId)).map((r) => ({
           id: r.id,
           sessionId: r.sessionId,
           status: r.status,
@@ -30,27 +45,27 @@ export function profileTools(gateway: Gateway, run: Run): ToolSet {
     read_memories: tool({
       description: 'Read shared memories and their versions before changing an existing key.',
       inputSchema: z.object({}),
-      execute: async () => (await gateway.memories(run.profileId)).slice(0, 30),
+      execute: async () => (await services.memories.memories(run.profileId)).slice(0, 30),
     }),
 
     remember: tool({
       description:
         'Save a fact or decision shared by all sessions of this profile. Use expectedVersion=0 for a new key, or the current version for an update.',
       inputSchema: memorySchema,
-      execute: async (input) => gateway.remember(run.profileId, input, run.sessionId),
+      execute: async (input) => services.memories.remember(run.profileId, input, run.sessionId),
     }),
 
     list_sessions: tool({
       description: 'Find other conversations belonging to this profile.',
       inputSchema: z.object({}),
-      execute: async () => gateway.sessions(run.profileId),
+      execute: async () => services.sessions.sessions(run.profileId),
     }),
 
     read_session: tool({
       description: 'Read recent messages in one of this profile’s sessions.',
       inputSchema: z.object({ sessionId: z.string().uuid() }),
       execute: async ({ sessionId }) =>
-        (await gateway.messages(run.profileId, sessionId, 20)).map((m) => ({
+        (await services.sessions.messages(run.profileId, sessionId, 20)).map((m) => ({
           role: m.role,
           content: m.content.slice(0, 2000),
           createdAt: m.createdAt,
@@ -105,7 +120,7 @@ export function profileTools(gateway: Gateway, run: Run): ToolSet {
         'Inspect saved results before continuing a run; unknown external effects require reconciliation.',
       inputSchema: z.object({ runId: z.string().uuid() }),
       execute: async ({ runId }) =>
-        (await gateway.checkpoints(run.profileId, runId)).map((checkpoint) => {
+        (await services.lifecycle.checkpoints(run.profileId, runId)).map((checkpoint) => {
           const data =
             checkpoint.data && typeof checkpoint.data === 'object'
               ? (checkpoint.data as Record<string, unknown>)
@@ -184,11 +199,11 @@ export function profileTools(gateway: Gateway, run: Run): ToolSet {
         skills: z.array(skillSchema).max(20),
       }),
       execute: async (input) => {
-        if (!(await gateway.profile(run.profileId)).allowSelfManagement) {
+        if (!(await services.profiles.profile(run.profileId)).allowSelfManagement) {
           throw new GatewayError(403, 'Self-management is disabled');
         }
 
-        const updated = await gateway.updateProfile(run.profileId, input);
+        const updated = await services.profiles.updateProfile(run.profileId, input);
 
         return {
           version: updated.version,
@@ -214,11 +229,11 @@ export function profileTools(gateway: Gateway, run: Run): ToolSet {
           .optional(),
       }),
       execute: async (input) => {
-        if (!(await gateway.profile(run.profileId)).allowSelfManagement) {
+        if (!(await services.profiles.profile(run.profileId)).allowSelfManagement) {
           throw new GatewayError(403, 'Self-management is disabled');
         }
 
-        const updated = await gateway.updateProfile(run.profileId, input);
+        const updated = await services.profiles.updateProfile(run.profileId, input);
 
         return { id: updated.id, name: updated.name, version: updated.version };
       },
@@ -228,7 +243,7 @@ export function profileTools(gateway: Gateway, run: Run): ToolSet {
       description: 'Read the latest version of your identity before editing it.',
       inputSchema: z.object({}),
       execute: async () => {
-        const p = await gateway.profile(run.profileId);
+        const p = await services.profiles.profile(run.profileId);
 
         return {
           id: p.id,
@@ -248,12 +263,12 @@ export function profileTools(gateway: Gateway, run: Run): ToolSet {
         instructions: z.string().min(1).max(8000),
       }),
       execute: async (input) => {
-        if (!(await gateway.profile(run.profileId)).allowSelfManagement) {
+        if (!(await services.profiles.profile(run.profileId)).allowSelfManagement) {
           throw new GatewayError(403, 'Self-management is disabled');
         }
 
         const { apiKeyEnv: _env, credentialId: _credential, ...model } = run.profile.model;
-        const created = await gateway.createProfile({ ...input, model });
+        const created = await services.profiles.createProfile({ ...input, model });
 
         return { id: created.id, name: created.name };
       },

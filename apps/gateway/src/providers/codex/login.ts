@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { GatewayError } from '../../core/errors.js';
-import type { Gateway } from '../../gateway.js';
+import type { Profiles } from '../../profiles/service.js';
 import type { Credentials } from '../../services/credentials.js';
+import type { Providers } from '../service.js';
 
 const clientId = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const authOrigin = 'https://auth.openai.com';
@@ -24,7 +25,7 @@ export class CodexLogin {
   private stopped = false;
 
   constructor(
-    private readonly gateway: Gateway,
+    private readonly services: { profiles: Profiles; providers: Providers },
     private readonly credentials: Credentials,
     private readonly fetcher: typeof fetch = fetch,
   ) {}
@@ -35,11 +36,11 @@ export class CodexLogin {
   }
 
   async status(profileId: string): Promise<LoginState> {
-    await this.gateway.profile(profileId);
+    await this.services.profiles.profile(profileId);
     const pending = this.pending.get(profileId);
     if (pending) return pending;
 
-    const providers = await this.gateway.providers(profileId);
+    const providers = await this.services.providers.providers(profileId);
     const credentials = await this.credentials.list(profileId);
     return providers.some(
       (provider) =>
@@ -55,7 +56,7 @@ export class CodexLogin {
 
   async start(profileId: string): Promise<LoginState> {
     if (this.stopped) throw new GatewayError(503, 'Codex login is unavailable');
-    await this.gateway.profile(profileId);
+    await this.services.profiles.profile(profileId);
     const existing = this.pending.get(profileId);
     if (existing?.status === 'pending') return existing;
 
@@ -127,10 +128,10 @@ export class CodexLogin {
           kind: 'provider',
           secret: JSON.stringify(tokens),
         });
-        const previous = (await this.gateway.providers(profileId)).filter(
+        const previous = (await this.services.providers.providers(profileId)).filter(
           (provider) => provider.authMode === 'codex' && !provider.revokedAt,
         );
-        await this.gateway.configureCodexProvider(profileId, credential.id);
+        await this.services.providers.configureCodexProvider(profileId, credential.id);
         for (const provider of previous) {
           if (provider.credentialId) {
             await this.credentials.revoke(profileId, provider.credentialId).catch(() => {});

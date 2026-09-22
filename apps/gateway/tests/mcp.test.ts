@@ -4,10 +4,9 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { MockLanguageModelV4 } from 'ai/test';
 import { expect, it } from 'vitest';
-import { Gateway } from '../src/gateway.js';
 import { AgentRuntime } from '../src/runtime.js';
 import { createSafeFetch } from '../src/security/outbound.js';
-import { MemoryStore } from './helpers/memory-store.js';
+import { testServices } from './helpers/services.js';
 
 it.each([false, true])(
   'executes only allowlisted tools through HTTP MCP (large catalog: %s)',
@@ -92,7 +91,7 @@ it.each([false, true])(
 
     const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     const outbound = createSafeFetch({ allowPrivateOrigins: [origin] });
-    const gateway = new Gateway(new MemoryStore());
+    const services = testServices();
 
     const usage = {
       inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
@@ -196,7 +195,7 @@ it.each([false, true])(
     });
 
     try {
-      const profile = await gateway.createProfile({
+      const profile = await services.profiles.createProfile({
         name: 'MCP test',
         instructions: 'Help.',
         model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
@@ -209,15 +208,15 @@ it.each([false, true])(
         ],
       });
 
-      const session = await gateway.createSession(profile.id, { title: 'MCP' });
+      const session = await services.sessions.createSession(profile.id, { title: 'MCP' });
 
-      const run = await gateway.submit(profile.id, session.id, {
+      const run = await services.runs.submit(profile.id, session.id, {
         text: 'Find docs',
         requestKey: 'mcp',
       });
 
-      await new AgentRuntime(gateway, () => model, { outbound }).execute(profile.id, run.id);
-      expect((await gateway.run(profile.id, run.id)).status).toBe('completed');
+      await new AgentRuntime(services, () => model, { outbound }).execute(profile.id, run.id);
+      expect((await services.runs.run(profile.id, run.id)).status).toBe('completed');
       expect(called).toEqual([largeCatalog ? 'archive_19' : 'search']);
     } finally {
       await outbound.close();
@@ -308,18 +307,18 @@ it.each(['disconnect', 'isError'])(
     const outbound = createSafeFetch({ allowPrivateOrigins: [origin] });
 
     try {
-      const gateway = new Gateway(new MemoryStore());
+      const services = testServices();
 
-      const profile = await gateway.createProfile({
+      const profile = await services.profiles.createProfile({
         name: 'Effect test',
         instructions: 'Help.',
         model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
         mcpServers: [{ name: 'effects', url: `${origin}/mcp`, allowedTools: ['mutate'] }],
       });
 
-      const session = await gateway.createSession(profile.id, { title: 'Effects' });
+      const session = await services.sessions.createSession(profile.id, { title: 'Effects' });
 
-      const run = await gateway.submit(profile.id, session.id, {
+      const run = await services.runs.submit(profile.id, session.id, {
         text: 'Do it',
         requestKey: 'effect',
       });
@@ -382,9 +381,9 @@ it.each(['disconnect', 'isError'])(
         },
       });
 
-      await new AgentRuntime(gateway, () => model, { outbound }).execute(profile.id, run.id);
+      await new AgentRuntime(services, () => model, { outbound }).execute(profile.id, run.id);
 
-      const finished = await gateway.run(profile.id, run.id);
+      const finished = await services.runs.run(profile.id, run.id);
 
       expect(finished.status).toBe('interrupted');
       expect(effects).toBe(1);
@@ -392,7 +391,7 @@ it.each(['disconnect', 'isError'])(
       expect(finished.error).toContain('reconcil');
 
       expect(
-        (await gateway.checkpoints(profile.id, run.id)).filter((checkpoint) => {
+        (await services.lifecycle.checkpoints(profile.id, run.id)).filter((checkpoint) => {
           const data = checkpoint.data as { phase?: string; toolName?: string };
 
           return data.phase === 'tool-started' && data.toolName === remoteName;

@@ -9,11 +9,10 @@ import type {
   DeviceFactory,
   DeviceSessionStore,
 } from '../src/channels/whatsapp/types.js';
-import { Gateway } from '../src/gateway.js';
 import { SecretBox } from '../src/security/crypto.js';
 import { Channels } from '../src/services/channels.js';
 import { Credentials } from '../src/services/credentials.js';
-import { MemoryStore } from './helpers/memory-store.js';
+import { testServices } from './helpers/services.js';
 
 const actorId = '5511999999999@c.us';
 const token = 'synthetic-whatsapp-admin-token-32-characters';
@@ -22,10 +21,10 @@ const message = { actorId, chatId: actorId, text: 'Hello', requestKey: 'wa-messa
 
 async function setup(send?: (chatId: string, text: string) => Promise<string>) {
   let now = Date.now();
-  const store = new MemoryStore();
-  const gateway = new Gateway(store);
+  const services = testServices();
+  const store = services.store;
   const box = new SecretBox({ activeKeyId: 'v1', keys: { v1: randomBytes(32) } });
-  const credentials = new Credentials(gateway, box);
+  const credentials = new Credentials(services, box);
   const devices: Array<{ callbacks: DeviceCallbacks; store: DeviceSessionStore }> = [];
   const sent: Array<{ chatId: string; text: string }> = [];
 
@@ -42,18 +41,18 @@ async function setup(send?: (chatId: string, text: string) => Promise<string>) {
     };
   };
 
-  const connection = () => new WhatsAppConnections(gateway, box, factory, () => now);
+  const connection = () => new WhatsAppConnections(store, box, factory, () => now);
   const whatsapp = connection();
   const registry = new ChannelRegistry([new WhatsAppChannel(whatsapp)]);
-  const channels = new Channels(gateway, credentials, fetch, registry);
+  const channels = new Channels(services, credentials, fetch, registry);
   const receive = (id: string, input: typeof message, generation: number) =>
     channels.receiveLinked(id, input, generation);
-  const profile = await gateway.createProfile({
+  const profile = await services.profiles.createProfile({
     name: 'WhatsApp',
     instructions: 'Help.',
     model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
   });
-  const session = await gateway.createSession(profile.id, {
+  const session = await services.sessions.createSession(profile.id, {
     title: 'WhatsApp',
     channel: 'whatsapp',
   });
@@ -64,11 +63,11 @@ async function setup(send?: (chatId: string, text: string) => Promise<string>) {
     actorIds: [actorId],
     chatIds: [actorId],
   });
-  const app = createApp({ gateway, credentials, channels, whatsapp, token, logger: false });
+  const app = createApp({ ...services, credentials, channels, whatsapp, token, logger: false });
   const base = `/v1/profiles/${profile.id}/channels/${binding.id}`;
 
   return {
-    gateway,
+    services,
     store,
     devices,
     sent,
@@ -196,12 +195,18 @@ describe('WhatsApp linked device', () => {
       await callbacks.message({ ...message, text: 'Next', requestKey: 'wa-message-two' });
       await f.whatsapp.tick(f.receive);
 
-      const [first] = await f.gateway.activities(f.profile.id);
+      const [first] = await f.services.runs.activities(f.profile.id);
       if (!first) throw new Error('Run missing');
       expect(first.input).toBe('Hello');
       expect(await f.store.list('channelInbox', { where: { status: 'pending' } })).toHaveLength(1);
-      await f.gateway.claim(first.id, f.profile.id, 'worker');
-      await f.gateway.finish(f.profile.id, first.id, 'worker', 'completed', 'First answer');
+      await f.services.lifecycle.claim(first.id, f.profile.id, 'worker');
+      await f.services.lifecycle.finish(
+        f.profile.id,
+        first.id,
+        'worker',
+        'completed',
+        'First answer',
+      );
       await Promise.all([f.channels.dispatch(), f.channels.dispatch()]);
       expect(f.sent).toEqual([{ chatId: actorId, text: 'First answer' }]);
       expect((await f.channels.deliveries(f.profile.id))[0]?.remoteMessageIds).toEqual([
@@ -209,16 +214,22 @@ describe('WhatsApp linked device', () => {
       ]);
 
       await f.whatsapp.tick(f.receive);
-      expect((await f.gateway.activities(f.profile.id))[0]?.input).toBe('Next');
+      expect((await f.services.runs.activities(f.profile.id))[0]?.input).toBe('Next');
       expect(await f.store.list('channelInbox', { where: { status: 'pending' } })).toHaveLength(0);
-      const [second] = await f.gateway.activities(f.profile.id);
+      const [second] = await f.services.runs.activities(f.profile.id);
       if (!second) throw new Error('Second run missing');
       await f.whatsapp.disconnect(f.profile.id, f.binding.id);
       await f.whatsapp.connect(f.profile.id, f.binding.id);
       await f.whatsapp.tick(f.receive);
       await f.devices.at(-1)?.callbacks.ready('different-account');
-      await f.gateway.claim(second.id, f.profile.id, 'worker');
-      await f.gateway.finish(f.profile.id, second.id, 'worker', 'completed', 'Old account reply');
+      await f.services.lifecycle.claim(second.id, f.profile.id, 'worker');
+      await f.services.lifecycle.finish(
+        f.profile.id,
+        second.id,
+        'worker',
+        'completed',
+        'Old account reply',
+      );
       await f.channels.dispatch();
       expect(f.sent).toHaveLength(1);
       expect(
@@ -278,10 +289,10 @@ describe('WhatsApp linked device', () => {
       await f.devices[0]?.callbacks.ready('account');
       await f.devices[0]?.callbacks.message(message);
       await f.whatsapp.tick(f.receive);
-      const [run] = await f.gateway.activities(f.profile.id);
+      const [run] = await f.services.runs.activities(f.profile.id);
       if (!run) throw new Error('Run missing');
-      await f.gateway.claim(run.id, f.profile.id, 'worker');
-      await f.gateway.finish(f.profile.id, run.id, 'worker', 'completed', 'Answer');
+      await f.services.lifecycle.claim(run.id, f.profile.id, 'worker');
+      await f.services.lifecycle.finish(f.profile.id, run.id, 'worker', 'completed', 'Answer');
       await f.channels.dispatch();
       await f.channels.dispatch();
 

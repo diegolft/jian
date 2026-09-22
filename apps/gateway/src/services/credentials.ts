@@ -8,7 +8,8 @@ import {
 } from '@elos/contracts';
 import type { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
-import type { Gateway } from '../gateway.js';
+import type { Store } from '../core/store.js';
+import type { Profiles } from '../profiles/service.js';
 import type { EncryptedSecret, SecretBox } from '../security/crypto.js';
 import { hashToken, issueToken } from '../security/tokens.js';
 
@@ -21,7 +22,7 @@ export type AccessKeyRecord = z.infer<typeof keyMetadataSchema> & { hash: string
 /** Only metadata leaves this service. AAD prevents copying a secret between profiles or purposes. */
 export class Credentials {
   constructor(
-    private readonly gateway: Gateway,
+    private readonly services: { profiles: Profiles; store: Store },
     private readonly box: SecretBox,
   ) {}
 
@@ -53,8 +54,8 @@ export class Credentials {
       envelope: this.box.encrypt(secret, this.aad(metadata)),
     };
 
-    await this.gateway.store.transaction(profileId, async (tx) => {
-      await this.gateway.profile(profileId, tx);
+    await this.services.store.transaction(profileId, async (tx) => {
+      await this.services.profiles.profile(profileId, tx);
       await tx.put('credential', record.id, profileId, record);
 
       await tx.event({
@@ -69,15 +70,15 @@ export class Credentials {
   }
 
   async list(profileId: string) {
-    await this.gateway.profile(profileId);
+    await this.services.profiles.profile(profileId);
 
-    return (await this.gateway.store.list('credential', { profileId })).map((record) =>
+    return (await this.services.store.list('credential', { profileId })).map((record) =>
       this.metadata(record),
     );
   }
 
   async resolve(profileId: string, id: string, kind: CredentialRecord['kind']) {
-    const record = await this.gateway.store.get('credential', id);
+    const record = await this.services.store.get('credential', id);
 
     if (!record || record.profileId !== profileId || record.kind !== kind || record.revokedAt) {
       throw new GatewayError(403, 'Credential unavailable');
@@ -91,7 +92,7 @@ export class Credentials {
     id: string,
     transform: (secret: string) => Promise<string>,
   ) {
-    return this.gateway.store.transaction(profileId, async (tx) => {
+    return this.services.store.transaction(profileId, async (tx) => {
       const record = await tx.get('credential', id);
       if (
         !record ||
@@ -116,7 +117,7 @@ export class Credentials {
   }
 
   private async change(profileId: string, id: string, rotate: boolean) {
-    return this.gateway.store.transaction(profileId, async (tx) => {
+    return this.services.store.transaction(profileId, async (tx) => {
       const value = await tx.get('credential', id);
       const record = assertFound(value?.profileId === profileId ? value : null, 'Credential');
       const now = new Date().toISOString();
@@ -171,8 +172,8 @@ export class Credentials {
       createdAt: new Date().toISOString(),
     };
 
-    await this.gateway.store.transaction(profileId, async (tx) => {
-      await this.gateway.profile(profileId, tx);
+    await this.services.store.transaction(profileId, async (tx) => {
+      await this.services.profiles.profile(profileId, tx);
       await tx.put('accessKey', id, profileId, record);
 
       await tx.event({
@@ -189,15 +190,15 @@ export class Credentials {
   }
 
   async keys(profileId: string) {
-    await this.gateway.profile(profileId);
+    await this.services.profiles.profile(profileId);
 
-    return (await this.gateway.store.list('accessKey', { profileId })).map(
+    return (await this.services.store.list('accessKey', { profileId })).map(
       ({ hash: _hash, ...metadata }) => metadata,
     );
   }
 
   async revokeKey(profileId: string, id: string) {
-    return this.gateway.store.transaction(profileId, async (tx) => {
+    return this.services.store.transaction(profileId, async (tx) => {
       const value = await tx.get('accessKey', id);
       const record = assertFound(value?.profileId === profileId ? value : null, 'Access key');
       const changed = { ...record, revokedAt: new Date().toISOString() };
@@ -230,7 +231,7 @@ export class Credentials {
       throw new GatewayError(401, 'Unauthorized');
     }
 
-    const [key] = await this.gateway.store.list('accessKey', {
+    const [key] = await this.services.store.list('accessKey', {
       profileId,
       where: { hash },
       limit: 1,

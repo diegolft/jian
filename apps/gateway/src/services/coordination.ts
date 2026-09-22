@@ -11,7 +11,10 @@ import {
 } from '@elos/contracts';
 import { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
-import type { Gateway } from '../gateway.js';
+import type { Store } from '../core/store.js';
+import type { Profiles } from '../profiles/service.js';
+import type { Runs } from '../runs/service.js';
+import type { Sessions } from '../sessions/service.js';
 
 export type ArtifactRecord = z.infer<typeof artifactSchema>;
 
@@ -23,9 +26,16 @@ const releaseSchema = leaseInputSchema
   .omit({ ttlSeconds: true })
   .extend({ fence: z.number().int().positive() });
 
+type CoordinationServices = {
+  profiles: Profiles;
+  sessions: Sessions;
+  runs: Runs;
+  store: Store;
+};
+
 export class Coordination {
   constructor(
-    private readonly gateway: Gateway,
+    private readonly services: CoordinationServices,
     private readonly clock = Date.now,
   ) {}
 
@@ -33,14 +43,14 @@ export class Coordination {
     const query = pageQuerySchema.parse(input);
 
     if (sessionId) {
-      await this.gateway.session(profileId, sessionId);
+      await this.services.sessions.session(profileId, sessionId);
     } else {
-      await this.gateway.profile(profileId);
+      await this.services.profiles.profile(profileId);
     }
 
     // A cursor is a record reference, so validate ownership before using it for pagination.
     if (query.before) {
-      const cursor = await this.gateway.store.get('message', query.before);
+      const cursor = await this.services.store.get('message', query.before);
 
       assertFound(
         cursor?.profileId === profileId && (!sessionId || cursor.sessionId === sessionId)
@@ -50,7 +60,7 @@ export class Coordination {
       );
     }
 
-    const items = await this.gateway.store.list('message', {
+    const items = await this.services.store.list('message', {
       profileId,
       ...(sessionId ? { where: { sessionId } } : {}),
       before: query.before,
@@ -83,8 +93,8 @@ export class Coordination {
       createdAt: new Date(this.clock()).toISOString(),
     };
 
-    await this.gateway.store.transaction(run.profileId, async (tx) => {
-      await this.gateway.run(run.profileId, run.id, tx);
+    await this.services.store.transaction(run.profileId, async (tx) => {
+      await this.services.runs.run(run.profileId, run.id, tx);
       await tx.put('artifact', record.id, run.profileId, record);
     });
 
@@ -93,7 +103,7 @@ export class Coordination {
 
   async artifact(profileId: string, id: string, input: unknown) {
     const { offset, limit } = artifactQuerySchema.parse(input);
-    const value = await this.gateway.store.get('artifact', id);
+    const value = await this.services.store.get('artifact', id);
     const record = assertFound(value?.profileId === profileId ? value : null, 'Artifact');
     const end = Math.min(offset + limit, record.content.length);
 
@@ -111,8 +121,8 @@ export class Coordination {
   async acquire(profileId: string, input: unknown) {
     const { ttlSeconds, ...data } = leaseInputSchema.parse(input);
 
-    return this.gateway.store.transaction(profileId, async (tx) => {
-      await this.gateway.session(profileId, data.sessionId, tx);
+    return this.services.store.transaction(profileId, async (tx) => {
+      await this.services.sessions.session(profileId, data.sessionId, tx);
 
       const id = this.leaseId(profileId, data.resource);
       const current = await tx.get('lease', id);
@@ -146,7 +156,7 @@ export class Coordination {
   async release(profileId: string, input: unknown) {
     const data = releaseSchema.parse(input);
 
-    return this.gateway.store.transaction(profileId, async (tx) => {
+    return this.services.store.transaction(profileId, async (tx) => {
       const record = assertFound(
         await tx.get('lease', this.leaseId(profileId, data.resource)),
         'Resource lease',
@@ -171,9 +181,9 @@ export class Coordination {
   async send(profileId: string, input: unknown) {
     const data = mailInputSchema.parse(input);
 
-    return this.gateway.store.transaction(profileId, async (tx) => {
-      await this.gateway.session(profileId, data.fromSessionId, tx);
-      await this.gateway.session(profileId, data.toSessionId, tx);
+    return this.services.store.transaction(profileId, async (tx) => {
+      await this.services.sessions.session(profileId, data.fromSessionId, tx);
+      await this.services.sessions.session(profileId, data.toSessionId, tx);
 
       const id = `${profileId}:${createHash('sha256')
         .update(JSON.stringify([data.fromSessionId, data.requestKey]))
@@ -210,9 +220,9 @@ export class Coordination {
   }
 
   async inbox(profileId: string, sessionId: string) {
-    await this.gateway.session(profileId, sessionId);
+    await this.services.sessions.session(profileId, sessionId);
 
-    return this.gateway.store.list('mail', {
+    return this.services.store.list('mail', {
       profileId,
       where: { toSessionId: sessionId },
       limit: 30,

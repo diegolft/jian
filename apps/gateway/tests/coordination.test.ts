@@ -1,24 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { Gateway } from '../src/gateway.js';
 import { Coordination } from '../src/services/coordination.js';
-import { MemoryStore } from './helpers/memory-store.js';
+import { testServices } from './helpers/services.js';
 
 async function setup() {
-  const gateway = new Gateway(new MemoryStore());
+  const services = testServices();
 
-  const profile = await gateway.createProfile({
+  const profile = await services.profiles.createProfile({
     name: 'Test',
     instructions: 'Help.',
     model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
   });
 
-  const a = await gateway.createSession(profile.id, { title: 'A' });
-  const b = await gateway.createSession(profile.id, { title: 'B' });
+  const a = await services.sessions.createSession(profile.id, { title: 'A' });
+  const b = await services.sessions.createSession(profile.id, { title: 'B' });
   let now = 1000;
-  const coordination = new Coordination(gateway, () => now);
+  const coordination = new Coordination(services, () => now);
 
   return {
-    gateway,
+    services,
     profile,
     a,
     b,
@@ -63,7 +62,7 @@ describe('shared coordination', () => {
   });
 
   it('deduplicates cross-session mail and exposes it only to the target profile', async () => {
-    const { gateway, profile, a, b, coordination } = await setup();
+    const { services, profile, a, b, coordination } = await setup();
 
     const payload = {
       fromSessionId: a.id,
@@ -77,7 +76,7 @@ describe('shared coordination', () => {
     expect((await coordination.send(profile.id, payload)).id).toBe(first.id);
     expect(await coordination.inbox(profile.id, b.id)).toHaveLength(1);
 
-    const other = await gateway.createProfile({
+    const other = await services.profiles.createProfile({
       name: 'Other',
       instructions: 'Help',
       model: profile.model,
@@ -87,8 +86,8 @@ describe('shared coordination', () => {
   });
 
   it('returns bounded artifact pages and preserves the complete tool output', async () => {
-    const { gateway, profile, a, coordination } = await setup();
-    const run = await gateway.submit(profile.id, a.id, { text: 'run', requestKey: 'run' });
+    const { services, profile, a, coordination } = await setup();
+    const run = await services.runs.submit(profile.id, a.id, { text: 'run', requestKey: 'run' });
 
     const saved = await coordination.storeArtifact(run, 'remote_search', {
       value: 'a'.repeat(20000),

@@ -1,13 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { GatewayError } from '../core/errors.js';
-import type { Gateway } from '../gateway.js';
+import type { Store } from '../core/store.js';
+import type { Profiles } from '../profiles/service.js';
 import type { Credentials } from '../services/credentials.js';
 
 type ProfileParams = { profileId: string };
 
 interface EventOptions {
-  gateway: Gateway;
+  profiles: Profiles;
+  store: Store;
   token: string;
   credentials?: Credentials;
   maxStreams?: number;
@@ -15,16 +17,15 @@ interface EventOptions {
 
 /** Each connection owns its cursor; durable events survive disconnects and worker restarts. */
 export function registerEventRoutes(app: FastifyInstance, options: EventOptions) {
-  const gateway = options.gateway;
   let streams = 0;
   const cursorSchema = z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
   app.get<{ Params: ProfileParams; Querystring: { after?: string } }>(
     '/v1/profiles/:profileId/events',
     async (request) => {
-      await gateway.profile(request.params.profileId);
+      await options.profiles.profile(request.params.profileId);
 
-      return gateway.store.events(
+      return options.store.events(
         request.params.profileId,
         cursorSchema.parse(request.query.after ?? 0),
       );
@@ -36,7 +37,7 @@ export function registerEventRoutes(app: FastifyInstance, options: EventOptions)
     async (request, reply) => {
       const profileId = request.params.profileId;
 
-      await gateway.profile(profileId);
+      await options.profiles.profile(profileId);
 
       let cursor = cursorSchema.parse(request.headers['last-event-id'] ?? request.query.after ?? 0);
 
@@ -94,7 +95,7 @@ export function registerEventRoutes(app: FastifyInstance, options: EventOptions)
             return;
           }
 
-          const events = await gateway.store.events(profileId, cursor);
+          const events = await options.store.events(profileId, cursor);
 
           for (const event of events) {
             if (closed) {

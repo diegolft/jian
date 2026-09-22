@@ -3,10 +3,9 @@ import { randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
-import { Gateway } from '../src/gateway.js';
 import { SecretBox } from '../src/security/crypto.js';
 import { Credentials } from '../src/services/credentials.js';
-import { MemoryStore } from './helpers/memory-store.js';
+import { testServices } from './helpers/services.js';
 
 const token = 'test-token-that-is-at-least-32-characters';
 const headers = { authorization: `Bearer ${token}` };
@@ -20,32 +19,32 @@ const input = {
 const apps: FastifyInstance[] = [];
 
 function setup() {
-  const gateway = new Gateway(new MemoryStore());
-  const app = createApp({ gateway, token, logger: false });
+  const services = testServices();
+  const app = createApp({ ...services, token, logger: false });
 
   apps.push(app);
 
-  return { app, gateway };
+  return { app, services };
 }
 
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 
-describe('HTTP gateway', () => {
+describe('HTTP services', () => {
   it('keeps provider setup admin-only while scoped chat can use a registered model', async () => {
-    const gateway = new Gateway(new MemoryStore());
+    const services = testServices();
     const credentials = new Credentials(
-      gateway,
+      services,
       new SecretBox({
         activeKeyId: 'test',
         keys: { test: randomBytes(32) },
       }),
     );
-    const app = createApp({ gateway, credentials, token, logger: false });
+    const app = createApp({ ...services, credentials, token, logger: false });
     apps.push(app);
 
-    const profile = await gateway.createProfile({ name: 'New', instructions: 'Help.' });
+    const profile = await services.profiles.createProfile({ name: 'New', instructions: 'Help.' });
     const secret = await credentials.create(profile.id, {
       label: 'Test',
       kind: 'provider',
@@ -94,7 +93,7 @@ describe('HTTP gateway', () => {
         .statusCode,
     ).toBe(403);
 
-    const session = await gateway.createSession(profile.id, { title: 'Chat' });
+    const session = await services.sessions.createSession(profile.id, { title: 'Chat' });
     const response = await app.inject({
       method: 'POST',
       url: `${base}/sessions/${session.id}/messages`,
@@ -172,8 +171,8 @@ describe('HTTP gateway', () => {
   });
 
   it('returns explicit conflicts and replayable event cursors', async () => {
-    const { app, gateway } = setup();
-    const profile = await gateway.createProfile(input);
+    const { app, services } = setup();
+    const profile = await services.profiles.createProfile(input);
     const url = `/v1/profiles/${profile.id}`;
 
     await app.inject({
@@ -207,12 +206,12 @@ describe('HTTP gateway', () => {
 });
 
 it('streams committed events over HTTP and resumes after a cursor', async () => {
-  const { app, gateway } = setup();
-  const profile = await gateway.createProfile(input);
-  const initial = (await gateway.store.events(profile.id, 0))[0];
+  const { app, services } = setup();
+  const profile = await services.profiles.createProfile(input);
+  const initial = (await services.store.events(profile.id, 0))[0];
 
   assert.ok(initial, 'Profile creation must emit an event');
-  await gateway.updateProfile(profile.id, { expectedVersion: 1, name: 'Updated' });
+  await services.profiles.updateProfile(profile.id, { expectedVersion: 1, name: 'Updated' });
 
   const url = await app.listen({ host: '127.0.0.1', port: 0 });
   const controller = new AbortController();

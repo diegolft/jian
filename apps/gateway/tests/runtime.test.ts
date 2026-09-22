@@ -1,11 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it } from 'vitest';
-import { Gateway } from '../src/gateway.js';
 import { AgentRuntime } from '../src/runtime.js';
 import { SecretBox } from '../src/security/crypto.js';
 import { Credentials } from '../src/services/credentials.js';
-import { MemoryStore } from './helpers/memory-store.js';
+import { testServices } from './helpers/services.js';
 
 const input = {
   name: 'Atlas',
@@ -26,21 +25,21 @@ const answer = (text: string) => ({
 });
 
 async function fixture() {
-  const gateway = new Gateway(new MemoryStore());
-  const profile = await gateway.createProfile(input);
-  const session = await gateway.createSession(profile.id, { title: 'Mac' });
+  const services = testServices();
+  const profile = await services.profiles.createProfile(input);
+  const session = await services.sessions.createSession(profile.id, { title: 'Mac' });
 
-  const run = await gateway.submit(profile.id, session.id, {
+  const run = await services.runs.submit(profile.id, session.id, {
     text: 'Remember the deployment time',
     requestKey: 'one',
   });
 
-  return { gateway, profile, session, run };
+  return { services, profile, session, run };
 }
 
 describe('agent runtime', () => {
   it('refreshes shared context between real SDK tool-loop steps', async () => {
-    const { gateway, profile, session, run } = await fixture();
+    const { services, profile, session, run } = await fixture();
     let step = 0;
 
     const model = new MockLanguageModelV4({
@@ -77,32 +76,32 @@ describe('agent runtime', () => {
       },
     });
 
-    await new AgentRuntime(gateway, () => model).execute(profile.id, run.id);
+    await new AgentRuntime(services, () => model).execute(profile.id, run.id);
 
-    const completed = await gateway.run(profile.id, run.id);
+    const completed = await services.runs.run(profile.id, run.id);
 
     expect(completed.status).toBe('completed');
     expect(completed.output).toBe('Saved: deploy at 21:00.');
-    expect((await gateway.memories(profile.id))[0]?.sourceSessionId).toBe(session.id);
+    expect((await services.memories.memories(profile.id))[0]?.sourceSessionId).toBe(session.id);
 
-    const other = await gateway.createSession(profile.id, { title: 'Telegram' });
+    const other = await services.sessions.createSession(profile.id, { title: 'Telegram' });
 
-    const otherRun = await gateway.submit(profile.id, other.id, {
+    const otherRun = await services.runs.submit(profile.id, other.id, {
       text: 'When was the deployment?',
       requestKey: 'two',
     });
 
-    expect((await gateway.context(otherRun)).system).toContain('Deploy at 21:00');
+    expect((await services.contexts.context(otherRun)).system).toContain('Deploy at 21:00');
 
     expect(
-      (await gateway.store.events(profile.id, 0)).filter(
+      (await services.store.events(profile.id, 0)).filter(
         (e) => e.type === 'run.step' && (e.data as { phase: string }).phase === 'step-completed',
       ),
     ).toHaveLength(2);
   });
 
   it('persists a safe failure without leaking provider credentials', async () => {
-    const { gateway, profile, run } = await fixture();
+    const { services, profile, run } = await fixture();
 
     const model = new MockLanguageModelV4({
       doGenerate: async () => {
@@ -110,42 +109,42 @@ describe('agent runtime', () => {
       },
     });
 
-    await new AgentRuntime(gateway, () => model).execute(profile.id, run.id);
+    await new AgentRuntime(services, () => model).execute(profile.id, run.id);
 
-    const result = await gateway.run(profile.id, run.id);
+    const result = await services.runs.run(profile.id, run.id);
 
     expect(result.status).toBe('failed');
     expect(JSON.stringify(result)).not.toContain('secret-api-key');
 
-    expect(JSON.stringify(await gateway.store.events(profile.id, 0))).not.toContain(
+    expect(JSON.stringify(await services.store.events(profile.id, 0))).not.toContain(
       'secret-api-key',
     );
   });
 
   it('does not execute a cancelled or already claimed run', async () => {
-    const { gateway, profile, run } = await fixture();
+    const { services, profile, run } = await fixture();
 
-    await gateway.cancel(profile.id, run.id);
+    await services.runs.cancel(profile.id, run.id);
 
-    await new AgentRuntime(gateway, () => {
+    await new AgentRuntime(services, () => {
       throw new Error('must not resolve');
     }).execute(profile.id, run.id);
 
-    expect((await gateway.run(profile.id, run.id)).status).toBe('cancelled');
+    expect((await services.runs.run(profile.id, run.id)).status).toBe('cancelled');
   });
 
   it('bounds context without dropping the newest user message', async () => {
-    const { gateway, profile, run } = await fixture();
+    const { services, profile, run } = await fixture();
 
     for (let i = 0; i < 20; i++) {
-      await gateway.remember(profile.id, {
+      await services.memories.remember(profile.id, {
         key: `memory-${i}`,
         content: 'x'.repeat(4000),
         expectedVersion: 0,
       });
     }
 
-    const context = await gateway.context(run);
+    const context = await services.contexts.context(run);
 
     expect(context.system.length).toBeLessThan(24_000);
     expect(context.messages.at(-1)?.content).toBe('Remember the deployment time');
@@ -153,11 +152,11 @@ describe('agent runtime', () => {
 });
 
 it('resolves a provider key from the profile vault and keeps it out of durable events', async () => {
-  const { gateway, profile } = await fixture();
+  const { services, profile } = await fixture();
   const vaultSecret = 'vault"\\\nsecret';
 
   const credentials = new Credentials(
-    gateway,
+    services,
     new SecretBox({ activeKeyId: 'test', keys: { test: randomBytes(32) } }),
   );
 
@@ -167,18 +166,21 @@ it('resolves a provider key from the profile vault and keeps it out of durable e
     secret: vaultSecret,
   });
 
-  const updated = await gateway.updateProfile(profile.id, {
+  const updated = await services.profiles.updateProfile(profile.id, {
     expectedVersion: profile.version,
     model: { provider: 'openai', modelId: 'test', credentialId: credential.id },
   });
 
-  const session = await gateway.createSession(updated.id, { title: 'Vault' });
-  const run = await gateway.submit(updated.id, session.id, { text: 'Hello', requestKey: 'vault' });
+  const session = await services.sessions.createSession(updated.id, { title: 'Vault' });
+  const run = await services.runs.submit(updated.id, session.id, {
+    text: 'Hello',
+    requestKey: 'vault',
+  });
   let resolvedKey: string | undefined;
   const model = new MockLanguageModelV4({ doGenerate: async () => answer(`Hello ${vaultSecret}`) });
 
   await new AgentRuntime(
-    gateway,
+    services,
     (_config, _env, _fetch, key) => {
       resolvedKey = key;
 
@@ -189,21 +191,27 @@ it('resolves a provider key from the profile vault and keeps it out of durable e
 
   expect(resolvedKey).toBe(vaultSecret);
 
-  const finished = await gateway.run(updated.id, run.id);
+  const finished = await services.runs.run(updated.id, run.id);
 
   expect(finished.status).toBe('completed');
   expect(finished.output).toBe('Hello [REDACTED]');
 
-  expect(JSON.stringify(await gateway.store.events(updated.id, 0))).not.toContain(
+  expect(JSON.stringify(await services.store.events(updated.id, 0))).not.toContain(
     JSON.stringify(vaultSecret).slice(1, -1),
   );
 });
 
 it('stops a run after its cumulative token cap without making another model call', async () => {
-  const gateway = new Gateway(new MemoryStore());
-  const profile = await gateway.createProfile({ ...input, contextPolicy: { maxRunTokens: 8192 } });
-  const session = await gateway.createSession(profile.id, { title: 'Budget' });
-  const run = await gateway.submit(profile.id, session.id, { text: 'Hello', requestKey: 'budget' });
+  const services = testServices();
+  const profile = await services.profiles.createProfile({
+    ...input,
+    contextPolicy: { maxRunTokens: 8192 },
+  });
+  const session = await services.sessions.createSession(profile.id, { title: 'Budget' });
+  const run = await services.runs.submit(profile.id, session.id, {
+    text: 'Hello',
+    requestKey: 'budget',
+  });
   let calls = 0;
 
   const model = new MockLanguageModelV4({
@@ -229,24 +237,27 @@ it('stops a run after its cumulative token cap without making another model call
     },
   });
 
-  await new AgentRuntime(gateway, () => model).execute(profile.id, run.id);
+  await new AgentRuntime(services, () => model).execute(profile.id, run.id);
 
-  expect((await gateway.run(profile.id, run.id)).usage).toEqual({
+  expect((await services.runs.run(profile.id, run.id)).usage).toEqual({
     inputTokens: 8000,
     outputTokens: 300,
     steps: 1,
   });
 
   expect(calls).toBe(1);
-  expect((await gateway.run(profile.id, run.id)).status).toBe('failed');
+  expect((await services.runs.run(profile.id, run.id)).status).toBe('failed');
 });
 
 it('uses conservative estimates when a provider omits usage counters', async () => {
-  const gateway = new Gateway(new MemoryStore());
-  const profile = await gateway.createProfile({ ...input, contextPolicy: { maxRunTokens: 8192 } });
-  const session = await gateway.createSession(profile.id, { title: 'Missing usage' });
+  const services = testServices();
+  const profile = await services.profiles.createProfile({
+    ...input,
+    contextPolicy: { maxRunTokens: 8192 },
+  });
+  const session = await services.sessions.createSession(profile.id, { title: 'Missing usage' });
 
-  const run = await gateway.submit(profile.id, session.id, {
+  const run = await services.runs.submit(profile.id, session.id, {
     text: 'Continue',
     requestKey: 'missing-usage',
   });
@@ -283,9 +294,9 @@ it('uses conservative estimates when a provider omits usage counters', async () 
     },
   });
 
-  await new AgentRuntime(gateway, () => model).execute(profile.id, run.id);
+  await new AgentRuntime(services, () => model).execute(profile.id, run.id);
 
-  const finished = await gateway.run(profile.id, run.id);
+  const finished = await services.runs.run(profile.id, run.id);
 
   expect(finished.status).toBe('failed');
   expect(calls).toBeLessThan(12);
@@ -294,16 +305,19 @@ it('uses conservative estimates when a provider omits usage counters', async () 
 });
 
 it('reports a safe context-budget error when required prompt content cannot fit', async () => {
-  const gateway = new Gateway(new MemoryStore());
+  const services = testServices();
 
-  const profile = await gateway.createProfile({
+  const profile = await services.profiles.createProfile({
     ...input,
     instructions: 'x'.repeat(8000),
     contextPolicy: { inputTokens: 4096, outputTokens: 256 },
   });
 
-  const session = await gateway.createSession(profile.id, { title: 'Budget' });
-  const run = await gateway.submit(profile.id, session.id, { text: 'Hi', requestKey: 'too-large' });
+  const session = await services.sessions.createSession(profile.id, { title: 'Budget' });
+  const run = await services.runs.submit(profile.id, session.id, {
+    text: 'Hi',
+    requestKey: 'too-large',
+  });
   let calls = 0;
 
   const model = new MockLanguageModelV4({
@@ -314,9 +328,9 @@ it('reports a safe context-budget error when required prompt content cannot fit'
     },
   });
 
-  await new AgentRuntime(gateway, () => model).execute(profile.id, run.id);
+  await new AgentRuntime(services, () => model).execute(profile.id, run.id);
 
-  const finished = await gateway.run(profile.id, run.id);
+  const finished = await services.runs.run(profile.id, run.id);
 
   expect(calls).toBe(0);
   expect(finished.status).toBe('failed');
@@ -325,7 +339,7 @@ it('reports a safe context-budget error when required prompt content cannot fit'
 });
 
 it('does not mark a local validation failure as an uncertain external effect', async () => {
-  const { gateway, profile, run } = await fixture();
+  const { services, profile, run } = await fixture();
   let calls = 0;
 
   const model = new MockLanguageModelV4({
@@ -352,16 +366,16 @@ it('does not mark a local validation failure as an uncertain external effect', a
     },
   });
 
-  await new AgentRuntime(gateway, () => model).execute(profile.id, run.id);
-  expect((await gateway.run(profile.id, run.id)).status).toBe('completed');
+  await new AgentRuntime(services, () => model).execute(profile.id, run.id);
+  expect((await services.runs.run(profile.id, run.id)).status).toBe('completed');
   expect(calls).toBe(2);
 });
 
 it('stores a large tool output and sends only a bounded reference to the model', async () => {
-  const { gateway, profile, run } = await fixture();
+  const { services, profile, run } = await fixture();
 
   for (let i = 0; i < 5; i++) {
-    await gateway.remember(profile.id, {
+    await services.memories.remember(profile.id, {
       key: `large-${i}`,
       content: `result-${i}:${'x'.repeat(3900)}`,
       expectedVersion: 0,
@@ -393,7 +407,7 @@ it('stores a large tool output and sends only a bounded reference to the model',
     },
   });
 
-  await new AgentRuntime(gateway, () => model, {
+  await new AgentRuntime(services, () => model, {
     storeArtifact: async (_run, _toolName, output) => {
       capturedOutput = output;
 
@@ -404,16 +418,18 @@ it('stores a large tool output and sends only a bounded reference to the model',
     },
   }).execute(profile.id, run.id);
 
-  expect((await gateway.run(profile.id, run.id)).status).toBe('completed');
+  expect((await services.runs.run(profile.id, run.id)).status).toBe('completed');
   expect(JSON.stringify(capturedOutput)).toContain('result-0:');
   expect(secondPrompt).toContain('00000000-0000-4000-8000-000000000001');
   expect(secondPrompt).not.toContain('x'.repeat(3900));
 
-  expect(JSON.stringify(await gateway.checkpoints(profile.id, run.id))).toContain(
+  expect(JSON.stringify(await services.lifecycle.checkpoints(profile.id, run.id))).toContain(
     '00000000-0000-4000-8000-000000000001',
   );
 
-  expect(JSON.stringify(await gateway.store.events(profile.id, 0))).not.toContain('x'.repeat(3900));
+  expect(JSON.stringify(await services.store.events(profile.id, 0))).not.toContain(
+    'x'.repeat(3900),
+  );
 });
 
 it('redacts an escaped host credential from tool prompts, artifacts, checkpoints and final output', async () => {
@@ -424,9 +440,9 @@ it('redacts an escaped host credential from tool prompts, artifacts, checkpoints
   process.env.ELOS_PROVIDER_TEST = secret;
 
   try {
-    const { gateway, profile, run } = await fixture();
+    const { services, profile, run } = await fixture();
 
-    await gateway.remember(profile.id, {
+    await services.memories.remember(profile.id, {
       key: 'hidden',
       content: `${secret}${'x'.repeat(3800)}`,
       expectedVersion: 0,
@@ -457,7 +473,7 @@ it('redacts an escaped host credential from tool prompts, artifacts, checkpoints
       },
     });
 
-    await new AgentRuntime(gateway, () => model, {
+    await new AgentRuntime(services, () => model, {
       storeArtifact: async (_run, _toolName, output) => {
         artifact = output;
 
@@ -468,12 +484,12 @@ it('redacts an escaped host credential from tool prompts, artifacts, checkpoints
       },
     }).execute(profile.id, run.id);
 
-    const result = await gateway.run(profile.id, run.id);
+    const result = await services.runs.run(profile.id, run.id);
 
     const durable = JSON.stringify({
       artifact,
-      checkpoints: await gateway.checkpoints(profile.id, run.id),
-      events: await gateway.store.events(profile.id, 0),
+      checkpoints: await services.lifecycle.checkpoints(profile.id, run.id),
+      events: await services.store.events(profile.id, 0),
       output: result.output,
     });
 
@@ -492,11 +508,11 @@ it('redacts an escaped host credential from tool prompts, artifacts, checkpoints
 });
 
 it('creates a child profile without inheriting provider credential access', async () => {
-  const gateway = new Gateway(new MemoryStore());
-  const profile = await gateway.createProfile({ ...input, allowSelfManagement: true });
-  const session = await gateway.createSession(profile.id, { title: 'Parent' });
+  const services = testServices();
+  const profile = await services.profiles.createProfile({ ...input, allowSelfManagement: true });
+  const session = await services.sessions.createSession(profile.id, { title: 'Parent' });
 
-  const run = await gateway.submit(profile.id, session.id, {
+  const run = await services.runs.submit(profile.id, session.id, {
     text: 'Create a child',
     requestKey: 'child',
   });
@@ -527,9 +543,11 @@ it('creates a child profile without inheriting provider credential access', asyn
     },
   });
 
-  await new AgentRuntime(gateway, () => model).execute(profile.id, run.id);
+  await new AgentRuntime(services, () => model).execute(profile.id, run.id);
 
-  const child = (await gateway.profiles()).find((candidate) => candidate.name === 'Child');
+  const child = (await services.profiles.profiles()).find(
+    (candidate) => candidate.name === 'Child',
+  );
 
   expect(child?.model.apiKeyEnv).toBeUndefined();
   expect(child?.model.credentialId).toBeUndefined();
@@ -537,7 +555,7 @@ it('creates a child profile without inheriting provider credential access', asyn
 });
 
 it('does not report completion when the agent exhausts its tool budget', async () => {
-  const { gateway, profile, run } = await fixture();
+  const { services, profile, run } = await fixture();
   let calls = 0;
 
   const model = new MockLanguageModelV4({
@@ -557,20 +575,22 @@ it('does not report completion when the agent exhausts its tool budget', async (
     }),
   });
 
-  await new AgentRuntime(gateway, () => model).execute(profile.id, run.id);
-  expect((await gateway.run(profile.id, run.id)).status).toBe('failed');
+  await new AgentRuntime(services, () => model).execute(profile.id, run.id);
+  expect((await services.runs.run(profile.id, run.id)).status).toBe('failed');
 
   expect(
-    (await gateway.messages(profile.id, run.sessionId)).filter((m) => m.role === 'assistant'),
+    (await services.sessions.messages(profile.id, run.sessionId)).filter(
+      (m) => m.role === 'assistant',
+    ),
   ).toHaveLength(0);
 });
 
 it('versions self-managed skills without accepting new capability grants', async () => {
-  const gateway = new Gateway(new MemoryStore());
-  const profile = await gateway.createProfile({ ...input, allowSelfManagement: true });
-  const session = await gateway.createSession(profile.id, { title: 'Skills' });
+  const services = testServices();
+  const profile = await services.profiles.createProfile({ ...input, allowSelfManagement: true });
+  const session = await services.sessions.createSession(profile.id, { title: 'Skills' });
 
-  const run = await gateway.submit(profile.id, session.id, {
+  const run = await services.runs.submit(profile.id, session.id, {
     text: 'Save a release skill',
     requestKey: 'skill',
   });
@@ -610,10 +630,10 @@ it('versions self-managed skills without accepting new capability grants', async
     },
   });
 
-  await new AgentRuntime(gateway, () => model).execute(profile.id, run.id);
-  expect((await gateway.run(profile.id, run.id)).status).toBe('completed');
+  await new AgentRuntime(services, () => model).execute(profile.id, run.id);
+  expect((await services.runs.run(profile.id, run.id)).status).toBe('completed');
 
-  const updated = await gateway.profile(profile.id);
+  const updated = await services.profiles.profile(profile.id);
 
   expect(updated.version).toBe(2);
   expect(updated.skills[0]?.name).toBe('release');

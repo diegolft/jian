@@ -1,10 +1,10 @@
 import { MockLanguageModelV4 } from 'ai/test';
 import { PgBoss } from 'pg-boss';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { Gateway } from '../src/gateway.js';
 import { PostgresStore } from '../src/postgres.js';
 import { RunQueue } from '../src/queue.js';
 import { AgentRuntime } from '../src/runtime.js';
+import { buildServices } from '../src/services.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -14,7 +14,7 @@ if (!databaseUrl) {
 
 const connectionString = databaseUrl;
 const store = new PostgresStore(connectionString);
-const gateway = new Gateway(store);
+const services = { ...buildServices({ store }), store };
 
 const input = {
   name: 'CI',
@@ -32,35 +32,35 @@ afterAll(async () => {
 
 describe('PostgreSQL durability', () => {
   it('serializes concurrent submissions and persists state across connections', async () => {
-    const profile = await gateway.createProfile(input);
-    const session = await gateway.createSession(profile.id, { title: 'One' });
+    const profile = await services.profiles.createProfile(input);
+    const session = await services.sessions.createSession(profile.id, { title: 'One' });
 
     const submits = await Promise.all(
       Array.from({ length: 8 }, () =>
-        gateway.submit(profile.id, session.id, { text: 'Hello', requestKey: 'same' }),
+        services.runs.submit(profile.id, session.id, { text: 'Hello', requestKey: 'same' }),
       ),
     );
 
     expect(new Set(submits.map((r) => r.id)).size).toBe(1);
-    expect(await gateway.messages(profile.id, session.id)).toHaveLength(1);
+    expect(await services.sessions.messages(profile.id, session.id)).toHaveLength(1);
 
     const second = new PostgresStore(connectionString);
 
     try {
-      expect((await new Gateway(second).profile(profile.id)).name).toBe('CI');
+      expect((await buildServices({ store: second }).profiles.profile(profile.id)).name).toBe('CI');
     } finally {
       await second.close();
     }
 
     const claims = await Promise.all(
-      submits.map((r, i) => gateway.claim(r.id, profile.id, `worker-${i}`)),
+      submits.map((r, i) => services.lifecycle.claim(r.id, profile.id, `worker-${i}`)),
     );
 
     expect(claims.filter(Boolean)).toHaveLength(1);
   });
 
   it('rolls back record writes and events together', async () => {
-    const profile = await gateway.createProfile(input);
+    const profile = await services.profiles.createProfile(input);
 
     await expect(
       store.transaction(profile.id, async (tx) => {
@@ -77,7 +77,7 @@ describe('PostgreSQL durability', () => {
       }),
     ).rejects.toThrow('rollback');
 
-    expect((await gateway.profile(profile.id)).name).toBe('CI');
+    expect((await services.profiles.profile(profile.id)).name).toBe('CI');
     expect((await store.events(profile.id, 0)).map((e) => e.type)).toEqual(['profile.created']);
   });
 
@@ -94,12 +94,12 @@ describe('PostgreSQL durability', () => {
       }),
     });
 
-    const runtime = new AgentRuntime(gateway, () => model);
-    const queue = new RunQueue(new PgBoss(connectionString), gateway, runtime, () => {});
-    const profile = await gateway.createProfile(input);
-    const session = await gateway.createSession(profile.id, { title: 'Queue' });
+    const runtime = new AgentRuntime(services, () => model);
+    const queue = new RunQueue(new PgBoss(connectionString), services, runtime, () => {});
+    const profile = await services.profiles.createProfile(input);
+    const session = await services.sessions.createSession(profile.id, { title: 'Queue' });
 
-    const run = await gateway.submit(profile.id, session.id, {
+    const run = await services.runs.submit(profile.id, session.id, {
       text: 'Hello',
       requestKey: 'queue',
     });
@@ -108,13 +108,13 @@ describe('PostgreSQL durability', () => {
       await queue.start();
 
       await expect
-        .poll(async () => (await gateway.run(profile.id, run.id)).status, {
+        .poll(async () => (await services.runs.run(profile.id, run.id)).status, {
           timeout: 20_000,
           interval: 200,
         })
         .toBe('completed');
 
-      expect((await gateway.messages(profile.id, session.id)).at(-1)?.content).toBe(
+      expect((await services.sessions.messages(profile.id, session.id)).at(-1)?.content).toBe(
         'Hello from the worker',
       );
     } finally {
@@ -126,16 +126,16 @@ describe('PostgreSQL durability', () => {
 it('applies migrations repeatedly and searches old records through stable cursors', async () => {
   await store.migrate();
 
-  const profile = await gateway.createProfile(input);
-  const session = await gateway.createSession(profile.id, { title: 'Search' });
+  const profile = await services.profiles.createProfile(input);
+  const session = await services.sessions.createSession(profile.id, { title: 'Search' });
 
   for (let index = 0; index < 4; index += 1) {
-    const run = await gateway.submit(profile.id, session.id, {
+    const run = await services.runs.submit(profile.id, session.id, {
       text: `deployment ${index}`,
       requestKey: `search-${index}`,
     });
 
-    await gateway.cancel(profile.id, run.id);
+    await services.runs.cancel(profile.id, run.id);
   }
 
   const first = await store.list('message', {
@@ -156,7 +156,7 @@ it('applies migrations repeatedly and searches old records through stable cursor
   expect(first.map((message) => message.content)).toEqual(['deployment 3', 'deployment 2']);
   expect(next.map((message) => message.content)).toEqual(['deployment 1', 'deployment 0']);
 
-  await gateway.remember(profile.id, {
+  await services.memories.remember(profile.id, {
     key: 'deployment',
     content: 'At 21:00',
     expectedVersion: 0,

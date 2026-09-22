@@ -3,13 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { fitPrompt, tokenCounter } from '../src/context/budget.js';
 import { buildContext } from '../src/context/build.js';
-import { Gateway } from '../src/gateway.js';
-import { MemoryStore } from './helpers/memory-store.js';
+import { testServices } from './helpers/services.js';
 
 async function fixture() {
-  const gateway = new Gateway(new MemoryStore());
+  const services = testServices();
 
-  const profile = await gateway.createProfile({
+  const profile = await services.profiles.createProfile({
     name: 'Atlas',
     instructions: 'Help the owner.',
     identity: {
@@ -24,58 +23,58 @@ async function fixture() {
     ],
   });
 
-  const session = await gateway.createSession(profile.id, { title: 'Test' });
+  const session = await services.sessions.createSession(profile.id, { title: 'Test' });
 
-  const run = await gateway.submit(profile.id, session.id, {
+  const run = await services.runs.submit(profile.id, session.id, {
     text: 'When was the deployment?',
     requestKey: 'one',
   });
 
-  return { gateway, profile, session, run };
+  return { services, profile, session, run };
 }
 
 describe('context', () => {
   it('retains a Unicode current turn when the older-history budget is zero', async () => {
-    const gateway = new Gateway(new MemoryStore());
+    const services = testServices();
 
-    const profile = await gateway.createProfile({
+    const profile = await services.profiles.createProfile({
       name: 'Zero history',
       instructions: 'Help.',
       model: { provider: 'openai', modelId: 'gpt-4o', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
       contextPolicy: { historyTokens: 0 },
     });
 
-    const session = await gateway.createSession(profile.id, { title: 'Unicode' });
+    const session = await services.sessions.createSession(profile.id, { title: 'Unicode' });
 
-    const run = await gateway.submit(profile.id, session.id, {
+    const run = await services.runs.submit(profile.id, session.id, {
       text: 'Olá 世界 🌍',
       requestKey: 'current',
     });
 
-    const context = await gateway.context(run);
+    const context = await services.contexts.context(run);
 
     expect(context.messages).toEqual([{ role: 'user', content: 'Olá 世界 🌍' }]);
   });
 
   it('includes structured identity and a skill catalog while selecting relevant memories', async () => {
-    const { gateway, profile, run } = await fixture();
+    const { services, profile, run } = await fixture();
 
-    await gateway.remember(profile.id, {
+    await services.memories.remember(profile.id, {
       key: 'deployment',
       content: 'Deployment completed at 21:00',
       expectedVersion: 0,
     });
 
-    await gateway.remember(profile.id, {
+    await services.memories.remember(profile.id, {
       key: 'weather',
       content: 'Forecast is sunny',
       expectedVersion: 0,
     });
 
     const context = buildContext(run, {
-      memories: await gateway.memories(profile.id),
+      memories: await services.memories.memories(profile.id),
       activities: [],
-      history: await gateway.messages(profile.id, run.sessionId),
+      history: await services.sessions.messages(profile.id, run.sessionId),
     });
 
     expect(context.system).toContain('Researcher');

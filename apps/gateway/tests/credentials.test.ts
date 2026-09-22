@@ -1,30 +1,29 @@
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { Gateway } from '../src/gateway.js';
 import { SecretBox } from '../src/security/crypto.js';
 import { Credentials } from '../src/services/credentials.js';
-import { MemoryStore } from './helpers/memory-store.js';
+import { testServices } from './helpers/services.js';
 
 async function setup() {
-  const gateway = new Gateway(new MemoryStore());
+  const services = testServices();
 
-  const profile = await gateway.createProfile({
+  const profile = await services.profiles.createProfile({
     name: 'Test',
     instructions: 'Help.',
     model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
   });
 
   const vault = new Credentials(
-    gateway,
+    services,
     new SecretBox({ activeKeyId: 'v1', keys: { v1: randomBytes(32) } }),
   );
 
-  return { gateway, profile, vault };
+  return { services, profile, vault };
 }
 
 describe('profile credentials', () => {
   it('stores ciphertext, hides secrets in metadata and rejects cross-profile or wrong-purpose reads', async () => {
-    const { gateway, profile, vault } = await setup();
+    const { services, profile, vault } = await setup();
 
     const value = await vault.create(profile.id, {
       label: 'Provider',
@@ -34,7 +33,7 @@ describe('profile credentials', () => {
 
     expect(JSON.stringify(value)).not.toContain('synthetic-secret');
 
-    expect(JSON.stringify(await gateway.store.get('credential', value.id))).not.toContain(
+    expect(JSON.stringify(await services.store.get('credential', value.id))).not.toContain(
       'synthetic-secret',
     );
 
@@ -50,7 +49,7 @@ describe('profile credentials', () => {
   });
 
   it('issues hashed expiring keys, enforces scope and revokes immediately', async () => {
-    const { gateway, profile, vault } = await setup();
+    const { services, profile, vault } = await setup();
 
     const key = await vault.issueKey(profile.id, {
       label: 'Mac',
@@ -58,7 +57,7 @@ describe('profile credentials', () => {
       expiresAt: new Date(Date.now() + 60000).toISOString(),
     });
 
-    expect(JSON.stringify(await gateway.store.get('accessKey', key.id))).not.toContain(key.token);
+    expect(JSON.stringify(await services.store.get('accessKey', key.id))).not.toContain(key.token);
     await expect(vault.authorize(key.token, profile.id, 'read')).resolves.toBeUndefined();
     await expect(vault.authorize(key.token, profile.id, 'chat')).rejects.toThrow();
 

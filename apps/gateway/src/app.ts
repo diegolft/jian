@@ -5,7 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { LogController } from 'fastify';
 import type { WhatsAppConnections } from './channels/whatsapp/connections.js';
 import { GatewayError } from './core/errors.js';
-import type { Gateway } from './gateway.js';
+import type { Store } from './core/store.js';
 import { registerEventRoutes } from './http/events.js';
 import { closePanelSession, openPanelSession } from './http/panel-session.js';
 import { configureSecurity } from './http/security.js';
@@ -14,25 +14,27 @@ import type { CodexLogin } from './providers/codex/login.js';
 import type { Channels } from './services/channels.js';
 import { Coordination } from './services/coordination.js';
 import type { Credentials } from './services/credentials.js';
+import type { Services } from './services.js';
 
-export function createApp(options: {
-  gateway: Gateway;
-  token: string;
-  logger?: boolean;
-  credentials?: Credentials;
-  codexLogin?: CodexLogin;
-  channels?: Channels;
-  whatsapp?: WhatsAppConnections;
-  maxStreams?: number;
-  uiRoot?: string;
-  onCancel?: (runId: string) => void;
-}) {
+export function createApp(
+  options: Services & {
+    store: Store;
+    token: string;
+    logger?: boolean;
+    credentials?: Credentials;
+    codexLogin?: CodexLogin;
+    channels?: Channels;
+    whatsapp?: WhatsAppConnections;
+    maxStreams?: number;
+    uiRoot?: string;
+    onCancel?: (runId: string) => void;
+  },
+) {
   if (options.token.length < 32) {
     throw new Error('ELOS_API_TOKEN must have at least 32 characters');
   }
 
-  const gateway = options.gateway;
-  const coordination = new Coordination(gateway);
+  const coordination = new Coordination(options);
 
   const app = Fastify({
     logger:
@@ -108,35 +110,38 @@ export function createApp(options: {
   );
 
   app.delete('/v1/panel/session', async (request, reply) => closePanelSession(request, reply));
-  app.get('/v1/profiles', async () => gateway.profiles());
+  app.get('/v1/profiles', async () => options.profiles.profiles());
 
   app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/providers', async (request) =>
-    gateway.providers(request.params.profileId),
+    options.providers.providers(request.params.profileId),
   );
 
   app.post<{ Params: ProfileParams }>('/v1/profiles/:profileId/providers', async (request, reply) =>
-    reply.code(201).send(await gateway.createProvider(request.params.profileId, request.body)),
+    reply
+      .code(201)
+      .send(await options.providers.createProvider(request.params.profileId, request.body)),
   );
 
   app.delete<{ Params: ProfileParams & { providerId: string } }>(
     '/v1/profiles/:profileId/providers/:providerId',
-    async (request) => gateway.revokeProvider(request.params.profileId, request.params.providerId),
+    async (request) =>
+      options.providers.revokeProvider(request.params.profileId, request.params.providerId),
   );
 
   app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/model-defaults', async (request) =>
-    gateway.modelDefaults(request.params.profileId),
+    options.providers.modelDefaults(request.params.profileId),
   );
 
   app.put<{ Params: ProfileParams }>('/v1/profiles/:profileId/model-defaults', async (request) =>
-    gateway.setModelDefaults(request.params.profileId, request.body),
+    options.providers.setModelDefaults(request.params.profileId, request.body),
   );
 
   app.post('/v1/profiles', async (request, reply) =>
-    reply.code(201).send(await gateway.createProfile(request.body)),
+    reply.code(201).send(await options.profiles.createProfile(request.body)),
   );
 
   app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId', async (request) =>
-    gateway.profile(request.params.profileId),
+    options.profiles.profile(request.params.profileId),
   );
 
   app.patch<{ Params: ProfileParams }>('/v1/profiles/:profileId', async (request) => {
@@ -148,24 +153,27 @@ export function createApp(options: {
       }
     }
 
-    return gateway.updateProfile(request.params.profileId, request.body);
+    return options.profiles.updateProfile(request.params.profileId, request.body);
   });
 
   app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/revisions', async (request) =>
-    gateway.revisions(request.params.profileId),
+    options.profiles.revisions(request.params.profileId),
   );
 
   app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/sessions', async (request) =>
-    gateway.sessions(request.params.profileId),
+    options.sessions.sessions(request.params.profileId),
   );
 
   app.post<{ Params: ProfileParams }>('/v1/profiles/:profileId/sessions', async (request, reply) =>
-    reply.code(201).send(await gateway.createSession(request.params.profileId, request.body)),
+    reply
+      .code(201)
+      .send(await options.sessions.createSession(request.params.profileId, request.body)),
   );
 
   app.get<{ Params: SessionParams }>(
     '/v1/profiles/:profileId/sessions/:sessionId/messages',
-    async (request) => gateway.messages(request.params.profileId, request.params.sessionId),
+    async (request) =>
+      options.sessions.messages(request.params.profileId, request.params.sessionId),
   );
 
   app.post<{ Params: SessionParams }>(
@@ -174,28 +182,32 @@ export function createApp(options: {
       reply
         .code(202)
         .send(
-          await gateway.submit(request.params.profileId, request.params.sessionId, request.body),
+          await options.runs.submit(
+            request.params.profileId,
+            request.params.sessionId,
+            request.body,
+          ),
         ),
   );
 
   app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/memories', async (request) =>
-    gateway.memories(request.params.profileId),
+    options.memories.memories(request.params.profileId),
   );
 
   app.put<{ Params: ProfileParams }>('/v1/profiles/:profileId/memories', async (request) =>
-    gateway.remember(request.params.profileId, request.body),
+    options.memories.remember(request.params.profileId, request.body),
   );
 
   app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/activities', async (request) =>
-    gateway.activities(request.params.profileId),
+    options.runs.activities(request.params.profileId),
   );
 
   app.get<{ Params: RunParams }>('/v1/profiles/:profileId/runs/:runId', async (request) =>
-    gateway.run(request.params.profileId, request.params.runId),
+    options.runs.run(request.params.profileId, request.params.runId),
   );
 
   app.post<{ Params: RunParams }>('/v1/profiles/:profileId/runs/:runId/cancel', async (request) => {
-    const result = await gateway.cancel(request.params.profileId, request.params.runId);
+    const result = await options.runs.cancel(request.params.profileId, request.params.runId);
 
     options.onCancel?.(result.id);
 
@@ -237,7 +249,8 @@ export function createApp(options: {
 
   app.get<{ Params: RunParams }>(
     '/v1/profiles/:profileId/runs/:runId/checkpoints',
-    async (request) => gateway.checkpoints(request.params.profileId, request.params.runId),
+    async (request) =>
+      options.lifecycle.checkpoints(request.params.profileId, request.params.runId),
   );
 
   app.post<{ Params: RunParams }>(
@@ -246,7 +259,11 @@ export function createApp(options: {
       reply
         .code(202)
         .send(
-          await gateway.continueRun(request.params.profileId, request.params.runId, request.body),
+          await options.runs.continueRun(
+            request.params.profileId,
+            request.params.runId,
+            request.body,
+          ),
         ),
   );
 

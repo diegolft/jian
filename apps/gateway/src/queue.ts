@@ -1,5 +1,6 @@
 import type { PgBoss } from 'pg-boss';
-import type { Gateway } from './gateway.js';
+import type { Store } from './core/store.js';
+import type { RunLifecycle } from './runs/lifecycle.js';
 import type { AgentRuntime } from './runtime.js';
 
 const queueName = 'elos-agent-runs';
@@ -11,7 +12,7 @@ export class RunQueue {
 
   constructor(
     private boss: PgBoss,
-    private gateway: Gateway,
+    private services: { lifecycle: RunLifecycle; store: Store },
     private runtime: AgentRuntime,
     private report: (message: string) => void = console.error,
   ) {}
@@ -41,9 +42,9 @@ export class RunQueue {
   }
 
   private async dispatch() {
-    await this.gateway.recover();
+    await this.services.lifecycle.recover();
 
-    const queued = await this.gateway.store.list('run', {
+    const queued = await this.services.store.list('run', {
       where: { status: 'queued' },
       limit: 1000,
     });
