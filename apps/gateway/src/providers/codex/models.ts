@@ -1,0 +1,60 @@
+import { z } from 'zod';
+import { accountHeaders } from './model.js';
+
+/**
+ * The account's own catalog, which is the only place a ChatGPT login learns what it may call.
+ *
+ * `client_version` is read as a Codex CLI version and decides what the backend will show: it
+ * hides anything whose minimum version is newer, and the request is refused outright without
+ * it. The zero sentinel asks for everything the account has.
+ */
+const CATALOG = 'https://chatgpt.com/backend-api/codex/models?client_version=0.0.0';
+
+const catalog = z.object({
+  models: z
+    .array(
+      z.looseObject({
+        slug: z.string().min(1),
+        display_name: z.string().optional().catch(undefined),
+        visibility: z.string().optional().catch(undefined),
+        priority: z.number().optional().catch(undefined),
+      }),
+    )
+    .optional(),
+});
+
+export type CodexModel = { id: string; displayName?: string };
+
+export async function listCodexModels(
+  accessToken: string,
+  fetcher: typeof globalThis.fetch,
+): Promise<CodexModel[]> {
+  const headers = accountHeaders(accessToken);
+
+  // Without the account header the backend answers 200 with an empty catalog, which would read
+  // as "this account has no models" instead of as a request that was never properly addressed.
+  if (!headers['ChatGPT-Account-ID']) {
+    throw new Error('O token do ChatGPT não identifica a conta; entre novamente.');
+  }
+
+  const response = await fetcher(CATALOG, {
+    headers: { accept: 'application/json', authorization: `Bearer ${accessToken}`, ...headers },
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (!response.ok) {
+    // The body can echo the token back; only the status is safe to surface.
+    throw new Error(`O ChatGPT respondeu ${response.status} ao listar modelos.`);
+  }
+
+  const parsed = catalog.parse(await response.json());
+
+  return (parsed.models ?? [])
+    .filter((model) => !['hide', 'hidden'].includes(model.visibility ?? ''))
+    .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0) || a.slug.localeCompare(b.slug))
+    .map((model) => ({
+      id: model.slug,
+      ...(model.display_name ? { displayName: model.display_name } : {}),
+    }))
+    .slice(0, 200);
+}

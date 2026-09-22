@@ -2,7 +2,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 
 const endpoint = 'https://chatgpt.com/backend-api/codex';
 
-function accountHeaders(token: string) {
+export function accountHeaders(token: string) {
   try {
     const payload = JSON.parse(
       Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8'),

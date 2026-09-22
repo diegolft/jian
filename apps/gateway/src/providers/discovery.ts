@@ -11,6 +11,7 @@ import type { GatewayVault } from '../security/gateway-vault.js';
 import { bareModelId, modelCapabilities } from './capabilities.js';
 import type { ProviderKind } from './catalog.js';
 import type { ModelCatalog } from './catalog-source.js';
+import { listCodexModels } from './codex/models.js';
 import type { ProviderAdmin } from './port.js';
 import { providerSecret } from './service.js';
 
@@ -143,6 +144,8 @@ export interface ProviderModelOptions {
   env?: NodeJS.ProcessEnv;
   clock?: Clock;
   catalog?: ModelCatalog;
+  /** Absent means a ChatGPT login cannot be listed; its models are then typed by hand. */
+  codexLogin?: { accessToken(providerId: string): Promise<string> };
 }
 
 /**
@@ -159,6 +162,7 @@ export class ProviderModels {
   private readonly inflight = new Map<string, Promise<ProviderModelList>>();
   private readonly ttlMs: number;
   private readonly catalog: ModelCatalog | undefined;
+  private readonly codexLogin: ProviderModelOptions['codexLogin'];
   private readonly env: NodeJS.ProcessEnv;
   private readonly clock: Clock;
 
@@ -169,6 +173,7 @@ export class ProviderModels {
   ) {
     this.ttlMs = options.ttlMs ?? 60_000;
     this.catalog = options.catalog;
+    this.codexLogin = options.codexLogin;
     this.env = options.env ?? process.env;
     this.clock = options.clock ?? Date.now;
   }
@@ -241,8 +246,7 @@ export class ProviderModels {
 
   private async fetchModels(provider: ProviderRecord) {
     if (provider.authMode === 'codex') {
-      // The ChatGPT device login talks to the Codex backend, which publishes no model index.
-      throw new Error('O login ChatGPT não expõe uma lista de modelos; informe o ID do modelo.');
+      return this.fetchCodexModels(provider);
     }
 
     const kind = provider.kind as ProviderKind;
@@ -272,6 +276,28 @@ export class ProviderModels {
     await this.catalog?.prime();
 
     return parse(kind, await response.json(), this.catalog);
+  }
+
+  /**
+   * A ChatGPT login has its own catalog, on the Codex backend rather than on the API. The
+   * token is taken from the login service so an expired one is refreshed rather than refused,
+   * and the capabilities still come from the public catalog like any other model's.
+   */
+  private async fetchCodexModels(provider: ProviderRecord): Promise<ProviderModel[]> {
+    if (!this.codexLogin) {
+      throw new Error('O login ChatGPT não está disponível neste gateway.');
+    }
+
+    const token = await this.codexLogin.accessToken(provider.id);
+    const listed = await listCodexModels(token, this.fetcher);
+
+    await this.catalog?.prime();
+
+    return listed.map((model) => ({
+      id: model.id,
+      ...(model.displayName ? { displayName: model.displayName.slice(0, 200) } : {}),
+      ...modelCapabilities('openai', model.id, undefined, this.catalog?.lookup('openai', model.id)),
+    }));
   }
 
   private async apiKey(provider: ProviderRecord) {

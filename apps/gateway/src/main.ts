@@ -86,7 +86,7 @@ const codexLogin = new CodexLogin(services, gatewayVault);
 const providerModels = new ProviderModels(
   { providers: services.providers, vault: gatewayVault },
   outbound.fetch,
-  { catalog },
+  { catalog, codexLogin },
 );
 
 // A profile answers as soon as a provider exists: with no model chosen, one is taken from what
