@@ -118,7 +118,7 @@ it('offers a model the capability table does not know, marked and held to the fl
   expect(known?.reasoningEfforts).toContain('high');
   expect(unknown).toMatchObject({
     known: false,
-    contextWindow: 8192,
+    contextWindow: 128_000,
     reasoningEfforts: [],
     inputModalities: ['text'],
   });
@@ -165,4 +165,53 @@ it('keeps model discovery admin-only and inside the profile', async () => {
   });
 
   expect(crossed.statusCode).toBe(404);
+});
+
+it('takes the router listing as the whole truth about a model', async () => {
+  const services = await testServices();
+  const profile = await services.profiles.createProfile({ name: 'Atlas', instructions: 'Help.' });
+
+  const provider = await services.providers.createProvider(profile.id, {
+    name: 'OpenRouter',
+    kind: 'openrouter',
+    secret: 'synthetic-key',
+  });
+
+  const fetcher = (async () =>
+    Response.json({
+      data: [
+        {
+          id: 'anthropic/claude-sonnet-5',
+          name: 'Claude Sonnet 5',
+          context_length: 1_000_000,
+          top_provider: { max_completion_tokens: 128_000 },
+          architecture: { input_modalities: ['text', 'image', 'file'] },
+          supported_parameters: ['reasoning_effort', 'tools'],
+        },
+        {
+          id: 'some/plain-model',
+          context_length: 32_768,
+          top_provider: { max_completion_tokens: null },
+          architecture: { input_modalities: ['text'] },
+          supported_parameters: ['tools'],
+        },
+      ],
+    })) as typeof globalThis.fetch;
+
+  const list = await new ProviderModels(services, fetcher).list(profile.id, provider.id);
+  const sonnet = list.models.find((model) => model.id === 'anthropic/claude-sonnet-5');
+  const plain = list.models.find((model) => model.id === 'some/plain-model');
+
+  // Reported, not guessed: no row for either model exists in the capability table.
+  expect(sonnet).toMatchObject({
+    known: true,
+    contextWindow: 1_000_000,
+    maxOutputTokens: 128_000,
+    displayName: 'Claude Sonnet 5',
+  });
+  expect(sonnet?.inputModalities).toEqual(['text', 'image', 'pdf']);
+  expect(sonnet?.reasoningEfforts).toContain('high');
+
+  expect(plain).toMatchObject({ known: true, contextWindow: 32_768 });
+  expect(plain?.reasoningEfforts).toEqual([]);
 });

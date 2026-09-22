@@ -50,7 +50,7 @@ ps: ## Show the state of the production containers
 
 ##@ Development
 
-dev: ## Run the gateway on :4310 and the panel on :3000, both reloading
+dev: db-up ## Run the gateway on :4310 and the panel on :3000, both reloading
 	pnpm run dev
 
 db-up: ## Start the development PostgreSQL on 127.0.0.1:5432

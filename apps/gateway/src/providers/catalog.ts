@@ -18,6 +18,13 @@ export const providerCatalog = {
     name: 'OpenAI',
     env: ['OPENAI_API_KEY'],
   },
+  // One key for every model the router carries, and the only listing that reports a model's
+  // window, output ceiling, modalities and whether it takes an effort — so nothing about an
+  // OpenRouter model is guessed here.
+  openrouter: {
+    name: 'OpenRouter',
+    env: ['OPENROUTER_API_KEY'],
+  },
 } as const;
 
 export type ProviderKind = keyof typeof providerCatalog;

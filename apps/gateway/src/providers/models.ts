@@ -35,6 +35,14 @@ export function resolveModel(
       return createOpenAI({ apiKey, baseURL: config.baseURL, fetch: fetcher })(config.modelId);
     case 'openai-codex':
       return createCodexModel(apiKey, config.modelId, fetcher);
+    case 'openrouter':
+      // The router speaks the OpenAI shape; its model ids carry the vendor prefix as given.
+      return createOpenAICompatible({
+        name: 'openrouter',
+        apiKey,
+        baseURL: config.baseURL ?? 'https://openrouter.ai/api/v1',
+        fetch: fetcher,
+      }).chatModel(config.modelId);
     case 'anthropic':
       return createAnthropic({
         ...(config.providerId ||

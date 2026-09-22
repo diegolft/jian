@@ -504,7 +504,8 @@
                         "enum": [
                           "openai",
                           "anthropic",
-                          "google"
+                          "google",
+                          "openrouter"
                         ]
                       },
                       "apiKeyEnv": {
@@ -761,7 +762,8 @@
                     "enum": [
                       "openai",
                       "anthropic",
-                      "google"
+                      "google",
+                      "openrouter"
                     ]
                   },
                   "secret": {
@@ -799,7 +801,8 @@
                       "enum": [
                         "openai",
                         "anthropic",
-                        "google"
+                        "google",
+                        "openrouter"
                       ]
                     },
                     "apiKeyEnv": {
@@ -1380,7 +1383,8 @@
                       "enum": [
                         "openai",
                         "anthropic",
-                        "google"
+                        "google",
+                        "openrouter"
                       ]
                     },
                     "apiKeyEnv": {
@@ -3405,6 +3409,7 @@
                             "openai",
                             "anthropic",
                             "google",
+                            "openrouter",
                             "openai-compatible",
                             "openai-codex"
                           ]
@@ -10650,6 +10655,7 @@
                             "openai",
                             "anthropic",
                             "google",
+                            "openrouter",
                             "openai-compatible",
                             "openai-codex"
                           ]
@@ -11183,6 +11189,7 @@
                               "openai",
                               "anthropic",
                               "google",
+                              "openrouter",
                               "openai-compatible",
                               "openai-codex"
                             ]
@@ -11712,6 +11719,7 @@
                           "openai",
                           "anthropic",
                           "google",
+                          "openrouter",
                           "openai-compatible",
                           "openai-codex"
                         ]
@@ -12012,6 +12020,7 @@
                             "openai",
                             "anthropic",
                             "google",
+                            "openrouter",
                             "openai-compatible",
                             "openai-codex"
                           ]
@@ -12554,6 +12563,7 @@
                             "openai",
                             "anthropic",
                             "google",
+                            "openrouter",
                             "openai-compatible",
                             "openai-codex"
                           ]
@@ -13088,6 +13098,7 @@
                           "openai",
                           "anthropic",
                           "google",
+                          "openrouter",
                           "openai-compatible",
                           "openai-codex"
                         ]
@@ -13374,6 +13385,7 @@
                             "openai",
                             "anthropic",
                             "google",
+                            "openrouter",
                             "openai-compatible",
                             "openai-codex"
                           ]
@@ -13929,6 +13941,7 @@
                                   "openai",
                                   "anthropic",
                                   "google",
+                                  "openrouter",
                                   "openai-compatible",
                                   "openai-codex"
                                 ]
@@ -15385,6 +15398,7 @@
                             "openai",
                             "anthropic",
                             "google",
+                            "openrouter",
                             "openai-compatible",
                             "openai-codex"
                           ]
@@ -16407,6 +16421,7 @@
                               "openai",
                               "anthropic",
                               "google",
+                              "openrouter",
                               "openai-compatible",
                               "openai-codex"
                             ]
@@ -16934,6 +16949,7 @@
                             "openai",
                             "anthropic",
                             "google",
+                            "openrouter",
                             "openai-compatible",
                             "openai-codex"
                           ]
@@ -17460,6 +17476,7 @@
                             "openai",
                             "anthropic",
                             "google",
+                            "openrouter",
                             "openai-compatible",
                             "openai-codex"
                           ]

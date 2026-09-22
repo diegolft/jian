@@ -16,7 +16,14 @@ const endpointSchema = z.url().refine((value) => {
 
 export const modelSchema = z
   .strictObject({
-    provider: z.enum(['openai', 'anthropic', 'google', 'openai-compatible', 'openai-codex']),
+    provider: z.enum([
+      'openai',
+      'anthropic',
+      'google',
+      'openrouter',
+      'openai-compatible',
+      'openai-codex',
+    ]),
     modelId: z.string().trim().min(1).max(160),
     apiKeyEnv: z
       .string()

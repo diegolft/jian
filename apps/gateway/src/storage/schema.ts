@@ -71,7 +71,12 @@ export const profileRevisions = pgTable(
   ],
 );
 
-export const providerKind = pgEnum('provider_kind', ['openai', 'anthropic', 'google']);
+export const providerKind = pgEnum('provider_kind', [
+  'openai',
+  'anthropic',
+  'google',
+  'openrouter',
+]);
 
 export const providers = pgTable(
   'providers',

@@ -126,7 +126,8 @@ it('isolates providers and freezes the chosen model and its context budget per r
   expect(chosen.model?.modelId).toBe('gpt-4.1-mini');
   expect(chosen.contextPolicy?.inputTokens).toBe(32_000);
   expect(standard.model?.modelId).toBe('internal-preview');
-  expect(standard.contextPolicy?.inputTokens).toBe(4096);
+  // Uncatalogued, so it runs on the floor rather than on a ceiling nobody stated.
+  expect(standard.contextPolicy?.inputTokens).toBe(32_000);
   expect(JSON.stringify(chosen)).not.toContain('synthetic-api-key');
 
   await expect(

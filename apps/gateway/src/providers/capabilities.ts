@@ -5,7 +5,7 @@ import type { ProviderKind } from './catalog.js';
  * Bump whenever a row changes, so a support question about a wrong ceiling can be answered
  * with the table the installation was running.
  */
-export const capabilityTableVersion = '2026-09-22';
+export const capabilityTableVersion = '2026-09-22b';
 
 type Entry = Omit<ModelCapabilities, 'known'>;
 
@@ -19,6 +19,9 @@ type Entry = Omit<ModelCapabilities, 'known'>;
  * of falling to the floor below. A model with no row is still offered — with `known: false`.
  */
 const table: Record<ProviderKind, Record<string, Entry>> = {
+  // Empty on purpose: the router reports every model's limits itself, so a row here could
+  // only contradict it.
+  openrouter: {},
   openai: {
     'gpt-3.5-turbo': {
       contextWindow: 16_385,
@@ -148,6 +151,42 @@ const table: Record<ProviderKind, Record<string, Entry>> = {
       reasoningEfforts: ['none', 'low', 'medium', 'high'],
       inputModalities: ['text', 'image', 'pdf'],
     },
+    'claude-sonnet-5': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 128_000,
+      reasoningEfforts: ['low', 'medium', 'high'],
+      inputModalities: ['text', 'image', 'pdf'],
+    },
+    'claude-opus-5': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 128_000,
+      reasoningEfforts: ['low', 'medium', 'high'],
+      inputModalities: ['text', 'image', 'pdf'],
+    },
+    'claude-opus-4-6': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 128_000,
+      reasoningEfforts: ['low', 'medium', 'high'],
+      inputModalities: ['text', 'image', 'pdf'],
+    },
+    'claude-opus-4-7': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 128_000,
+      reasoningEfforts: ['low', 'medium', 'high'],
+      inputModalities: ['text', 'image', 'pdf'],
+    },
+    'claude-opus-4-8': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 128_000,
+      reasoningEfforts: ['low', 'medium', 'high'],
+      inputModalities: ['text', 'image', 'pdf'],
+    },
+    'claude-sonnet-4-6': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 128_000,
+      reasoningEfforts: ['low', 'medium', 'high'],
+      inputModalities: ['text', 'image', 'pdf'],
+    },
     'claude-haiku-4-5': {
       contextWindow: 200_000,
       maxOutputTokens: 64_000,
@@ -236,9 +275,14 @@ const table: Record<ProviderKind, Record<string, Entry>> = {
  * a real conversation. No reasoning effort is offered, because offering one we cannot confirm
  * would fail at the provider instead of here.
  */
+/**
+ * What an uncatalogued model is assumed to hold. Small enough to be safe on a modest model,
+ * large enough that a run with a system prompt and a tool list still fits: below this the
+ * gateway refuses the turn itself and the owner never reaches the provider's own error.
+ */
 const floor: Entry = {
-  contextWindow: 8192,
-  maxOutputTokens: 4096,
+  contextWindow: 128_000,
+  maxOutputTokens: 8192,
   reasoningEfforts: [],
   inputModalities: ['text'],
 };
@@ -250,16 +294,32 @@ const clamp = (value: number, min: number, max: number) =>
 export const bareModelId = (id: string) => id.replace(/^models\//, '');
 
 /**
- * `reported` is only used when the table has no row: some listings (Gemini) do carry token
- * limits, and the provider's own number beats our floor. It never promotes a model to
- * `known`, because efforts and modalities are still uncatalogued.
+ * `reported` is what the provider's own listing said. Token limits alone (Gemini) beat the
+ * floor but leave the model uncatalogued, because efforts and modalities are still unknown.
+ * A listing that reports all four (OpenRouter) is authoritative and needs no table row.
  */
 export function modelCapabilities(
   kind: ProviderKind,
   modelId: string,
-  reported?: { contextWindow?: number; maxOutputTokens?: number },
+  reported?: {
+    contextWindow?: number;
+    maxOutputTokens?: number;
+    reasoningEfforts?: ModelCapabilities['reasoningEfforts'];
+    inputModalities?: ModelCapabilities['inputModalities'];
+  },
 ): ModelCapabilities {
   const id = bareModelId(modelId);
+
+  if (reported?.contextWindow && reported.inputModalities?.length) {
+    return {
+      contextWindow: clamp(reported.contextWindow, 4096, 20_000_000),
+      maxOutputTokens: clamp(reported.maxOutputTokens ?? floor.maxOutputTokens, 256, 1_000_000),
+      reasoningEfforts: reported.reasoningEfforts ?? [],
+      inputModalities: reported.inputModalities,
+      known: true,
+    };
+  }
+
   const matched = Object.entries(table[kind])
     .filter(([key]) => id === key || id.startsWith(`${key}-`))
     .sort(([a], [b]) => b.length - a.length)[0];

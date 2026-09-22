@@ -49,7 +49,7 @@ export const providerModelListSchema = z.strictObject({
 /** The key travels once, on the way in. `createdAt` is the only thing said about it afterwards. */
 export const providerInputSchema = z.strictObject({
   name: z.string().trim().min(1).max(100),
-  kind: z.enum(['openai', 'anthropic', 'google']),
+  kind: z.enum(['openai', 'anthropic', 'google', 'openrouter']),
   secret: secretSchema,
 });
 

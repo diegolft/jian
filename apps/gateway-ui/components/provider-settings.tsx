@@ -25,6 +25,11 @@ type Props = {
 
 const providers = [
   {
+    kind: 'openrouter',
+    name: 'OpenRouter',
+    variables: 'OPENROUTER_API_KEY',
+  },
+  {
     kind: 'anthropic',
     name: 'Anthropic',
     variables: 'ANTHROPIC_API_KEY ou ANTHROPIC_API_TOKEN',

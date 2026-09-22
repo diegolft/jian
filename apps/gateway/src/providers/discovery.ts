@@ -1,4 +1,9 @@
-import type { ProviderModel, ProviderModelList, ProviderRecord } from '@jian/contracts';
+import type {
+  ModelCapabilities,
+  ProviderModel,
+  ProviderModelList,
+  ProviderRecord,
+} from '@jian/contracts';
 import { z } from 'zod';
 import { type Clock, nowIso } from '../core/clock.js';
 import { GatewayError } from '../core/errors.js';
@@ -13,7 +18,60 @@ const endpoints: Record<ProviderKind, string> = {
   openai: 'https://api.openai.com/v1/models',
   anthropic: 'https://api.anthropic.com/v1/models?limit=1000',
   google: 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000',
+  openrouter: 'https://openrouter.ai/api/v1/models',
 };
+
+/** What the router publishes per model; everything the capability table exists to supply. */
+const routed = z.object({
+  data: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string().optional(),
+      context_length: z.number().optional(),
+      top_provider: z.object({ max_completion_tokens: z.number().nullish() }).optional(),
+      architecture: z.object({ input_modalities: z.array(z.string()).optional() }).optional(),
+      supported_parameters: z.array(z.string()).optional(),
+    }),
+  ),
+});
+
+const modalities = new Set(['text', 'image', 'audio', 'video', 'pdf']);
+
+/** The router names a document modality `file`; the contract calls the same thing `pdf`. */
+function toModalities(reported: string[] | undefined): ModelCapabilities['inputModalities'] {
+  const mapped = (reported ?? [])
+    .map((value) => (value === 'file' ? 'pdf' : value))
+    .filter((value) => modalities.has(value)) as ModelCapabilities['inputModalities'];
+
+  return mapped.length ? [...new Set(mapped)] : ['text'];
+}
+
+/**
+ * The router says whether a model takes an effort, not which levels it accepts, so the set is
+ * the contract's own — a level the model rejects comes back as the provider's error, which is
+ * the truth, rather than being hidden behind a guess made here.
+ */
+function toEfforts(parameters: string[] | undefined): ModelCapabilities['reasoningEfforts'] {
+  return parameters?.includes('reasoning_effort') ? ['low', 'medium', 'high'] : [];
+}
+
+function parseRouted(body: unknown): ProviderModel[] {
+  return routed
+    .parse(body)
+    .data.slice(0, 1000)
+    .map((model) => ({
+      id: model.id,
+      ...(model.name ? { displayName: model.name.slice(0, 200) } : {}),
+      ...modelCapabilities('openrouter', model.id, {
+        contextWindow: model.context_length,
+        maxOutputTokens: model.top_provider?.max_completion_tokens ?? undefined,
+        reasoningEfforts: toEfforts(model.supported_parameters),
+        inputModalities: toModalities(model.architecture?.input_modalities),
+      }),
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .slice(0, 500);
+}
 
 const listed = z.object({
   data: z
@@ -32,6 +90,10 @@ const listed = z.object({
 });
 
 function parse(kind: ProviderKind, body: unknown): ProviderModel[] {
+  if (kind === 'openrouter') {
+    return parseRouted(body);
+  }
+
   const payload = listed.parse(body);
   const rows =
     kind === 'google'
@@ -175,7 +237,10 @@ export class ProviderModels {
 
     const kind = provider.kind as ProviderKind;
     const key = await this.apiKey(profileId, provider);
-    const bearer = provider.kind === 'openai' || provider.apiKeyEnv === 'ANTHROPIC_API_TOKEN';
+    const bearer =
+      provider.kind === 'openai' ||
+      provider.kind === 'openrouter' ||
+      provider.apiKeyEnv === 'ANTHROPIC_API_TOKEN';
 
     const response = await this.fetcher(endpoints[kind], {
       headers: {

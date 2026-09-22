@@ -1045,7 +1045,7 @@ export interface operations {
                     "application/json": {
                         name: string;
                         /** @enum {string} */
-                        kind: "openai" | "anthropic" | "google";
+                        kind: "openai" | "anthropic" | "google" | "openrouter";
                         apiKeyEnv?: string;
                         /** @enum {string} */
                         authMode?: "api" | "codex";
@@ -1175,7 +1175,7 @@ export interface operations {
                 "application/json": {
                     name: string;
                     /** @enum {string} */
-                    kind: "openai" | "anthropic" | "google";
+                    kind: "openai" | "anthropic" | "google" | "openrouter";
                     secret: string;
                 };
             };
@@ -1190,7 +1190,7 @@ export interface operations {
                     "application/json": {
                         name: string;
                         /** @enum {string} */
-                        kind: "openai" | "anthropic" | "google";
+                        kind: "openai" | "anthropic" | "google" | "openrouter";
                         apiKeyEnv?: string;
                         /** @enum {string} */
                         authMode?: "api" | "codex";
@@ -1465,7 +1465,7 @@ export interface operations {
                     "application/json": {
                         name: string;
                         /** @enum {string} */
-                        kind: "openai" | "anthropic" | "google";
+                        kind: "openai" | "anthropic" | "google" | "openrouter";
                         apiKeyEnv?: string;
                         /** @enum {string} */
                         authMode?: "api" | "codex";
@@ -2316,7 +2316,7 @@ export interface operations {
                         continuationOf?: string;
                         model?: {
                             /** @enum {string} */
-                            provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                            provider: "openai" | "anthropic" | "google" | "openrouter" | "openai-compatible" | "openai-codex";
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
@@ -5961,7 +5961,7 @@ export interface operations {
                          */
                         model: {
                             /** @enum {string} */
-                            provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                            provider: "openai" | "anthropic" | "google" | "openrouter" | "openai-compatible" | "openai-codex";
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
@@ -6183,7 +6183,7 @@ export interface operations {
                          */
                         model: {
                             /** @enum {string} */
-                            provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                            provider: "openai" | "anthropic" | "google" | "openrouter" | "openai-compatible" | "openai-codex";
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
@@ -6399,7 +6399,7 @@ export interface operations {
                      */
                     model?: {
                         /** @enum {string} */
-                        provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                        provider: "openai" | "anthropic" | "google" | "openrouter" | "openai-compatible" | "openai-codex";
                         modelId: string;
                         apiKeyEnv?: string;
                         /** Format: uuid */
@@ -6505,7 +6505,7 @@ export interface operations {
                          */
                         model: {
                             /** @enum {string} */
-                            provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                            provider: "openai" | "anthropic" | "google" | "openrouter" | "openai-compatible" | "openai-codex";
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
@@ -6729,7 +6729,7 @@ export interface operations {
                          */
                         model: {
                             /** @enum {string} */
-                            provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                            provider: "openai" | "anthropic" | "google" | "openrouter" | "openai-compatible" | "openai-codex";
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
@@ -6940,7 +6940,7 @@ export interface operations {
                     avatar?: string | null;
                     model?: {
                         /** @enum {string} */
-                        provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                        provider: "openai" | "anthropic" | "google" | "openrouter" | "openai-compatible" | "openai-codex";
                         modelId: string;
                         apiKeyEnv?: string;
                         /** Format: uuid */
@@ -7025,7 +7025,7 @@ export interface operations {
                          */
                         model: {
                             /** @enum {string} */
-                            provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                            provider: "openai" | "anthropic" | "google" | "openrouter" | "openai-compatible" | "openai-codex";
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
@@ -7253,7 +7253,7 @@ export interface operations {
                              */
                             model: {
                                 /** @enum {string} */
-                                provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                                provider: "openai" | "anthropic" | "google" | "openrouter" | "openai-compatible" | "openai-codex";
                                 modelId: string;
                                 apiKeyEnv?: string;
                                 /** Format: uuid */
@@ -7916,7 +7916,7 @@ export interface operations {
                         continuationOf?: string;
                         model?: {
                             /** @enum {string} */
-                            provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                            provider: "openai" | "anthropic" | "google" | "openrouter" | "openai-compatible" | "openai-codex";
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
@@ -8379,7 +8379,7 @@ export interface operations {
                         continuationOf?: string;
                         model?: {
                             /** @enum {string} */
-                            provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                            provider: "openai" | "anthropic" | "google" | "openrouter" | "openai-compatible" | "openai-codex";
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
@@ -8578,7 +8578,7 @@ export interface operations {
                         continuationOf?: string;
                         model?: {
                             /** @enum {string} */
-                            provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                            provider: "openai" | "anthropic" | "google" | "openrouter" | "openai-compatible" | "openai-codex";
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
@@ -8777,7 +8777,7 @@ export interface operations {
                         continuationOf?: string;
                         model?: {
                             /** @enum {string} */
-                            provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                            provider: "openai" | "anthropic" | "google" | "openrouter" | "openai-compatible" | "openai-codex";
                             modelId: string;
                             apiKeyEnv?: string;
                             /** Format: uuid */
