@@ -5,11 +5,13 @@ import { useEffect, useRef, useState } from 'react';
 import {
   date,
   type GatewayApi,
+  type ModelSelection,
   type Mutation,
   type Profile,
   type ProfileData,
   type Run,
 } from '../lib/api';
+import { availableModels } from './provider-settings';
 import { Badge, Button, Empty, Field, Modal, SectionHeading } from './ui';
 
 const running = (run?: Run) => run?.status === 'queued' || run?.status === 'running';
@@ -28,19 +30,26 @@ function Conversation({
   profileId,
   sessionId,
   initialRun,
+  data,
 }: {
   api: GatewayApi;
   profileId: string;
   sessionId: string;
   initialRun?: Run;
+  data: ProfileData;
 }) {
   const [messages, setMessages] = useState<Awaited<ReturnType<GatewayApi['messages']>>>([]);
   const [run, setRun] = useState(initialRun);
   const [text, setText] = useState('');
+  const [selectedModel, setSelectedModel] = useState(() => {
+    const defaultModel = data.modelDefaults.conversation;
+    return defaultModel ? `${defaultModel.providerId}:${defaultModel.modelId}` : '';
+  });
+  const models = availableModels(data);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   // Retain the key after an uncertain HTTP result, so a retry cannot enqueue the same text twice.
-  const pending = useRef<{ text: string; key: string } | undefined>(undefined);
+  const pending = useRef<{ text: string; key: string; model: string } | undefined>(undefined);
   const end = useRef<HTMLDivElement>(null);
   const alive = useRef(true);
 
@@ -192,12 +201,24 @@ function Conversation({
           setBusy(true);
           setError('');
 
-          if (pending.current?.text !== input) {
-            pending.current = { text: input, key: crypto.randomUUID() };
+          if (pending.current?.text !== input || pending.current.model !== selectedModel) {
+            pending.current = { text: input, key: crypto.randomUUID(), model: selectedModel };
           }
 
           try {
-            const submitted = await api.submit(profileId, sessionId, input, pending.current.key);
+            const model: ModelSelection | undefined = selectedModel
+              ? {
+                  providerId: selectedModel.split(':')[0],
+                  modelId: selectedModel.split(':').slice(1).join(':'),
+                }
+              : undefined;
+            const submitted = await api.submit(
+              profileId,
+              sessionId,
+              input,
+              pending.current.key,
+              model,
+            );
 
             if (!alive.current) {
               return;
@@ -228,7 +249,24 @@ function Conversation({
           disabled={busy || running(run)}
         />
         <div>
-          <small>A memória pertence ao perfil. O histórico pertence à sessão.</small>
+          <label className="composer-model">
+            <span>Modelo</span>
+            <select
+              aria-label="Modelo da conversa"
+              value={selectedModel}
+              onChange={(event) => setSelectedModel(event.target.value)}
+              disabled={busy || running(run)}
+            >
+              <option value="">
+                {models.length ? 'Padrão do perfil' : 'Configure um provider'}
+              </option>
+              {models.map(({ provider, model }) => (
+                <option key={`${provider.id}:${model.id}`} value={`${provider.id}:${model.id}`}>
+                  {provider.name} · {model.id}
+                </option>
+              ))}
+            </select>
+          </label>
           <Button
             type="submit"
             aria-label="Enviar mensagem"
@@ -306,6 +344,7 @@ export function Sessions({
               profileId={profile.id}
               sessionId={active.id}
               initialRun={data.activities.filter((run) => run.sessionId === active.id).at(-1)}
+              data={data}
             />
           ) : (
             <Empty title="Selecione uma conversa">

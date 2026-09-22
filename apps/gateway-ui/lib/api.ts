@@ -12,6 +12,9 @@ export type Session = JsonResponse<'listSessions', 200>[number];
 export type Channel = JsonResponse<'listChannels', 200>[number];
 
 export type Credential = JsonResponse<'listCredentials', 200>[number];
+export type Provider = JsonResponse<'listProviders', 200>[number];
+export type ModelDefaults = JsonResponse<'getModelDefaults', 200>;
+export type ModelSelection = NonNullable<ModelDefaults['conversation']>;
 
 export type AccessKey = JsonResponse<'listAccessKeys', 200>[number];
 
@@ -32,6 +35,8 @@ export type NewChannel = operations['createChannel']['requestBody']['content']['
 
 export type NewCredential =
   operations['createCredential']['requestBody']['content']['application/json'];
+export type NewProvider =
+  operations['createProvider']['requestBody']['content']['application/json'];
 
 export type NewKey = operations['createAccessKey']['requestBody']['content']['application/json'];
 
@@ -56,7 +61,7 @@ async function result<T>(
     if (response.status === 409) {
       const message =
         detail?.error === 'Configure a provider credential before starting a run'
-          ? 'Selecione uma credencial de provider em Identidade e modelo antes de conversar.'
+          ? 'Configure uma credencial em Providers antes de conversar.'
           : 'O estado mudou ou a sessão está ocupada. Atualize e tente novamente.';
 
       throw new Error(message);
@@ -80,16 +85,19 @@ async function result<T>(
   return data;
 }
 
-/** The admin token stays in React memory. Every request goes to this gateway's own origin. */
-export function gatewayApi(token: string) {
+/**
+ * The panel never holds the host token: it trades it for a signed cookie the browser keeps and
+ * no script can read. The header is what stops that cookie from working from another origin.
+ */
+export function gatewayApi() {
   const client = createElosClient({
     baseUrl: window.location.origin,
-    token,
+    headers: { 'x-elos-panel': '1' },
     fetch: (request, init) =>
       fetch(request, {
         ...init,
         cache: 'no-store',
-        credentials: 'omit',
+        credentials: 'same-origin',
         signal: init?.signal ?? AbortSignal.timeout(30_000),
       }),
   });
@@ -98,10 +106,48 @@ export function gatewayApi(token: string) {
   const channel = (profileId: string, channelId: string) => ({ path: { profileId, channelId } });
 
   return {
+    signIn: (token: string) => result(client.POST('/v1/panel/session', { body: { token } })),
+    signOut: () => result(client.DELETE('/v1/panel/session')),
     profiles: () => result(client.GET('/v1/profiles')),
     createProfile: (body: NewProfile) => result(client.POST('/v1/profiles', { body })),
     updateProfile: (profileId: string, body: ProfilePatch) =>
       result(client.PATCH('/v1/profiles/{profileId}', { params: profile(profileId), body })),
+    providers: (profileId: string) =>
+      result(client.GET('/v1/profiles/{profileId}/providers', { params: profile(profileId) })),
+    startCodexLogin: (profileId: string) =>
+      result(
+        client.POST('/v1/profiles/{profileId}/providers/openai/oauth', {
+          params: profile(profileId),
+        }),
+      ),
+    codexLogin: (profileId: string) =>
+      result(
+        client.GET('/v1/profiles/{profileId}/providers/openai/oauth', {
+          params: profile(profileId),
+        }),
+      ),
+    createProvider: (profileId: string, body: NewProvider) =>
+      result(
+        client.POST('/v1/profiles/{profileId}/providers', {
+          params: profile(profileId),
+          body,
+        }),
+      ),
+    revokeProvider: (profileId: string, providerId: string) =>
+      result(
+        client.DELETE('/v1/profiles/{profileId}/providers/{providerId}', {
+          params: { path: { profileId, providerId } },
+        }),
+      ),
+    modelDefaults: (profileId: string) =>
+      result(client.GET('/v1/profiles/{profileId}/model-defaults', { params: profile(profileId) })),
+    setModelDefaults: (profileId: string, body: Pick<ModelDefaults, 'conversation' | 'channel'>) =>
+      result(
+        client.PUT('/v1/profiles/{profileId}/model-defaults', {
+          params: profile(profileId),
+          body,
+        }),
+      ),
     sessions: (profileId: string) =>
       result(client.GET('/v1/profiles/{profileId}/sessions', { params: profile(profileId) })),
     createSession: (profileId: string, title: string, channel = 'api') =>
@@ -117,11 +163,17 @@ export function gatewayApi(token: string) {
           params: { path: { profileId, sessionId } },
         }),
       ),
-    submit: (profileId: string, sessionId: string, text: string, requestKey: string) =>
+    submit: (
+      profileId: string,
+      sessionId: string,
+      text: string,
+      requestKey: string,
+      model?: ModelSelection,
+    ) =>
       result(
         client.POST('/v1/profiles/{profileId}/sessions/{sessionId}/messages', {
           params: { path: { profileId, sessionId } },
-          body: { text, requestKey },
+          body: { text, requestKey, ...(model ? { model } : {}) },
         }),
       ),
     run: (profileId: string, runId: string) =>
@@ -219,6 +271,8 @@ export function gatewayApi(token: string) {
 export type GatewayApi = ReturnType<typeof gatewayApi>;
 
 export type ProfileData = {
+  providers: Provider[];
+  modelDefaults: ModelDefaults;
   sessions: Session[];
   channels: Channel[];
   credentials: Credential[];

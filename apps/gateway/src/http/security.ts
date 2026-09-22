@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 import { GatewayError } from '../domain.js';
 import type { Credentials } from '../services/credentials.js';
+import { authorizesPanel } from './panel-session.js';
 
 interface SecurityOptions {
   token: string;
@@ -38,6 +39,11 @@ export function configureSecurity(app: FastifyInstance, options: SecurityOptions
     const expected = Buffer.from(`Bearer ${options.token}`);
 
     if (supplied.length === expected.length && timingSafeEqual(supplied, expected)) {
+      return;
+    }
+
+    // The panel trades the host token for a signed cookie, so its requests carry no bearer.
+    if (!authorization && authorizesPanel(request, options.token)) {
       return;
     }
 

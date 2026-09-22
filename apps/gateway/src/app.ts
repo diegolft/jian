@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { createOpenAPI, operationSchema, operations } from '@elos/contracts';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
@@ -6,9 +7,11 @@ import type { WhatsAppConnections } from './channels/whatsapp/connections.js';
 import { GatewayError } from './domain.js';
 import type { Gateway } from './gateway.js';
 import { registerEventRoutes } from './http/events.js';
+import { closePanelSession, openPanelSession } from './http/panel-session.js';
 import { configureSecurity } from './http/security.js';
 import { registerGatewayUi } from './http/ui.js';
 import type { Channels } from './services/channels.js';
+import type { CodexLogin } from './services/codex-login.js';
 import { Coordination } from './services/coordination.js';
 import type { Credentials } from './services/credentials.js';
 
@@ -17,6 +20,7 @@ export function createApp(options: {
   token: string;
   logger?: boolean;
   credentials?: Credentials;
+  codexLogin?: CodexLogin;
   channels?: Channels;
   whatsapp?: WhatsAppConnections;
   maxStreams?: number;
@@ -66,12 +70,66 @@ export function createApp(options: {
 
   type ProfileParams = { profileId: string };
 
+  app.post<{ Params: ProfileParams }>(
+    '/v1/profiles/:profileId/providers/openai/oauth',
+    async (request) => {
+      if (!options.codexLogin) throw new GatewayError(503, 'Codex login is unavailable');
+      return options.codexLogin.start(request.params.profileId);
+    },
+  );
+  app.get<{ Params: ProfileParams }>(
+    '/v1/profiles/:profileId/providers/openai/oauth',
+    async (request) => {
+      if (!options.codexLogin) throw new GatewayError(503, 'Codex login is unavailable');
+      return options.codexLogin.status(request.params.profileId);
+    },
+  );
+
   type SessionParams = ProfileParams & { sessionId: string };
 
   type RunParams = ProfileParams & { runId: string };
 
   app.get('/health', async () => ({ status: 'ok', service: 'elos' }));
+
+  app.post(
+    '/v1/panel/session',
+    // Tighter than the global ceiling: this is the one route that accepts the host token.
+    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (request, reply) => {
+      const supplied = Buffer.from((request.body as { token: string }).token);
+      const expected = Buffer.from(options.token);
+
+      if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
+        throw new GatewayError(401, 'Unauthorized');
+      }
+
+      return reply.code(201).send(openPanelSession(request, reply, options.token));
+    },
+  );
+
+  app.delete('/v1/panel/session', async (request, reply) => closePanelSession(request, reply));
   app.get('/v1/profiles', async () => gateway.profiles());
+
+  app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/providers', async (request) =>
+    gateway.providers(request.params.profileId),
+  );
+
+  app.post<{ Params: ProfileParams }>('/v1/profiles/:profileId/providers', async (request, reply) =>
+    reply.code(201).send(await gateway.createProvider(request.params.profileId, request.body)),
+  );
+
+  app.delete<{ Params: ProfileParams & { providerId: string } }>(
+    '/v1/profiles/:profileId/providers/:providerId',
+    async (request) => gateway.revokeProvider(request.params.profileId, request.params.providerId),
+  );
+
+  app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/model-defaults', async (request) =>
+    gateway.modelDefaults(request.params.profileId),
+  );
+
+  app.put<{ Params: ProfileParams }>('/v1/profiles/:profileId/model-defaults', async (request) =>
+    gateway.setModelDefaults(request.params.profileId, request.body),
+  );
 
   app.post('/v1/profiles', async (request, reply) =>
     reply.code(201).send(await gateway.createProfile(request.body)),

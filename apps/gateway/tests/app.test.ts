@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { Gateway } from '../src/gateway.js';
+import { SecretBox } from '../src/security/crypto.js';
+import { Credentials } from '../src/services/credentials.js';
 import { MemoryStore } from './helpers/memory-store.js';
 
 const token = 'test-token-that-is-at-least-32-characters';
@@ -30,6 +33,79 @@ afterEach(async () => {
 });
 
 describe('HTTP gateway', () => {
+  it('keeps provider setup admin-only while scoped chat can use a registered model', async () => {
+    const gateway = new Gateway(new MemoryStore());
+    const credentials = new Credentials(
+      gateway,
+      new SecretBox({
+        activeKeyId: 'test',
+        keys: { test: randomBytes(32) },
+      }),
+    );
+    const app = createApp({ gateway, credentials, token, logger: false });
+    apps.push(app);
+
+    const profile = await gateway.createProfile({ name: 'New', instructions: 'Help.' });
+    const secret = await credentials.create(profile.id, {
+      label: 'Test',
+      kind: 'provider',
+      secret: 'synthetic-secret',
+    });
+    const base = `/v1/profiles/${profile.id}`;
+    const payload = {
+      name: 'OpenAI',
+      kind: 'openai',
+      credentialId: secret.id,
+      models: [{ id: 'sample', contextWindow: 16_000, maxOutputTokens: 2048 }],
+    };
+    const created = await app.inject({
+      method: 'POST',
+      url: `${base}/providers`,
+      headers,
+      payload,
+    });
+
+    expect(created.statusCode).toBe(201);
+    expect(created.body).not.toContain('synthetic-secret');
+
+    const chosen = { providerId: created.json().id, modelId: 'sample' };
+    const configured = await app.inject({
+      method: 'PUT',
+      url: `${base}/model-defaults`,
+      headers,
+      payload: { conversation: chosen, channel: null },
+    });
+    expect(configured.statusCode).toBe(200);
+
+    const key = await credentials.issueKey(profile.id, {
+      label: 'Chat',
+      scopes: ['chat'],
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const scoped = { authorization: `Bearer ${key.token}` };
+
+    expect((await app.inject({ url: `${base}/providers`, headers: scoped })).statusCode).toBe(403);
+    expect(
+      (await app.inject({ method: 'POST', url: `${base}/providers`, headers: scoped, payload }))
+        .statusCode,
+    ).toBe(403);
+    expect(
+      (await app.inject({ method: 'POST', url: `${base}/providers/openai/oauth`, headers: scoped }))
+        .statusCode,
+    ).toBe(403);
+
+    const session = await gateway.createSession(profile.id, { title: 'Chat' });
+    const response = await app.inject({
+      method: 'POST',
+      url: `${base}/sessions/${session.id}/messages`,
+      headers: scoped,
+      payload: { text: 'Hello', requestKey: 'once' },
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(response.json().model.modelId).toBe('sample');
+    expect(response.body).not.toContain('synthetic-secret');
+  });
   it('protects profiles and events while exposing liveness', async () => {
     const { app } = setup();
 
@@ -169,4 +245,91 @@ it('streams committed events over HTTP and resumes after a cursor', async () => 
   } finally {
     controller.abort();
   }
+});
+
+describe('panel session', () => {
+  const panel = { 'x-elos-panel': '1' };
+
+  async function signIn(app: FastifyInstance) {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/panel/session',
+      payload: { token },
+    });
+
+    expect(response.statusCode).toBe(201);
+
+    const cookie = response.cookies[0];
+
+    assert(cookie && cookie.name === 'elos_panel');
+
+    return { cookie: `elos_panel=${cookie.value}`, raw: cookie, response };
+  }
+
+  it('hands the browser an unreadable cookie that authorizes administration', async () => {
+    const { app } = setup();
+    const { cookie, raw, response } = await signIn(app);
+
+    expect(raw.httpOnly).toBe(true);
+    expect(raw.sameSite).toBe('Strict');
+    expect(raw.path).toBe('/');
+    // Plain HTTP is a supported self-hosted setup; a Secure cookie would never be sent back.
+    expect(raw.secure).toBeFalsy();
+    expect(Date.parse(response.json().expiresAt)).toBeGreaterThan(Date.now());
+    expect(cookie).not.toContain(token);
+
+    const listed = await app.inject({ url: '/v1/profiles', headers: { cookie, ...panel } });
+
+    expect(listed.statusCode).toBe(200);
+  });
+
+  it('refuses the wrong host token without issuing a cookie', async () => {
+    const { app } = setup();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/panel/session',
+      payload: { token: `${token}-wrong` },
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.cookies).toHaveLength(0);
+  });
+
+  it('ignores a cookie sent without the panel header, tampered with, or expired', async () => {
+    const { app } = setup();
+    const { cookie, raw } = await signIn(app);
+
+    // A third-party site can send the cookie, but not a header that needs a preflight.
+    expect((await app.inject({ url: '/v1/profiles', headers: { cookie } })).statusCode).toBe(401);
+
+    const [expiry, signature] = raw.value.split('.');
+
+    for (const forged of [
+      `${expiry}.${signature?.replace(/^./, (first) => (first === 'A' ? 'B' : 'A'))}`,
+      `${Number(expiry) + 60_000}.${signature}`,
+      `${Date.now() - 1000}.${signature}`,
+    ]) {
+      const response = await app.inject({
+        url: '/v1/profiles',
+        headers: { cookie: `elos_panel=${forged}`, ...panel },
+      });
+
+      expect(response.statusCode).toBe(401);
+    }
+  });
+
+  it('clears the cookie on sign out', async () => {
+    const { app } = setup();
+    const { cookie } = await signIn(app);
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: '/v1/panel/session',
+      headers: { cookie, ...panel },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.cookies[0]).toMatchObject({ name: 'elos_panel', value: '' });
+    expect(response.cookies[0]?.maxAge).toBe(0);
+  });
 });

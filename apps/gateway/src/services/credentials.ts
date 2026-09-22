@@ -86,6 +86,35 @@ export class Credentials {
     return this.box.decrypt(record.envelope, this.aad(record));
   }
 
+  async transformSecret(
+    profileId: string,
+    id: string,
+    transform: (secret: string) => Promise<string>,
+  ) {
+    return this.gateway.store.transaction(profileId, async (tx) => {
+      const record = await tx.get('credential', id);
+      if (
+        !record ||
+        record.profileId !== profileId ||
+        record.kind !== 'provider' ||
+        record.revokedAt
+      ) {
+        throw new GatewayError(403, 'Credential unavailable');
+      }
+      const current = this.box.decrypt(record.envelope, this.aad(record));
+      const next = await transform(current);
+      if (next !== current) {
+        await tx.put('credential', id, profileId, {
+          ...record,
+          envelope: this.box.encrypt(next, this.aad(record)),
+          version: record.version + 1,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+      return next;
+    });
+  }
+
   private async change(profileId: string, id: string, rotate: boolean) {
     return this.gateway.store.transaction(profileId, async (tx) => {
       const value = await tx.get('credential', id);

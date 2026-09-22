@@ -14,6 +14,7 @@ import { AgentRuntime } from './runtime.js';
 import { SecretBox } from './security/crypto.js';
 import { createSafeFetch } from './security/outbound.js';
 import { Channels } from './services/channels.js';
+import { CodexLogin } from './services/codex-login.js';
 import { Coordination } from './services/coordination.js';
 import { Credentials } from './services/credentials.js';
 import { type StartupStage, startupFailure } from './startup.js';
@@ -62,6 +63,7 @@ try {
 }
 
 const credentials = new Credentials(gateway, box);
+const codexLogin = new CodexLogin(gateway, credentials);
 
 const outbound = createSafeFetch({
   allowPrivateOrigins: config.data.ELOS_ALLOW_PRIVATE_ORIGINS.split(',')
@@ -84,6 +86,7 @@ const channels = new Channels(gateway, credentials, outbound.fetch, channelRegis
 
 const runtime = new AgentRuntime(gateway, undefined, {
   credentials,
+  codexLogin,
   outbound,
   storeArtifact: (run, toolName, output) => coordination.storeArtifact(run, toolName, output),
 });
@@ -98,6 +101,7 @@ const app =
     ? createApp({
         gateway,
         credentials,
+        codexLogin,
         channels,
         whatsapp,
         token: config.data.ELOS_API_TOKEN,
@@ -113,6 +117,7 @@ async function shutdown() {
   }
 
   stopping = true;
+  codexLogin.stop();
   // End long-lived event streams before waiting for HTTP shutdown.
   app?.server.closeAllConnections();
   await app?.close();

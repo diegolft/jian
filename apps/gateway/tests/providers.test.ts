@@ -1,3 +1,4 @@
+import { generateText } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { modelSchema } from '../src/domain.js';
 import { resolveModel } from '../src/providers.js';
@@ -57,4 +58,24 @@ it('accepts an explicitly resolved vault key without consulting host environment
   if (typeof model !== 'string') {
     expect(model.modelId).toBe('chosen-model');
   }
+});
+
+it('sends ANTHROPIC_API_TOKEN as a bearer token', async () => {
+  let headers = new Headers();
+  const fetcher: typeof fetch = async (_input, init) => {
+    headers = new Headers(init?.headers);
+    return Response.json(
+      { type: 'error', error: { type: 'invalid_request_error', message: 'synthetic' } },
+      { status: 400 },
+    );
+  };
+  const model = resolveModel(
+    { provider: 'anthropic', modelId: 'test', apiKeyEnv: 'ANTHROPIC_API_TOKEN' },
+    { ANTHROPIC_API_TOKEN: 'synthetic-token' },
+    fetcher,
+  );
+
+  await expect(generateText({ model, prompt: 'Hi', maxRetries: 0 })).rejects.toThrow();
+  expect(headers.get('authorization')).toBe('Bearer synthetic-token');
+  expect(headers.has('x-api-key')).toBe(false);
 });

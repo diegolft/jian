@@ -1,6 +1,7 @@
 import type { LanguageModel } from 'ai';
 import type { ModelConfig, Run } from '../domain.js';
 import type { createSafeFetch } from '../security/outbound.js';
+import type { CodexLogin } from '../services/codex-login.js';
 import type { Credentials } from '../services/credentials.js';
 
 export type ModelResolver = (
@@ -12,6 +13,7 @@ export type ModelResolver = (
 
 export interface RuntimeOptions {
   credentials?: Pick<Credentials, 'resolve'>;
+  codexLogin?: Pick<CodexLogin, 'accessToken'>;
   outbound?: ReturnType<typeof createSafeFetch>;
   storeArtifact?: (
     run: Run,

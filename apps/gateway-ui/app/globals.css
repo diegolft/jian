@@ -466,22 +466,6 @@ svg {
   margin-top: 9px;
   font-size: 13px;
 }
-.page-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  padding-top: 36px;
-  margin-top: 30px;
-  border-top: 1px solid #f0f2f6;
-  font-size: 10px;
-  color: #6d7b8d;
-}
-.page-footer > span:first-child {
-  font-size: 11px;
-}
-.page-footer span span {
-  padding: 0 6px;
-}
 .mobile-menu {
   display: none;
 }
@@ -906,6 +890,45 @@ svg {
 .settings-fields {
   max-width: 650px;
 }
+.boot {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.avatar-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+.avatar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+}
+.avatar-actions small {
+  flex-basis: 100%;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.avatar-actions .form-error {
+  flex-basis: 100%;
+}
+/* The picture fills the same square the fallback initial occupies. */
+.profile-avatar,
+.mini-avatar {
+  overflow: hidden;
+}
+.profile-avatar img,
+.mini-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .field {
   display: flex;
   flex-direction: column;
@@ -1278,6 +1301,20 @@ legend {
 .composer .button {
   min-height: 32px;
   padding: 7px;
+}
+.composer-model {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  color: var(--muted);
+  font-size: 11px;
+}
+.composer-model select {
+  max-width: 300px;
+  padding: 7px 10px;
+  font-size: 11px;
 }
 
 .login-layout {
@@ -1702,13 +1739,6 @@ legend {
   }
   .save-bar > span {
     max-width: 160px;
-    font-size: 10px;
-  }
-  .page-footer {
-    font-size: 9px;
-    padding-top: 25px;
-  }
-  .page-footer > span:first-child {
     font-size: 10px;
   }
   .modal {

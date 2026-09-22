@@ -10,7 +10,7 @@ export function profileTools(gateway: Gateway, run: Run): ToolSet {
 
   const artifactPageChars = Math.max(
     1,
-    Math.floor((run.profile.contextPolicy.toolResultTokens - 64) / 4),
+    Math.floor(((run.contextPolicy ?? run.profile.contextPolicy).toolResultTokens - 64) / 4),
   );
 
   const tools: ToolSet = {

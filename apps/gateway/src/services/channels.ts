@@ -200,12 +200,18 @@ export class Channels {
     }
 
     // The binding, not the inbound payload, chooses the profile and session.
-    const run = await this.gateway.submit(channel.profileId, channel.sessionId, {
-      text: data.text,
-      requestKey: createHash('sha256')
-        .update(JSON.stringify([id, data.chatId, data.actorId, data.requestKey]))
-        .digest('hex'),
-    });
+    const run = await this.gateway.submit(
+      channel.profileId,
+      channel.sessionId,
+      {
+        text: data.text,
+        requestKey: createHash('sha256')
+          .update(JSON.stringify([id, data.chatId, data.actorId, data.requestKey]))
+          .digest('hex'),
+      },
+      undefined,
+      'channel',
+    );
 
     if (adapter.send) {
       await this.gateway.store.transaction(channel.profileId, async (tx) => {

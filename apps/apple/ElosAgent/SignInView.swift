@@ -2,7 +2,8 @@ import SwiftUI
 
 struct SignInView: View {
   @Environment(GatewaySession.self) private var session
-  @State private var serverURL = "http://localhost:3000"
+  // The Gateway, not the web panel's dev server. On a device, use the host's LAN address.
+  @State private var serverURL = "http://127.0.0.1:4310"
   @State private var accessKey = ""
 
   var body: some View {

@@ -42,4 +42,12 @@ export const migrations = [
           CHECK (kind IN ('profile','revision','session','message','memory','run','credential','accessKey','artifact','lease','mail','channel','delivery','checkpoint','channelConnection','channelAuth','channelInbox'));
 `,
   },
+  {
+    version: 4,
+    sql: `
+        ALTER TABLE elos_records DROP CONSTRAINT IF EXISTS elos_records_kind_check;
+        ALTER TABLE elos_records ADD CONSTRAINT elos_records_kind_check
+          CHECK (kind IN ('profile','revision','session','message','memory','run','credential','accessKey','artifact','lease','mail','channel','delivery','checkpoint','channelConnection','channelAuth','channelInbox','provider','modelDefault'));
+`,
+  },
 ];

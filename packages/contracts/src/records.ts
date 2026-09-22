@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { profileSchema, sessionSchema } from './profile.js';
+import { contextPolicySchema, modelSchema, profileSchema, sessionSchema } from './profile.js';
+import { modelSelectionSchema } from './providers.js';
 
 const uuid = z.uuid();
 const timestamp = z.iso.datetime();
@@ -56,6 +57,9 @@ export const runRecordSchema = z.strictObject({
   output: z.string().optional(),
   usage: usageSchema.optional(),
   continuationOf: uuid.optional(),
+  model: modelSchema.optional(),
+  modelSelection: modelSelectionSchema.optional(),
+  contextPolicy: contextPolicySchema.optional(),
 });
 
 export const revisionRecordSchema = z.strictObject({

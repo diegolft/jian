@@ -11,9 +11,10 @@ DATABASE_URL=postgres://elos:${password}@localhost:5432/elos
 HOST=127.0.0.1
 PORT=4310
 ELOS_ROLE=all
-ELOS_PROVIDER_OPENAI=
-ELOS_PROVIDER_ANTHROPIC=
-ELOS_PROVIDER_GOOGLE=
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+ANTHROPIC_API_TOKEN=
+GEMINI_API_TOKEN=
 `;
 try {
   await writeFile(new URL('../.env', import.meta.url), contents, { mode: 0o600, flag: 'wx' });

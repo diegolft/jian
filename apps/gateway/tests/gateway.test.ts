@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { randomBytes } from 'node:crypto';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Gateway } from '../src/gateway.js';
+import { SecretBox } from '../src/security/crypto.js';
+import { Credentials } from '../src/services/credentials.js';
 import { MemoryStore } from './helpers/memory-store.js';
 
 const profileInput = {
@@ -7,6 +10,83 @@ const profileInput = {
   instructions: 'Help with engineering.',
   model: { provider: 'openai' as const, modelId: 'test-model', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
 };
+
+afterEach(() => vi.unstubAllEnvs());
+
+it.each([
+  ['ANTHROPIC_API_KEY', 'anthropic'],
+  ['ANTHROPIC_API_TOKEN', 'anthropic'],
+  ['GEMINI_API_TOKEN', 'google'],
+  ['OPENAI_API_KEY', 'openai'],
+] as const)('detects %s as %s without storing the secret', async (name, kind) => {
+  if (name === 'ANTHROPIC_API_TOKEN') vi.stubEnv('ANTHROPIC_API_KEY', '');
+  vi.stubEnv(name, `synthetic-${name}`);
+  const gateway = new Gateway(new MemoryStore());
+  const profile = await gateway.createProfile({ name: 'Env', instructions: 'Help.' });
+  const providers = await gateway.providers(profile.id);
+  expect(providers.find((provider) => provider.kind === kind)?.apiKeyEnv).toBe(name);
+  expect(JSON.stringify(providers)).not.toContain(`synthetic-${name}`);
+});
+
+it('uses host provider credentials without manual registration or a model default', async () => {
+  vi.stubEnv('ANTHROPIC_API_TOKEN', 'synthetic-anthropic-token');
+  const gateway = new Gateway(new MemoryStore());
+  const profile = await gateway.createProfile({ name: 'Host', instructions: 'Help.' });
+  const providers = await gateway.providers(profile.id);
+  const anthropic = providers.find((provider) => provider.kind === 'anthropic');
+
+  expect(anthropic?.apiKeyEnv).toBe('ANTHROPIC_API_TOKEN');
+  expect(JSON.stringify(providers)).not.toContain('synthetic-anthropic-token');
+
+  const session = await gateway.createSession(profile.id, { title: 'Test' });
+  const run = await gateway.submit(profile.id, session.id, {
+    text: 'Hello',
+    requestKey: 'host-provider',
+  });
+
+  expect(run.model).toMatchObject({
+    provider: 'anthropic',
+    apiKeyEnv: 'ANTHROPIC_API_TOKEN',
+  });
+});
+
+it('replaces one provider credential and ignores an obsolete model default', async () => {
+  const gateway = new Gateway(new MemoryStore());
+  const profile = await gateway.createProfile({ name: 'Replace', instructions: 'Help.' });
+  const credentials = new Credentials(
+    gateway,
+    new SecretBox({ activeKeyId: 'test', keys: { test: randomBytes(32) } }),
+  );
+  const add = async (name: string) => {
+    const credential = await credentials.create(profile.id, {
+      label: name,
+      kind: 'provider',
+      secret: `synthetic-${name}`,
+    });
+    return gateway.createProvider(profile.id, {
+      name,
+      kind: 'openai',
+      credentialId: credential.id,
+      models: [{ id: name, contextWindow: 16_000, maxOutputTokens: 2048 }],
+    });
+  };
+  const old = await add('old');
+  await gateway.setModelDefaults(profile.id, {
+    conversation: { providerId: old.id, modelId: 'old' },
+    channel: null,
+  });
+  const current = await add('current');
+  const session = await gateway.createSession(profile.id, { title: 'Test' });
+  const run = await gateway.submit(profile.id, session.id, { text: 'Hello', requestKey: 'new' });
+
+  expect(run.model?.modelId).toBe('current');
+  expect(
+    (await gateway.providers(profile.id)).find((item) => item.id === old.id)?.revokedAt,
+  ).toBeDefined();
+  expect(
+    (await gateway.providers(profile.id)).find((item) => item.id === current.id)?.revokedAt,
+  ).toBeUndefined();
+});
 
 async function setup() {
   const gateway = new Gateway(new MemoryStore());
@@ -17,6 +97,76 @@ async function setup() {
 }
 
 describe('shared profile brain', () => {
+  it('isolates providers and freezes the chosen model and its context budget per run', async () => {
+    const { gateway, profile, session } = await setup();
+    const vault = new Credentials(
+      gateway,
+      new SecretBox({
+        activeKeyId: 'test',
+        keys: { test: randomBytes(32) },
+      }),
+    );
+    const credential = await vault.create(profile.id, {
+      label: 'OpenAI',
+      kind: 'provider',
+      secret: 'synthetic-api-key',
+    });
+    const provider = await gateway.createProvider(profile.id, {
+      name: 'Personal',
+      kind: 'openai',
+      credentialId: credential.id,
+      models: [
+        { id: 'small', contextWindow: 16_000, maxOutputTokens: 2048 },
+        { id: 'large', contextWindow: 64_000, maxOutputTokens: 8192 },
+      ],
+    });
+    const large = { providerId: provider.id, modelId: 'large' };
+    const small = { providerId: provider.id, modelId: 'small' };
+
+    await gateway.setModelDefaults(profile.id, { conversation: small, channel: large });
+
+    const chosen = await gateway.submit(profile.id, session.id, {
+      text: 'First',
+      requestKey: 'one',
+      model: large,
+    });
+    const otherSession = await gateway.createSession(profile.id, { title: 'Second' });
+    const standard = await gateway.submit(profile.id, otherSession.id, {
+      text: 'Second',
+      requestKey: 'two',
+    });
+
+    expect(chosen.model?.modelId).toBe('large');
+    expect(chosen.contextPolicy?.inputTokens).toBe(28_800);
+    expect(standard.model?.modelId).toBe('small');
+    expect(standard.contextPolicy?.inputTokens).toBe(7200);
+    expect(JSON.stringify(chosen)).not.toContain('synthetic-api-key');
+
+    await expect(
+      gateway.submit(profile.id, session.id, {
+        text: 'First',
+        requestKey: 'one',
+        model: small,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    const stranger = await gateway.createProfile({ name: 'Other', instructions: 'Help.' });
+    await expect(
+      gateway.setModelDefaults(stranger.id, {
+        conversation: large,
+        channel: null,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    await gateway.revokeProvider(profile.id, provider.id);
+    await expect(
+      gateway.submit(profile.id, otherSession.id, {
+        text: 'Third',
+        requestKey: 'three',
+        model: large,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
+  });
   it('makes one session’s memory visible to another while isolating other profiles', async () => {
     const { gateway, profile, session } = await setup();
 
@@ -164,6 +314,8 @@ describe('shared profile brain', () => {
   });
 });
 
+const avatar = `data:image/jpeg;base64,${Buffer.from('synthetic-image-bytes').toString('base64')}`;
+
 describe('profile configuration changes', () => {
   it('preserves skills, MCP configuration and permissions on a name-only edit', async () => {
     const gateway = new Gateway(new MemoryStore());
@@ -185,6 +337,46 @@ describe('profile configuration changes', () => {
     expect(updated.allowSelfManagement).toBe(true);
     expect(updated.skills).toHaveLength(1);
     expect(updated.mcpServers).toHaveLength(1);
+  });
+
+  it('keeps, replaces and clears the picture, and keeps its bytes out of the model context', async () => {
+    const gateway = new Gateway(new MemoryStore());
+    const profile = await gateway.createProfile({ ...profileInput, avatar });
+
+    expect(profile.avatar).toBe(avatar);
+
+    const renamed = await gateway.updateProfile(profile.id, {
+      expectedVersion: 1,
+      name: 'Atlas II',
+    });
+
+    expect(renamed.avatar).toBe(avatar);
+
+    const session = await gateway.createSession(profile.id, { title: 'Mac', channel: 'macos' });
+    const run = await gateway.submit(profile.id, session.id, { text: 'Hi', requestKey: 'one' });
+
+    expect((await gateway.context(run)).system).not.toContain(avatar.slice(-24));
+
+    const cleared = await gateway.updateProfile(profile.id, { expectedVersion: 2, avatar: null });
+
+    expect(cleared.avatar).toBeNull();
+  });
+
+  it('rejects a picture that is not an inline image within the size limit', async () => {
+    const gateway = new Gateway(new MemoryStore());
+    const profile = await gateway.createProfile(profileInput);
+
+    for (const rejected of [
+      'https://example.com/avatar.png',
+      'data:text/html;base64,PHNjcmlwdD4=',
+      `data:image/jpeg;base64,${'A'.repeat(100_001)}`,
+    ]) {
+      await expect(
+        gateway.updateProfile(profile.id, { expectedVersion: 1, avatar: rejected }),
+      ).rejects.toThrow();
+    }
+
+    expect((await gateway.profile(profile.id)).avatar).toBeNull();
   });
 });
 

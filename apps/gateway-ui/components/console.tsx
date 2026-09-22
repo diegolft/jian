@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   CircleHelp,
+  Cpu,
   Fingerprint,
   KeyRound,
   LayoutDashboard,
@@ -25,15 +26,19 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { date, type GatewayApi, gatewayApi, type Profile, type ProfileData } from '../lib/api';
+import { Avatar } from './avatar-field';
 import { Channels } from './channels';
 import { NewProfileDialog, ProfileEditor } from './profile-editor';
+import { ModelDefaults, Providers } from './provider-settings';
 import { AccessKeys, Capabilities, Credentials, Memories } from './resources';
 import { Sessions } from './sessions';
 import { Badge, Button, Empty, Field, Mark, SectionHeading } from './ui';
 
 const navigation = [
   { id: 'overview', label: 'Visão geral', icon: LayoutDashboard, group: 'workspace' },
-  { id: 'profile', label: 'Identidade e modelo', icon: Fingerprint, group: 'workspace' },
+  { id: 'profile', label: 'Identidade', icon: Fingerprint, group: 'workspace' },
+  { id: 'providers', label: 'Providers', icon: Plug, group: 'workspace' },
+  { id: 'defaults', label: 'Modelos padrão', icon: Cpu, group: 'workspace' },
   { id: 'channels', label: 'Canais', icon: Smartphone, group: 'workspace' },
   { id: 'sessions', label: 'Conversas', icon: MessageSquare, group: 'workspace' },
   { id: 'memories', label: 'Memórias', icon: BookOpen, group: 'capabilities' },
@@ -45,7 +50,7 @@ const navigation = [
 
 type Section = (typeof navigation)[number]['id'];
 
-function Login({ connected }: { connected: (token: string, profiles: Profile[]) => void }) {
+function Login({ connected }: { connected: (profiles: Profile[]) => void }) {
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
@@ -101,9 +106,11 @@ function Login({ connected }: { connected: (token: string, profiles: Profile[]) 
             setError('');
 
             const token = String(new FormData(event.currentTarget).get('token')).trim();
+            const api = gatewayApi();
 
             try {
-              connected(token, await gatewayApi(token).profiles());
+              await api.signIn(token);
+              connected(await api.profiles());
             } catch (error) {
               setError(
                 error instanceof Error ? error.message : 'Não foi possível conectar ao Gateway.',
@@ -139,7 +146,8 @@ function Login({ connected }: { connected: (token: string, profiles: Profile[]) 
             <ArrowRight size={17} />
           </Button>
           <p className="secure-note">
-            <ShieldCheck size={16} />O token fica apenas nesta aba, até você sair ou recarregar.
+            <ShieldCheck size={16} />O token não fica no navegador: a sessão vira um cookie
+            assinado, ilegível por scripts, que expira em 30 dias.
           </p>
           <details className="login-help">
             <summary>
@@ -169,21 +177,22 @@ function Overview({
   const connected = data.channels.filter((item) => !item.revokedAt);
 
   const providerReady =
+    data.providers.some((item) => !item.revokedAt) ||
     !!profile.model.apiKeyEnv ||
-    data.credentials.some((item) => item.id === profile.model.credentialId && !item.revokedAt);
+    !!profile.model.credentialId;
 
   const steps = [
     {
       label: 'Definir identidade',
-      description: 'Propósito, modelo e limites do seu agente.',
+      description: 'Propósito e instruções do seu agente.',
       done: true,
       section: 'profile' as const,
     },
     {
       label: 'Conectar inteligência',
-      description: 'Adicione e selecione a credencial do provider.',
+      description: 'Adicione os providers que processam as conversas.',
       done: providerReady,
-      section: 'credentials' as const,
+      section: 'providers' as const,
     },
     {
       label: 'Criar uma conversa',
@@ -214,14 +223,14 @@ function Overview({
         }
       />
       <section className="profile-summary">
-        <div className="profile-avatar">{profile.name.slice(0, 1).toLocaleUpperCase()}</div>
+        <Avatar name={profile.name} avatar={profile.avatar} className="profile-avatar" />
         <div className="grow">
           <div className="eyebrow">PERFIL ATIVO</div>
           <h2>{profile.name}</h2>
-          <p>{profile.identity.role || 'Uma identidade compartilhada entre todas as sessões.'}</p>
+          <p>{profile.instructions.slice(0, 130)}</p>
           <div className="tag-list">
-            <span>{profile.model.provider}</span>
-            <code>{profile.model.modelId}</code>
+            <span>{data.providers.filter((item) => !item.revokedAt).length} providers</span>
+            <span>{data.sessions.length} conversas</span>
           </div>
         </div>
         <button className="text-button" type="button" onClick={() => go('profile')}>
@@ -289,25 +298,11 @@ function Overview({
             continua com ele.
           </h2>
           <p>
-            Memórias relevantes entram na conversa quando fazem sentido. Você define os limites de
-            consumo.
+            Memórias relevantes entram na conversa quando fazem sentido. O contexto se adapta ao
+            modelo usado em cada execução.
           </p>
-          <dl>
-            <div>
-              <dt>Contexto por etapa</dt>
-              <dd>
-                {profile.contextPolicy.inputTokens.toLocaleString('pt-BR')} <small>tokens</small>
-              </dd>
-            </div>
-            <div>
-              <dt>Memórias por etapa</dt>
-              <dd>
-                {profile.contextPolicy.memoryTokens.toLocaleString('pt-BR')} <small>tokens</small>
-              </dd>
-            </div>
-          </dl>
-          <button type="button" className="text-button" onClick={() => go('profile')}>
-            Ajustar limites
+          <button type="button" className="text-button" onClick={() => go('defaults')}>
+            Definir modelos padrão
             <ArrowRight size={16} />
           </button>
         </section>
@@ -374,30 +369,49 @@ function Overview({
 }
 
 async function profileData(api: GatewayApi, id: string): Promise<ProfileData> {
-  const [sessions, channels, credentials, keys, memories, activities, deliveries] =
-    await Promise.all([
-      api.sessions(id),
-      api.channels(id),
-      api.credentials(id),
-      api.keys(id),
-      api.memories(id),
-      api.activities(id),
-      api.deliveries(id),
-    ]);
+  const [
+    sessions,
+    channels,
+    credentials,
+    keys,
+    memories,
+    activities,
+    deliveries,
+    providers,
+    modelDefaults,
+  ] = await Promise.all([
+    api.sessions(id),
+    api.channels(id),
+    api.credentials(id),
+    api.keys(id),
+    api.memories(id),
+    api.activities(id),
+    api.deliveries(id),
+    api.providers(id),
+    api.modelDefaults(id),
+  ]);
 
-  return { sessions, channels, credentials, keys, memories, activities, deliveries };
+  return {
+    sessions,
+    channels,
+    credentials,
+    keys,
+    memories,
+    activities,
+    deliveries,
+    providers,
+    modelDefaults,
+  };
 }
 
 function Workspace({
-  token,
   initialProfiles,
   logout,
 }: {
-  token: string;
   initialProfiles: Profile[];
   logout: () => void;
 }) {
-  const api = useMemo(() => gatewayApi(token), [token]);
+  const api = useMemo(() => gatewayApi(), []);
   const [profiles, setProfiles] = useState(initialProfiles);
   const [selected, setSelected] = useState(initialProfiles[0]?.id ?? '');
   const [data, setData] = useState<{ profileId: string; value: ProfileData }>();
@@ -535,7 +549,7 @@ function Workspace({
         <div className="profile-selector">
           <label htmlFor="profile-picker">SEU ESPAÇO</label>
           <div>
-            <span className="mini-avatar">{profile?.name.slice(0, 1).toUpperCase() ?? '+'}</span>
+            <Avatar name={profile?.name} avatar={profile?.avatar} className="mini-avatar" />
             <select
               id="profile-picker"
               value={selected}
@@ -674,13 +688,20 @@ function Workspace({
                 </Button>
               }
             >
-              Comece com um nome, uma identidade e um modelo. As conexões vêm em seguida.
+              Comece com um nome e instruções. Depois conecte seus providers.
             </Empty>
           ) : props ? (
             <div key={props.profile.id} className="page-enter">
               {section === 'overview' && <Overview {...props} go={go} />}
               {section === 'profile' && (
                 <ProfileEditor key={`${props.profile.id}:${props.profile.version}`} {...props} />
+              )}
+              {section === 'providers' && <Providers {...props} />}
+              {section === 'defaults' && (
+                <ModelDefaults
+                  key={`${props.profile.id}:${props.data.modelDefaults.updatedAt}`}
+                  {...props}
+                />
               )}
               {section === 'channels' && <Channels {...props} />}
               {section === 'sessions' && <Sessions {...props} />}
@@ -704,12 +725,6 @@ function Workspace({
               )}
             </div>
           )}
-          <footer className="page-footer">
-            <span>
-              elos <span>·</span> Seu agente, conectado.
-            </span>
-            <span>Open source · Apache 2.0</span>
-          </footer>
         </main>
       </div>
       {newProfile && (
@@ -729,15 +744,38 @@ function Workspace({
 }
 
 export function GatewayConsole() {
-  const [auth, setAuth] = useState<{ token: string; profiles: Profile[] }>();
+  const [profiles, setProfiles] = useState<Profile[]>();
+  const [checking, setChecking] = useState(true);
 
-  return auth ? (
+  // A signed cookie from an earlier visit is enough to walk straight back in.
+  useEffect(() => {
+    gatewayApi()
+      .profiles()
+      .then(setProfiles)
+      .catch(() => undefined)
+      .finally(() => setChecking(false));
+  }, []);
+
+  if (checking) {
+    return (
+      <main className="boot" aria-busy="true">
+        <LoaderCircle size={22} className="spin" aria-label="Verificando a sessão" />
+      </main>
+    );
+  }
+
+  return profiles ? (
     <Workspace
-      token={auth.token}
-      initialProfiles={auth.profiles}
-      logout={() => setAuth(undefined)}
+      initialProfiles={profiles}
+      logout={async () => {
+        // The cookie is the session; a failed call must not leave the panel looking signed in.
+        await gatewayApi()
+          .signOut()
+          .catch(() => undefined);
+        setProfiles(undefined);
+      }}
     />
   ) : (
-    <Login connected={(token, profiles) => setAuth({ token, profiles })} />
+    <Login connected={setProfiles} />
   );
 }

@@ -50,21 +50,22 @@ Every administrative call needs `Authorization: Bearer <ELOS_API_TOKEN>`, includ
 `GET /openapi.json`. A copy without secrets lives in
 [`packages/contracts/openapi.json`](../packages/contracts/openapi.json).
 
-1. Create a profile with `POST /v1/profiles`, passing `name`, `instructions` and
-   `model: { provider, modelId }`.
-2. Store the provider key with `POST /v1/profiles/{profileId}/credentials`, passing
-   `label`, `kind: "provider"` and `secret`. The response carries metadata only.
-3. Point the profile at it with `PATCH`, an `expectedVersion` and
-   `model: { provider, modelId, credentialId }`.
-4. Issue a client key with `POST /v1/profiles/{profileId}/keys`, passing `label`, `scopes`
+1. Create a profile with `POST /v1/profiles`, passing `name` and `instructions`.
+2. Configure `ANTHROPIC_API_KEY` or `ANTHROPIC_API_TOKEN`, `GEMINI_API_TOKEN`, or
+   `OPENAI_API_KEY` in the gateway environment, or enter a key on the Providers screen.
+   OpenAI also accepts a ChatGPT/Codex login there. No provider registration or model
+   allowlist is required.
+3. Issue a client key with `POST /v1/profiles/{profileId}/keys`, passing `label`, `scopes`
    and `expiresAt`. Keep the returned token; it is never shown again.
-5. Create a session and post to
+4. Create a session and post to
    `POST /v1/profiles/{profileId}/sessions/{sessionId}/messages` with `text` and a
-   `requestKey` per message.
+   `requestKey` per message. The configured provider is selected automatically.
 
-Providers: `openai`, `anthropic`, `google` and `openai-compatible`, the last requiring a
-`baseURL`. Host-managed keys through `apiKeyEnv: "ELOS_PROVIDER_*"` still work. A profile
-without a credential can be configured but cannot start a run.
+The Providers screen has fixed Anthropic, Gemini and OpenAI settings. It detects
+`ANTHROPIC_API_KEY`, `ANTHROPIC_API_TOKEN`, `GEMINI_API_TOKEN` and `OPENAI_API_KEY`
+from the gateway environment without exposing their values. OpenAI also supports
+ChatGPT/Codex device-code login. Existing profile records with `model`, `apiKeyEnv` or
+`openai-compatible` remain compatible. The context policy still bounds history and memory.
 
 Repeating a `requestKey` with the same text returns the existing run; different content
 returns `409`. A profile allows up to 32 active or queued runs, one per session, and each
@@ -109,8 +110,9 @@ candidates from a text index and injects only relevant matches within the budget
 the full history stays in the database and is read page by page. This is lexical search:
 embeddings and model-written summaries are not implemented.
 
-`contextPolicy` sets the input, output reserve, memory, history, tool-result, step and
-per-run limits. Recognised OpenAI models use a local tokenizer; everything else falls back
+For new provider connections, the selected model determines bounded input, output,
+memory, history and tool-result limits. Legacy profiles retain `contextPolicy` until
+they use a registered model. Recognised OpenAI models use a local tokenizer; everything else falls back
 to a conservative one token per UTF-8 byte, and the provider's own reported usage is
 recorded separately. These limits reduce spend but do not replace the spending caps you
 set with the provider.
@@ -119,7 +121,7 @@ Skills advertise short descriptions and load their instructions through `load_sk
 runs over HTTP with an explicit allowlist of tools. A remote catalogue is discovered on
 connection and searched with `search_mcp_tools`; schemas reach the prompt only after
 `load_mcp_tools`. Large results become paginated artifacts, capped at 1 MB per result.
-MCP over stdio, interactive OAuth and arbitrary code execution are out of scope for now.
+MCP over stdio, MCP OAuth and arbitrary code execution are out of scope for now.
 
 ## Verification
 

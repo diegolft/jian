@@ -56,8 +56,9 @@ export async function boundToolResult(
 ): Promise<unknown> {
   const sanitized = redactOutput(output, secrets);
   const json = JSON.stringify(sanitized) ?? 'null';
-  const count = tokenCounter(run.profile.model.provider, run.profile.model.modelId);
-  const limit = run.profile.contextPolicy.toolResultTokens;
+  const model = run.model ?? run.profile.model;
+  const count = tokenCounter(model.provider, model.modelId);
+  const limit = (run.contextPolicy ?? run.profile.contextPolicy).toolResultTokens;
 
   if (count(json) <= limit) {
     return sanitized;

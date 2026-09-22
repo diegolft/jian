@@ -5,6 +5,2046 @@
     "version": "0.2.0"
   },
   "paths": {
+    "/v1/profiles/{profileId}/providers/openai/oauth": {
+      "post": {
+        "operationId": "startCodexLogin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required permission: admin.",
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "connected",
+                        "failed"
+                      ]
+                    },
+                    "verificationUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "userCode": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "getCodexLogin",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required permission: admin.",
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "connected",
+                        "failed"
+                      ]
+                    },
+                    "verificationUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "userCode": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/profiles/{profileId}/providers": {
+      "get": {
+        "operationId": "listProviders",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required permission: admin.",
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "openai",
+                          "anthropic",
+                          "google"
+                        ]
+                      },
+                      "models": {
+                        "minItems": 1,
+                        "maxItems": 30,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160
+                            },
+                            "contextWindow": {
+                              "type": "integer",
+                              "minimum": 4096,
+                              "maximum": 1000000
+                            },
+                            "maxOutputTokens": {
+                              "type": "integer",
+                              "minimum": 256,
+                              "maximum": 128000
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "contextWindow",
+                            "maxOutputTokens"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "credentialId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "apiKeyEnv": {
+                        "type": "string"
+                      },
+                      "authMode": {
+                        "type": "string",
+                        "enum": [
+                          "api",
+                          "codex"
+                        ]
+                      },
+                      "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "profileId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                      },
+                      "revokedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "kind",
+                      "models",
+                      "id",
+                      "profileId",
+                      "createdAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createProvider",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required permission: admin.",
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "openai",
+                      "anthropic",
+                      "google"
+                    ]
+                  },
+                  "credentialId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "models": {
+                    "minItems": 1,
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "contextWindow": {
+                          "type": "integer",
+                          "minimum": 4096,
+                          "maximum": 1000000
+                        },
+                        "maxOutputTokens": {
+                          "type": "integer",
+                          "minimum": 256,
+                          "maximum": 128000
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "contextWindow",
+                        "maxOutputTokens"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "kind",
+                  "credentialId",
+                  "models"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "openai",
+                        "anthropic",
+                        "google"
+                      ]
+                    },
+                    "models": {
+                      "minItems": 1,
+                      "maxItems": 30,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "contextWindow": {
+                            "type": "integer",
+                            "minimum": 4096,
+                            "maximum": 1000000
+                          },
+                          "maxOutputTokens": {
+                            "type": "integer",
+                            "minimum": 256,
+                            "maximum": 128000
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "contextWindow",
+                          "maxOutputTokens"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "credentialId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "apiKeyEnv": {
+                      "type": "string"
+                    },
+                    "authMode": {
+                      "type": "string",
+                      "enum": [
+                        "api",
+                        "codex"
+                      ]
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "profileId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "revokedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "kind",
+                    "models",
+                    "id",
+                    "profileId",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/profiles/{profileId}/providers/{providerId}": {
+      "delete": {
+        "operationId": "revokeProvider",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required permission: admin.",
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "providerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "openai",
+                        "anthropic",
+                        "google"
+                      ]
+                    },
+                    "models": {
+                      "minItems": 1,
+                      "maxItems": 30,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "contextWindow": {
+                            "type": "integer",
+                            "minimum": 4096,
+                            "maximum": 1000000
+                          },
+                          "maxOutputTokens": {
+                            "type": "integer",
+                            "minimum": 256,
+                            "maximum": 128000
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "contextWindow",
+                          "maxOutputTokens"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "credentialId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "apiKeyEnv": {
+                      "type": "string"
+                    },
+                    "authMode": {
+                      "type": "string",
+                      "enum": [
+                        "api",
+                        "codex"
+                      ]
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "profileId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "revokedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "kind",
+                    "models",
+                    "id",
+                    "profileId",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/profiles/{profileId}/model-defaults": {
+      "get": {
+        "operationId": "getModelDefaults",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required permission: admin.",
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "conversation": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "providerId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "modelId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "providerId",
+                        "modelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "channel": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "providerId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "modelId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "providerId",
+                        "modelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "profileId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "conversation",
+                    "channel",
+                    "id",
+                    "profileId",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "setModelDefaults",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required permission: admin.",
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "providerId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "modelId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      }
+                    },
+                    "required": [
+                      "providerId",
+                      "modelId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "channel": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "providerId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "modelId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      }
+                    },
+                    "required": [
+                      "providerId",
+                      "modelId"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "conversation",
+                  "channel"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "conversation": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "providerId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "modelId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "providerId",
+                        "modelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "channel": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "providerId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "modelId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "providerId",
+                        "modelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "profileId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "conversation",
+                    "channel",
+                    "id",
+                    "profileId",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/openapi.json": {
       "get": {
         "operationId": "getOpenAPI",
@@ -603,6 +2643,121 @@
                       "type": "string",
                       "format": "uuid",
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "model": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "enum": [
+                            "openai",
+                            "anthropic",
+                            "google",
+                            "openai-compatible",
+                            "openai-codex"
+                          ]
+                        },
+                        "modelId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "apiKeyEnv": {
+                          "type": "string",
+                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                        },
+                        "credentialId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "baseURL": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "modelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "modelSelection": {
+                      "type": "object",
+                      "properties": {
+                        "providerId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "modelId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "providerId",
+                        "modelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "contextPolicy": {
+                      "type": "object",
+                      "properties": {
+                        "inputTokens": {
+                          "default": 16000,
+                          "type": "integer",
+                          "minimum": 4096,
+                          "maximum": 128000
+                        },
+                        "outputTokens": {
+                          "default": 4096,
+                          "type": "integer",
+                          "minimum": 256,
+                          "maximum": 16000
+                        },
+                        "memoryTokens": {
+                          "default": 1500,
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 8000
+                        },
+                        "historyTokens": {
+                          "default": 6000,
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 32000
+                        },
+                        "toolResultTokens": {
+                          "default": 1500,
+                          "type": "integer",
+                          "minimum": 128,
+                          "maximum": 8000
+                        },
+                        "maxSteps": {
+                          "default": 12,
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 30
+                        },
+                        "maxRunTokens": {
+                          "default": 100000,
+                          "type": "integer",
+                          "minimum": 8192,
+                          "maximum": 1000000
+                        }
+                      },
+                      "required": [
+                        "inputTokens",
+                        "outputTokens",
+                        "memoryTokens",
+                        "historyTokens",
+                        "toolResultTokens",
+                        "maxSteps",
+                        "maxRunTokens"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -5745,6 +7900,433 @@
         }
       }
     },
+    "/v1/panel/session": {
+      "post": {
+        "operationId": "startPanelSession",
+        "security": [],
+        "description": "Required permission: public.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 512,
+                    "writeOnly": true
+                  }
+                },
+                "required": [
+                  "token"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "expiresAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "endPanelSession",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required permission: admin.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ended": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ended"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/profiles": {
       "get": {
         "operationId": "listProfiles",
@@ -5775,7 +8357,20 @@
                         "minLength": 1,
                         "maxLength": 8000
                       },
+                      "avatar": {
+                        "default": null,
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "maxLength": 100000,
+                        "pattern": "^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$"
+                      },
                       "model": {
+                        "default": {
+                          "provider": "openai",
+                          "modelId": "unconfigured"
+                        },
                         "type": "object",
                         "properties": {
                           "provider": {
@@ -5784,7 +8379,8 @@
                               "openai",
                               "anthropic",
                               "google",
-                              "openai-compatible"
+                              "openai-compatible",
+                              "openai-codex"
                             ]
                           },
                           "modelId": {
@@ -5794,7 +8390,7 @@
                           },
                           "apiKeyEnv": {
                             "type": "string",
-                            "pattern": "^ELOS_PROVIDER_[A-Z0-9_]+$"
+                            "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                           },
                           "credentialId": {
                             "type": "string",
@@ -6024,6 +8620,7 @@
                     "required": [
                       "name",
                       "instructions",
+                      "avatar",
                       "model",
                       "identity",
                       "contextPolicy",
@@ -6240,7 +8837,20 @@
                     "minLength": 1,
                     "maxLength": 8000
                   },
+                  "avatar": {
+                    "default": null,
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 100000,
+                    "pattern": "^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$"
+                  },
                   "model": {
+                    "default": {
+                      "provider": "openai",
+                      "modelId": "unconfigured"
+                    },
                     "type": "object",
                     "properties": {
                       "provider": {
@@ -6249,7 +8859,8 @@
                           "openai",
                           "anthropic",
                           "google",
-                          "openai-compatible"
+                          "openai-compatible",
+                          "openai-codex"
                         ]
                       },
                       "modelId": {
@@ -6259,7 +8870,7 @@
                       },
                       "apiKeyEnv": {
                         "type": "string",
-                        "pattern": "^ELOS_PROVIDER_[A-Z0-9_]+$"
+                        "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                       },
                       "credentialId": {
                         "type": "string",
@@ -6453,8 +9064,7 @@
                 },
                 "required": [
                   "name",
-                  "instructions",
-                  "model"
+                  "instructions"
                 ],
                 "additionalProperties": false
               }
@@ -6479,7 +9089,20 @@
                       "minLength": 1,
                       "maxLength": 8000
                     },
+                    "avatar": {
+                      "default": null,
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 100000,
+                      "pattern": "^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$"
+                    },
                     "model": {
+                      "default": {
+                        "provider": "openai",
+                        "modelId": "unconfigured"
+                      },
                       "type": "object",
                       "properties": {
                         "provider": {
@@ -6488,7 +9111,8 @@
                             "openai",
                             "anthropic",
                             "google",
-                            "openai-compatible"
+                            "openai-compatible",
+                            "openai-codex"
                           ]
                         },
                         "modelId": {
@@ -6498,7 +9122,7 @@
                         },
                         "apiKeyEnv": {
                           "type": "string",
-                          "pattern": "^ELOS_PROVIDER_[A-Z0-9_]+$"
+                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                         },
                         "credentialId": {
                           "type": "string",
@@ -6728,6 +9352,7 @@
                   "required": [
                     "name",
                     "instructions",
+                    "avatar",
                     "model",
                     "identity",
                     "contextPolicy",
@@ -6957,7 +9582,20 @@
                       "minLength": 1,
                       "maxLength": 8000
                     },
+                    "avatar": {
+                      "default": null,
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 100000,
+                      "pattern": "^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$"
+                    },
                     "model": {
+                      "default": {
+                        "provider": "openai",
+                        "modelId": "unconfigured"
+                      },
                       "type": "object",
                       "properties": {
                         "provider": {
@@ -6966,7 +9604,8 @@
                             "openai",
                             "anthropic",
                             "google",
-                            "openai-compatible"
+                            "openai-compatible",
+                            "openai-codex"
                           ]
                         },
                         "modelId": {
@@ -6976,7 +9615,7 @@
                         },
                         "apiKeyEnv": {
                           "type": "string",
-                          "pattern": "^ELOS_PROVIDER_[A-Z0-9_]+$"
+                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                         },
                         "credentialId": {
                           "type": "string",
@@ -7206,6 +9845,7 @@
                   "required": [
                     "name",
                     "instructions",
+                    "avatar",
                     "model",
                     "identity",
                     "contextPolicy",
@@ -7432,6 +10072,14 @@
                     "minLength": 1,
                     "maxLength": 8000
                   },
+                  "avatar": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 100000,
+                    "pattern": "^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$"
+                  },
                   "model": {
                     "type": "object",
                     "properties": {
@@ -7441,7 +10089,8 @@
                           "openai",
                           "anthropic",
                           "google",
-                          "openai-compatible"
+                          "openai-compatible",
+                          "openai-codex"
                         ]
                       },
                       "modelId": {
@@ -7451,7 +10100,7 @@
                       },
                       "apiKeyEnv": {
                         "type": "string",
-                        "pattern": "^ELOS_PROVIDER_[A-Z0-9_]+$"
+                        "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                       },
                       "credentialId": {
                         "type": "string",
@@ -7656,7 +10305,20 @@
                       "minLength": 1,
                       "maxLength": 8000
                     },
+                    "avatar": {
+                      "default": null,
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 100000,
+                      "pattern": "^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$"
+                    },
                     "model": {
+                      "default": {
+                        "provider": "openai",
+                        "modelId": "unconfigured"
+                      },
                       "type": "object",
                       "properties": {
                         "provider": {
@@ -7665,7 +10327,8 @@
                             "openai",
                             "anthropic",
                             "google",
-                            "openai-compatible"
+                            "openai-compatible",
+                            "openai-codex"
                           ]
                         },
                         "modelId": {
@@ -7675,7 +10338,7 @@
                         },
                         "apiKeyEnv": {
                           "type": "string",
-                          "pattern": "^ELOS_PROVIDER_[A-Z0-9_]+$"
+                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                         },
                         "credentialId": {
                           "type": "string",
@@ -7905,6 +10568,7 @@
                   "required": [
                     "name",
                     "instructions",
+                    "avatar",
                     "model",
                     "identity",
                     "contextPolicy",
@@ -8147,7 +10811,20 @@
                             "minLength": 1,
                             "maxLength": 8000
                           },
+                          "avatar": {
+                            "default": null,
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "maxLength": 100000,
+                            "pattern": "^data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$"
+                          },
                           "model": {
+                            "default": {
+                              "provider": "openai",
+                              "modelId": "unconfigured"
+                            },
                             "type": "object",
                             "properties": {
                               "provider": {
@@ -8156,7 +10833,8 @@
                                   "openai",
                                   "anthropic",
                                   "google",
-                                  "openai-compatible"
+                                  "openai-compatible",
+                                  "openai-codex"
                                 ]
                               },
                               "modelId": {
@@ -8166,7 +10844,7 @@
                               },
                               "apiKeyEnv": {
                                 "type": "string",
-                                "pattern": "^ELOS_PROVIDER_[A-Z0-9_]+$"
+                                "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                               },
                               "credentialId": {
                                 "type": "string",
@@ -8396,6 +11074,7 @@
                         "required": [
                           "name",
                           "instructions",
+                          "avatar",
                           "model",
                           "identity",
                           "contextPolicy",
@@ -9421,6 +12100,26 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 120
+                  },
+                  "model": {
+                    "type": "object",
+                    "properties": {
+                      "providerId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "modelId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      }
+                    },
+                    "required": [
+                      "providerId",
+                      "modelId"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -9516,6 +12215,121 @@
                       "type": "string",
                       "format": "uuid",
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "model": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "enum": [
+                            "openai",
+                            "anthropic",
+                            "google",
+                            "openai-compatible",
+                            "openai-codex"
+                          ]
+                        },
+                        "modelId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "apiKeyEnv": {
+                          "type": "string",
+                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                        },
+                        "credentialId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "baseURL": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "modelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "modelSelection": {
+                      "type": "object",
+                      "properties": {
+                        "providerId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "modelId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "providerId",
+                        "modelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "contextPolicy": {
+                      "type": "object",
+                      "properties": {
+                        "inputTokens": {
+                          "default": 16000,
+                          "type": "integer",
+                          "minimum": 4096,
+                          "maximum": 128000
+                        },
+                        "outputTokens": {
+                          "default": 4096,
+                          "type": "integer",
+                          "minimum": 256,
+                          "maximum": 16000
+                        },
+                        "memoryTokens": {
+                          "default": 1500,
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 8000
+                        },
+                        "historyTokens": {
+                          "default": 6000,
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 32000
+                        },
+                        "toolResultTokens": {
+                          "default": 1500,
+                          "type": "integer",
+                          "minimum": 128,
+                          "maximum": 8000
+                        },
+                        "maxSteps": {
+                          "default": 12,
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 30
+                        },
+                        "maxRunTokens": {
+                          "default": 100000,
+                          "type": "integer",
+                          "minimum": 8192,
+                          "maximum": 1000000
+                        }
+                      },
+                      "required": [
+                        "inputTokens",
+                        "outputTokens",
+                        "memoryTokens",
+                        "historyTokens",
+                        "toolResultTokens",
+                        "maxSteps",
+                        "maxRunTokens"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -10339,6 +13153,121 @@
                         "type": "string",
                         "format": "uuid",
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "model": {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "enum": [
+                              "openai",
+                              "anthropic",
+                              "google",
+                              "openai-compatible",
+                              "openai-codex"
+                            ]
+                          },
+                          "modelId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          },
+                          "apiKeyEnv": {
+                            "type": "string",
+                            "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                          },
+                          "credentialId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "baseURL": {
+                            "type": "string",
+                            "format": "uri"
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "modelId"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "modelSelection": {
+                        "type": "object",
+                        "properties": {
+                          "providerId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "modelId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160
+                          }
+                        },
+                        "required": [
+                          "providerId",
+                          "modelId"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "contextPolicy": {
+                        "type": "object",
+                        "properties": {
+                          "inputTokens": {
+                            "default": 16000,
+                            "type": "integer",
+                            "minimum": 4096,
+                            "maximum": 128000
+                          },
+                          "outputTokens": {
+                            "default": 4096,
+                            "type": "integer",
+                            "minimum": 256,
+                            "maximum": 16000
+                          },
+                          "memoryTokens": {
+                            "default": 1500,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 8000
+                          },
+                          "historyTokens": {
+                            "default": 6000,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 32000
+                          },
+                          "toolResultTokens": {
+                            "default": 1500,
+                            "type": "integer",
+                            "minimum": 128,
+                            "maximum": 8000
+                          },
+                          "maxSteps": {
+                            "default": 12,
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 30
+                          },
+                          "maxRunTokens": {
+                            "default": 100000,
+                            "type": "integer",
+                            "minimum": 8192,
+                            "maximum": 1000000
+                          }
+                        },
+                        "required": [
+                          "inputTokens",
+                          "outputTokens",
+                          "memoryTokens",
+                          "historyTokens",
+                          "toolResultTokens",
+                          "maxSteps",
+                          "maxRunTokens"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": [
@@ -10646,6 +13575,121 @@
                       "type": "string",
                       "format": "uuid",
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "model": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "enum": [
+                            "openai",
+                            "anthropic",
+                            "google",
+                            "openai-compatible",
+                            "openai-codex"
+                          ]
+                        },
+                        "modelId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "apiKeyEnv": {
+                          "type": "string",
+                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                        },
+                        "credentialId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "baseURL": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "modelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "modelSelection": {
+                      "type": "object",
+                      "properties": {
+                        "providerId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "modelId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "providerId",
+                        "modelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "contextPolicy": {
+                      "type": "object",
+                      "properties": {
+                        "inputTokens": {
+                          "default": 16000,
+                          "type": "integer",
+                          "minimum": 4096,
+                          "maximum": 128000
+                        },
+                        "outputTokens": {
+                          "default": 4096,
+                          "type": "integer",
+                          "minimum": 256,
+                          "maximum": 16000
+                        },
+                        "memoryTokens": {
+                          "default": 1500,
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 8000
+                        },
+                        "historyTokens": {
+                          "default": 6000,
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 32000
+                        },
+                        "toolResultTokens": {
+                          "default": 1500,
+                          "type": "integer",
+                          "minimum": 128,
+                          "maximum": 8000
+                        },
+                        "maxSteps": {
+                          "default": 12,
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 30
+                        },
+                        "maxRunTokens": {
+                          "default": 100000,
+                          "type": "integer",
+                          "minimum": 8192,
+                          "maximum": 1000000
+                        }
+                      },
+                      "required": [
+                        "inputTokens",
+                        "outputTokens",
+                        "memoryTokens",
+                        "historyTokens",
+                        "toolResultTokens",
+                        "maxSteps",
+                        "maxRunTokens"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -10952,6 +13996,121 @@
                       "type": "string",
                       "format": "uuid",
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "model": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "enum": [
+                            "openai",
+                            "anthropic",
+                            "google",
+                            "openai-compatible",
+                            "openai-codex"
+                          ]
+                        },
+                        "modelId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "apiKeyEnv": {
+                          "type": "string",
+                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                        },
+                        "credentialId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "baseURL": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "modelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "modelSelection": {
+                      "type": "object",
+                      "properties": {
+                        "providerId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "modelId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        }
+                      },
+                      "required": [
+                        "providerId",
+                        "modelId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "contextPolicy": {
+                      "type": "object",
+                      "properties": {
+                        "inputTokens": {
+                          "default": 16000,
+                          "type": "integer",
+                          "minimum": 4096,
+                          "maximum": 128000
+                        },
+                        "outputTokens": {
+                          "default": 4096,
+                          "type": "integer",
+                          "minimum": 256,
+                          "maximum": 16000
+                        },
+                        "memoryTokens": {
+                          "default": 1500,
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 8000
+                        },
+                        "historyTokens": {
+                          "default": 6000,
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 32000
+                        },
+                        "toolResultTokens": {
+                          "default": 1500,
+                          "type": "integer",
+                          "minimum": 128,
+                          "maximum": 8000
+                        },
+                        "maxSteps": {
+                          "default": 12,
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 30
+                        },
+                        "maxRunTokens": {
+                          "default": 100000,
+                          "type": "integer",
+                          "minimum": 8192,
+                          "maximum": 1000000
+                        }
+                      },
+                      "required": [
+                        "inputTokens",
+                        "outputTokens",
+                        "memoryTokens",
+                        "historyTokens",
+                        "toolResultTokens",
+                        "maxSteps",
+                        "maxRunTokens"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [

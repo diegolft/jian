@@ -26,6 +26,13 @@ import {
   submitSchema,
 } from './profile.js';
 import {
+  codexLoginSchema,
+  modelDefaultsInputSchema,
+  modelDefaultsRecordSchema,
+  providerInputSchema,
+  providerRecordSchema,
+} from './providers.js';
+import {
   checkpointSchema,
   continuationSchema,
   eventSchema,
@@ -41,6 +48,9 @@ import {
   credentialMetadataSchema,
   keyInputSchema,
   keyMetadataSchema,
+  panelSessionEndSchema,
+  panelSessionInputSchema,
+  panelSessionSchema,
   type Scope,
 } from './security.js';
 
@@ -64,6 +74,58 @@ export const cursorSchema = z.strictObject({
 });
 
 export const operations: Operation[] = [
+  {
+    method: 'POST',
+    path: `${profile}/providers/openai/oauth`,
+    operationId: 'startCodexLogin',
+    scope: 'admin',
+    response: codexLoginSchema,
+  },
+  {
+    method: 'GET',
+    path: `${profile}/providers/openai/oauth`,
+    operationId: 'getCodexLogin',
+    scope: 'admin',
+    response: codexLoginSchema,
+  },
+  {
+    method: 'GET',
+    path: `${profile}/providers`,
+    operationId: 'listProviders',
+    scope: 'admin',
+    response: z.array(providerRecordSchema),
+  },
+  {
+    method: 'POST',
+    path: `${profile}/providers`,
+    operationId: 'createProvider',
+    scope: 'admin',
+    body: providerInputSchema,
+    response: providerRecordSchema,
+    status: 201,
+  },
+  {
+    method: 'DELETE',
+    path: `${profile}/providers/:providerId`,
+    operationId: 'revokeProvider',
+    scope: 'admin',
+    response: providerRecordSchema,
+  },
+  {
+    method: 'GET',
+    path: `${profile}/model-defaults`,
+    operationId: 'getModelDefaults',
+    scope: 'admin',
+    response: modelDefaultsRecordSchema,
+  },
+  {
+    method: 'PUT',
+    path: `${profile}/model-defaults`,
+    operationId: 'setModelDefaults',
+    scope: 'admin',
+    body: modelDefaultsInputSchema,
+    response: modelDefaultsRecordSchema,
+  },
   {
     method: 'GET',
     path: '/openapi.json',
@@ -234,6 +296,23 @@ export const operations: Operation[] = [
     operationId: 'health',
     scope: 'public',
     response: z.strictObject({ status: z.literal('ok'), service: z.literal('elos') }),
+  },
+  {
+    // Public because the body carries the host token this route exists to verify.
+    method: 'POST',
+    path: '/v1/panel/session',
+    operationId: 'startPanelSession',
+    scope: 'public',
+    body: panelSessionInputSchema,
+    response: panelSessionSchema,
+    status: 201,
+  },
+  {
+    method: 'DELETE',
+    path: '/v1/panel/session',
+    operationId: 'endPanelSession',
+    scope: 'admin',
+    response: panelSessionEndSchema,
   },
   {
     method: 'GET',

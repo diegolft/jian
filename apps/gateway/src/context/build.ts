@@ -15,8 +15,9 @@ export function buildContext(
   run: Run,
   sources: ContextSources,
 ): { system: string; messages: Array<{ role: 'user' | 'assistant'; content: string }> } {
-  const policy = run.profile.contextPolicy;
-  const count = tokenCounter(run.profile.model.provider, run.profile.model.modelId);
+  const policy = run.contextPolicy ?? run.profile.contextPolicy;
+  const model = run.model ?? run.profile.model;
+  const count = tokenCounter(model.provider, model.modelId);
   const query = terms(run.input);
 
   const ranked = sources.memories
@@ -103,7 +104,11 @@ export function buildContext(
 
   const system = [
     run.profile.instructions,
-    `Identity: ${JSON.stringify(run.profile.identity)}`,
+    ...(Object.values(run.profile.identity).some((value) =>
+      Array.isArray(value) ? value.length > 0 : Boolean(value),
+    )
+      ? [`Identity: ${JSON.stringify(run.profile.identity)}`]
+      : []),
     sharedContextGuidance,
     `Relevant shared memories: ${JSON.stringify(relevant)}`,
     `Current activities: ${JSON.stringify(activities)}`,

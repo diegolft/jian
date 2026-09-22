@@ -33,3 +33,17 @@ export const keyMetadataSchema = keyInputSchema.extend({
   createdAt: z.iso.datetime(),
   revokedAt: z.iso.datetime().optional(),
 });
+
+/**
+ * The panel signs in once with the host token and then rides a signed, HttpOnly cookie, so the
+ * token itself never reaches browser storage and no script can read the session back.
+ */
+export const panelSessionInputSchema = z.strictObject({
+  token: z.string().min(32).max(512).meta({ writeOnly: true }),
+});
+
+export const panelSessionSchema = z.strictObject({
+  expiresAt: z.iso.datetime(),
+});
+
+export const panelSessionEndSchema = z.strictObject({ ended: z.literal(true) });

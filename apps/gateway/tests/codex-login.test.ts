@@ -1,0 +1,79 @@
+import { randomBytes } from 'node:crypto';
+import { afterEach, expect, it, vi } from 'vitest';
+import { Gateway } from '../src/gateway.js';
+import { SecretBox } from '../src/security/crypto.js';
+import { CodexLogin } from '../src/services/codex-login.js';
+import { Credentials } from '../src/services/credentials.js';
+import { MemoryStore } from './helpers/memory-store.js';
+
+afterEach(() => vi.useRealTimers());
+
+it('connects ChatGPT through device login without exposing tokens', async () => {
+  vi.useFakeTimers();
+  const gateway = new Gateway(new MemoryStore());
+  const profile = await gateway.createProfile({ name: 'OAuth', instructions: 'Help.' });
+  const credentials = new Credentials(
+    gateway,
+    new SecretBox({
+      activeKeyId: 'test',
+      keys: { test: randomBytes(32) },
+    }),
+  );
+  const token = `a.${Buffer.from(JSON.stringify({ exp: 4_000_000_000 })).toString('base64url')}.b`;
+  const fetcher = vi.fn<typeof fetch>(async (input) => {
+    const url = String(input);
+    if (url.endsWith('/deviceauth/usercode')) {
+      return Response.json({ user_code: 'ABCD-1234', device_auth_id: 'device-1', interval: 3 });
+    }
+    if (url.endsWith('/deviceauth/token')) {
+      return Response.json({ authorization_code: 'code', code_verifier: 'verifier' });
+    }
+    return Response.json({ access_token: token, refresh_token: 'synthetic-refresh' });
+  });
+  const login = new CodexLogin(gateway, credentials, fetcher);
+
+  const [first, second] = await Promise.all([login.start(profile.id), login.start(profile.id)]);
+  expect(first).toMatchObject({ status: 'pending', userCode: 'ABCD-1234' });
+  expect(second).toEqual(first);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(3000);
+  expect(await login.status(profile.id)).toEqual({ status: 'connected' });
+  const provider = (await gateway.providers(profile.id)).find((item) => item.authMode === 'codex');
+  expect(provider?.credentialId).toBeDefined();
+  expect(JSON.stringify(provider)).not.toContain('synthetic-refresh');
+  expect(await login.accessToken(profile.id, provider?.credentialId ?? '')).toBe(token);
+  const session = await gateway.createSession(profile.id, { title: 'ChatGPT' });
+  const run = await gateway.submit(profile.id, session.id, { text: 'Hello', requestKey: 'oauth' });
+  expect(run.model?.provider).toBe('openai-codex');
+});
+
+it('renews a rotating OAuth token once for concurrent runs', async () => {
+  const gateway = new Gateway(new MemoryStore());
+  const profile = await gateway.createProfile({ name: 'Refresh', instructions: 'Help.' });
+  const credentials = new Credentials(
+    gateway,
+    new SecretBox({ activeKeyId: 'test', keys: { test: randomBytes(32) } }),
+  );
+  const expired = `a.${Buffer.from(JSON.stringify({ exp: 1 })).toString('base64url')}.b`;
+  const fresh = `a.${Buffer.from(JSON.stringify({ exp: 4_000_000_000 })).toString('base64url')}.b`;
+  const credential = await credentials.create(profile.id, {
+    label: 'ChatGPT',
+    kind: 'provider',
+    secret: JSON.stringify({ access_token: expired, refresh_token: 'first-refresh' }),
+  });
+  const fetcher = vi.fn<typeof fetch>(async () =>
+    Response.json({ access_token: fresh, refresh_token: 'second-refresh' }),
+  );
+  const login = new CodexLogin(gateway, credentials, fetcher);
+
+  expect(
+    await Promise.all([
+      login.accessToken(profile.id, credential.id),
+      login.accessToken(profile.id, credential.id),
+    ]),
+  ).toEqual([fresh, fresh]);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(await credentials.resolve(profile.id, credential.id, 'provider')).toContain(
+    'second-refresh',
+  );
+});

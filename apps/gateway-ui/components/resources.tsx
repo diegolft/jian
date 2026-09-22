@@ -351,8 +351,8 @@ export function Memories({ profile, data, api, mutate, busy }: Props) {
       <div className="notice">
         <BookOpen size={18} />
         <p>
-          O Gateway seleciona as memórias relevantes para cada pedido, respeitando o orçamento de{' '}
-          {profile.contextPolicy.memoryTokens.toLocaleString('pt-BR')} tokens.
+          O Gateway seleciona as memórias relevantes para cada pedido. O orçamento acompanha o
+          modelo escolhido para a execução.
         </p>
       </div>
       {data.memories.length ? (

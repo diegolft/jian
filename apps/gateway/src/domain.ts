@@ -2,8 +2,10 @@ import type {
   Checkpoint,
   Memory,
   Message,
+  ModelDefaultsRecord,
   Profile,
   ProfileRevision,
+  ProviderRecord,
   Run,
   Session,
 } from '@elos/contracts';
@@ -16,6 +18,8 @@ export * from '@elos/contracts';
 
 export type Records = {
   profile: Profile;
+  provider: ProviderRecord;
+  modelDefault: ModelDefaultsRecord;
   revision: ProfileRevision;
   session: Session;
   message: Message;

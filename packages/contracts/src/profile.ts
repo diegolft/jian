@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { modelSelectionSchema } from './providers.js';
 
 const endpointSchema = z.url().refine((value) => {
   const url = new URL(value);
@@ -13,11 +14,13 @@ const endpointSchema = z.url().refine((value) => {
 
 export const modelSchema = z
   .strictObject({
-    provider: z.enum(['openai', 'anthropic', 'google', 'openai-compatible']),
+    provider: z.enum(['openai', 'anthropic', 'google', 'openai-compatible', 'openai-codex']),
     modelId: z.string().trim().min(1).max(160),
     apiKeyEnv: z
       .string()
-      .regex(/^ELOS_PROVIDER_[A-Z0-9_]+$/)
+      .regex(
+        /^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$/,
+      )
       .optional(),
     credentialId: z.uuid().optional(),
     baseURL: endpointSchema.optional(),
@@ -78,10 +81,26 @@ export const contextPolicySchema = z
     path: ['outputTokens'],
   });
 
+/**
+ * The profile picture travels inline so every client renders it from the profile it already
+ * fetched. It stays out of `identity` because identity is serialized into the system prompt
+ * and is writable by a self-managing agent; base64 belongs in neither. The cap keeps a
+ * profile write inside the 256 KB request body limit — roughly a 256x256 JPEG.
+ */
+export const avatarSchema = z
+  .string()
+  .regex(
+    /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/,
+    'Use an inline PNG, JPEG or WebP image',
+  )
+  .max(100_000, 'The picture must stay under 100 kB encoded');
+
 export const profileSchema = z.strictObject({
   name: z.string().trim().min(1).max(100),
   instructions: z.string().trim().min(1).max(8_000),
-  model: modelSchema,
+  avatar: avatarSchema.nullable().default(null),
+  // Retained for existing installations and old runs; new profiles choose models per run.
+  model: modelSchema.default({ provider: 'openai', modelId: 'unconfigured' }),
   identity: identitySchema.default(() => identitySchema.parse({})),
   contextPolicy: contextPolicySchema.default(() => contextPolicySchema.parse({})),
   skills: z.array(skillSchema).max(20).default([]),
@@ -91,6 +110,9 @@ export const profileSchema = z.strictObject({
 
 export const profilePatchSchema = profileSchema.partial().extend({
   expectedVersion: z.number().int().positive(),
+  // Absent keeps the current picture; an explicit null removes it.
+  avatar: avatarSchema.nullable().optional(),
+  model: modelSchema.optional(),
   identity: identitySchema.optional(),
   contextPolicy: contextPolicySchema.optional(),
   skills: z.array(skillSchema).max(20).optional(),
@@ -109,6 +131,7 @@ export const sessionSchema = z.strictObject({
 export const submitSchema = z.strictObject({
   text: z.string().trim().min(1).max(8_000),
   requestKey: z.string().min(1).max(120),
+  model: modelSelectionSchema.optional(),
 });
 
 export const memorySchema = z.strictObject({

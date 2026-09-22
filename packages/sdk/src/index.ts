@@ -3,15 +3,22 @@ import type { paths } from './generated.js';
 
 export type { components, operations, paths } from './generated.js';
 
-/** Keep credentials in the caller's secure storage; each client belongs to one access key. */
+/**
+ * Keep credentials in the caller's secure storage; each client belongs to one access key.
+ * A caller that authenticates by cookie, such as the panel, passes headers and no token.
+ */
 export function createElosClient(options: {
   baseUrl: string;
-  token: string;
+  token?: string;
+  headers?: Record<string, string>;
   fetch?: typeof globalThis.fetch;
 }) {
   return createClient<paths>({
     baseUrl: options.baseUrl,
-    headers: { Authorization: `Bearer ${options.token}` },
+    headers: {
+      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+      ...options.headers,
+    },
     fetch: options.fetch,
   });
 }

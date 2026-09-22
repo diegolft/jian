@@ -20,7 +20,7 @@ uses explicit memory writes; it does not claim automatic semantic understanding.
 All sessions in a profile share one owner's trust boundary. Separate profiles are
 isolated. Group chats and multi-user access require a later ACL design.
 
-Provider credentials are environment references, never API-returned secret values.
+Provider API keys are encrypted in the per-profile vault and never API-returned secret values.
 Administrative bearer authentication protects every endpoint except liveness.
 MCP HTTP servers have explicit tool allowlists. Profile self-editing is opt-in,
 versioned and cannot grant new provider credentials or management permissions.

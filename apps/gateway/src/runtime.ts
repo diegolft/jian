@@ -57,32 +57,37 @@ export class AgentRuntime {
     pulse.unref();
 
     try {
-      const policy = run.profile.contextPolicy;
+      const policy = run.contextPolicy ?? run.profile.contextPolicy;
+      const config = run.model ?? run.profile.model;
       let providerKey: string | undefined;
 
-      if (run.profile.model.credentialId) {
+      if (config.provider === 'openai-codex' && config.credentialId) {
+        if (!this.options.codexLogin) throw new Error('ChatGPT login is unavailable');
+        providerKey = await this.options.codexLogin.accessToken(profileId, config.credentialId);
+        secrets.add(providerKey);
+      } else if (config.credentialId) {
         if (!this.options.credentials) {
           throw new Error('Provider credential is not configured');
         }
 
         providerKey = await this.options.credentials.resolve(
           profileId,
-          run.profile.model.credentialId,
+          config.credentialId,
           'provider',
         );
 
         secrets.add(providerKey);
       }
 
-      if (run.profile.model.apiKeyEnv) {
-        const selectedEnvKey = process.env[run.profile.model.apiKeyEnv];
+      if (config.apiKeyEnv) {
+        const selectedEnvKey = process.env[config.apiKeyEnv];
 
         if (selectedEnvKey) {
           secrets.add(selectedEnvKey);
         }
       }
 
-      const model = await this.model(run.profile.model, process.env, outbound.fetch, providerKey);
+      const model = await this.model(config, process.env, outbound.fetch, providerKey);
       const tools = profileTools(this.gateway, run);
       const { mcpToolNames, selectedMcpTools } = await connectMcpTools(run, tools, {
         credentials: this.options.credentials,
@@ -204,8 +209,8 @@ export class AgentRuntime {
           ) as ToolSet;
 
           const fitted = fitPrompt({
-            provider: run.profile.model.provider,
-            modelId: run.profile.model.modelId,
+            provider: config.provider,
+            modelId: config.modelId,
             policy,
             instructions: refreshed.system,
             messages,
@@ -228,7 +233,7 @@ export class AgentRuntime {
           };
         },
         onStepEnd: async ({ text, toolCalls, toolResults, finishReason, usage }) => {
-          const estimate = tokenCounter(run.profile.model.provider, run.profile.model.modelId);
+          const estimate = tokenCounter(config.provider, config.modelId);
 
           const inputTokens =
             usage.inputTokens && usage.inputTokens > 0 ? usage.inputTokens : preparedInputTokens;

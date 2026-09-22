@@ -21,7 +21,7 @@ Para rotacionar:
 
 Rotação do envelope não troca a chave no provider. Para trocar a credencial externa, crie outra credencial no cofre, atualize o perfil com controle de versão e revogue a anterior. Runs enfileirados guardam a configuração antiga; cancele-os se a revogação for urgente.
 
-O token administrativo legado fica no ambiente, separado do banco. Troque-o no host e reinicie API/workers. Nunca envie segredos em parâmetros de URL; use HTTPS e armazene tokens do cliente no cofre do sistema operacional.
+O token administrativo legado fica no ambiente, separado do banco. Troque-o no host e reinicie API/workers; a troca também invalida os cookies de sessão do painel, que são assinados com ele. Nunca envie segredos em parâmetros de URL; use HTTPS e armazene tokens do cliente no cofre do sistema operacional.
 
 ## Rede e limites
 

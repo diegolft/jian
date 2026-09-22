@@ -3,7 +3,9 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { LanguageModel } from 'ai';
+import { createCodexModel } from './codex-model.js';
 import type { ModelConfig } from './domain.js';
+import { providerEnvironment } from './provider-catalog.js';
 import { createSafeFetch } from './security/outbound.js';
 
 const defaultOutbound = createSafeFetch();
@@ -14,7 +16,15 @@ export function resolveModel(
   fetcher: typeof globalThis.fetch = defaultOutbound.fetch,
   explicitKey?: string,
 ): LanguageModel {
-  const apiKey = explicitKey ?? (config.apiKeyEnv ? env[config.apiKeyEnv] : undefined);
+  const apiKey =
+    explicitKey ??
+    (config.apiKeyEnv ? env[config.apiKeyEnv] : undefined) ??
+    (config.apiKeyEnv ||
+    config.credentialId ||
+    config.provider === 'openai-compatible' ||
+    config.provider === 'openai-codex'
+      ? undefined
+      : env[providerEnvironment(config.provider, env) ?? '']);
 
   if (!apiKey) {
     throw new Error('Provider credential is not configured');
@@ -23,8 +33,17 @@ export function resolveModel(
   switch (config.provider) {
     case 'openai':
       return createOpenAI({ apiKey, baseURL: config.baseURL, fetch: fetcher })(config.modelId);
+    case 'openai-codex':
+      return createCodexModel(apiKey, config.modelId, fetcher);
     case 'anthropic':
-      return createAnthropic({ apiKey, baseURL: config.baseURL, fetch: fetcher })(config.modelId);
+      return createAnthropic({
+        ...(config.credentialId ||
+        (config.apiKeyEnv ?? providerEnvironment('anthropic', env)) !== 'ANTHROPIC_API_TOKEN'
+          ? { apiKey }
+          : { authToken: apiKey }),
+        baseURL: config.baseURL,
+        fetch: fetcher,
+      })(config.modelId);
     case 'google':
       return createGoogleGenerativeAI({ apiKey, baseURL: config.baseURL, fetch: fetcher })(
         config.modelId,
