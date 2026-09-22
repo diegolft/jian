@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { afterEach, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
+import { ModelCatalog } from '../src/providers/catalog-source.js';
 import { ProviderModels } from '../src/providers/discovery.js';
 import { testServices } from './helpers/services.js';
 
@@ -15,9 +16,20 @@ afterEach(async () => {
 const listing = (...ids: string[]) =>
   Response.json({ data: ids.map((id) => ({ id, display_name: id.toUpperCase() })) });
 
-async function setup(respond: () => Promise<Response>) {
+/** A catalog served from a fixture: the tests never reach models.dev. */
+function testCatalog(entries: Record<string, unknown> = {}) {
+  const body = { anthropic: { models: entries } };
+
+  return new ModelCatalog(
+    (async () => Response.json(body)) as typeof globalThis.fetch,
+    () => 0,
+    'https://models.test/api.json',
+  );
+}
+
+async function setup(respond: () => Promise<Response>, catalog?: ModelCatalog) {
   let now = 1_700_000_000_000;
-  const services = await testServices(() => now);
+  const services = await testServices(() => now, catalog);
   const profile = await services.profiles.createProfile({ name: 'Atlas', instructions: 'Help.' });
   const provider = await services.providers.createProvider(profile.id, {
     name: 'Anthropic',
@@ -27,6 +39,7 @@ async function setup(respond: () => Promise<Response>) {
   const models = new ProviderModels(services, respond, {
     ttlMs: 60_000,
     clock: () => now,
+    ...(catalog ? { catalog } : {}),
   });
 
   return {
@@ -105,16 +118,25 @@ it('answers inside the cache window without reaching the provider again', async 
   expect(await models.list(profile.id, provider.id)).toMatchObject({ stale: false });
 });
 
-it('offers a model the capability table does not know, marked and held to the floor', async () => {
-  const { services, profile, provider, models } = await setup(async () =>
-    listing('claude-sonnet-4-5', 'claude-next-experimental'),
+it('takes what the public catalog knows and marks the model it does not cover', async () => {
+  const { services, profile, provider, models } = await setup(
+    async () => listing('claude-sonnet-4-5', 'claude-next-experimental'),
+    testCatalog({
+      'claude-sonnet-4-5': {
+        name: 'Claude Sonnet 4.5',
+        limit: { context: 200_000, output: 64_000 },
+        modalities: { input: ['text', 'image', 'pdf'] },
+        reasoning_options: [{ type: 'effort', values: ['low', 'medium', 'high'] }],
+      },
+    }),
   );
 
   const list = await models.list(profile.id, provider.id);
   const known = list.models.find((model) => model.id === 'claude-sonnet-4-5');
   const unknown = list.models.find((model) => model.id === 'claude-next-experimental');
 
-  expect(known).toMatchObject({ known: true, contextWindow: 200_000 });
+  // Nothing about this model is written in this repository: it comes from the catalog.
+  expect(known).toMatchObject({ known: true, contextWindow: 200_000, maxOutputTokens: 64_000 });
   expect(known?.reasoningEfforts).toContain('high');
   expect(unknown).toMatchObject({
     known: false,
@@ -130,13 +152,24 @@ it('offers a model the capability table does not know, marked and held to the fl
 
   expect(saved.conversation?.modelId).toBe('claude-next-experimental');
 
-  // An effort we cannot vouch for is refused rather than guessed at the provider.
+  // Nor does an uncatalogued model refuse an effort: the provider is the one who knows.
+  const withEffort = await services.providers.setModelDefaults(profile.id, {
+    conversation: {
+      providerId: provider.id,
+      modelId: 'claude-next-experimental',
+      reasoningEffort: 'high',
+    },
+  });
+
+  expect(withEffort.conversation?.reasoningEffort).toBe('high');
+
+  // A level the catalog does contradict is still refused.
   await expect(
     services.providers.setModelDefaults(profile.id, {
       conversation: {
         providerId: provider.id,
-        modelId: 'claude-next-experimental',
-        reasoningEffort: 'high',
+        modelId: 'claude-sonnet-4-5',
+        reasoningEffort: 'minimal',
       },
     }),
   ).rejects.toMatchObject({ statusCode: 409 });

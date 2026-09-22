@@ -10,6 +10,7 @@ import { GatewayError } from '../core/errors.js';
 import type { Vault } from '../security/vault.js';
 import { bareModelId, modelCapabilities } from './capabilities.js';
 import type { ProviderKind } from './catalog.js';
+import type { ModelCatalog } from './catalog-source.js';
 import type { ProviderAdmin } from './port.js';
 import { providerSecret } from './service.js';
 
@@ -55,19 +56,24 @@ function toEfforts(parameters: string[] | undefined): ModelCapabilities['reasoni
   return parameters?.includes('reasoning_effort') ? ['low', 'medium', 'high'] : [];
 }
 
-function parseRouted(body: unknown): ProviderModel[] {
+function parseRouted(body: unknown, catalog: ModelCatalog | undefined): ProviderModel[] {
   return routed
     .parse(body)
     .data.slice(0, 1000)
     .map((model) => ({
       id: model.id,
       ...(model.name ? { displayName: model.name.slice(0, 200) } : {}),
-      ...modelCapabilities('openrouter', model.id, {
-        contextWindow: model.context_length,
-        maxOutputTokens: model.top_provider?.max_completion_tokens ?? undefined,
-        reasoningEfforts: toEfforts(model.supported_parameters),
-        inputModalities: toModalities(model.architecture?.input_modalities),
-      }),
+      ...modelCapabilities(
+        'openrouter',
+        model.id,
+        {
+          contextWindow: model.context_length,
+          maxOutputTokens: model.top_provider?.max_completion_tokens ?? undefined,
+          reasoningEfforts: toEfforts(model.supported_parameters),
+          inputModalities: toModalities(model.architecture?.input_modalities),
+        },
+        catalog?.lookup('openrouter', model.id),
+      ),
     }))
     .sort((a, b) => a.id.localeCompare(b.id))
     .slice(0, 500);
@@ -89,9 +95,13 @@ const listed = z.object({
     .optional(),
 });
 
-function parse(kind: ProviderKind, body: unknown): ProviderModel[] {
+function parse(
+  kind: ProviderKind,
+  body: unknown,
+  catalog: ModelCatalog | undefined,
+): ProviderModel[] {
   if (kind === 'openrouter') {
-    return parseRouted(body);
+    return parseRouted(body, catalog);
   }
 
   const payload = listed.parse(body);
@@ -119,7 +129,7 @@ function parse(kind: ProviderKind, body: unknown): ProviderModel[] {
     unique.set(row.id, {
       id: row.id,
       ...(row.displayName ? { displayName: row.displayName.slice(0, 200) } : {}),
-      ...modelCapabilities(kind, row.id, row.reported),
+      ...modelCapabilities(kind, row.id, row.reported, catalog?.lookup(kind, row.id)),
     });
   }
 
@@ -132,6 +142,7 @@ export interface ProviderModelOptions {
   ttlMs?: number;
   env?: NodeJS.ProcessEnv;
   clock?: Clock;
+  catalog?: ModelCatalog;
 }
 
 /**
@@ -147,6 +158,7 @@ export class ProviderModels {
   private readonly cache = new Map<string, Entry>();
   private readonly inflight = new Map<string, Promise<ProviderModelList>>();
   private readonly ttlMs: number;
+  private readonly catalog: ModelCatalog | undefined;
   private readonly env: NodeJS.ProcessEnv;
   private readonly clock: Clock;
 
@@ -156,6 +168,7 @@ export class ProviderModels {
     options: ProviderModelOptions = {},
   ) {
     this.ttlMs = options.ttlMs ?? 60_000;
+    this.catalog = options.catalog;
     this.env = options.env ?? process.env;
     this.clock = options.clock ?? Date.now;
   }
@@ -259,7 +272,9 @@ export class ProviderModels {
       throw new Error(`O provider respondeu ${response.status} ao listar modelos.`);
     }
 
-    return parse(kind, await response.json());
+    await this.catalog?.prime();
+
+    return parse(kind, await response.json(), this.catalog);
   }
 
   private async apiKey(profileId: string, provider: ProviderRecord) {

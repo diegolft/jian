@@ -10,6 +10,7 @@ import { WhatsAppChannel } from './channels/whatsapp/adapter.js';
 import { WhatsAppConnections } from './channels/whatsapp/connections.js';
 import { createWhatsAppDeviceFactory } from './channels/whatsapp/driver.js';
 import { Coordination } from './coordination/service.js';
+import { ModelCatalog } from './providers/catalog-source.js';
 import { CodexLogin } from './providers/codex/login.js';
 import { ProviderModels } from './providers/discovery.js';
 import { RunQueue } from './runs/queue.js';
@@ -62,19 +63,23 @@ try {
   process.exit(1);
 }
 
-const vault = new Vault(store, box);
-// The store rides along: several consumers read records no single area owns.
-const services = { ...buildServices({ store, vault }), store };
-const codexLogin = new CodexLogin(services, vault);
-
 const outbound = createSafeFetch({
   allowPrivateOrigins: config.data.JIAN_ALLOW_PRIVATE_ORIGINS.split(',')
     .map((value) => value.trim())
     .filter(Boolean),
 });
 
-// Model listings go out through the same guarded client as every other provider call.
-const providerModels = new ProviderModels(services, outbound.fetch);
+// What each model can do is read from a catalog maintained outside this repository, so a model
+// released today works today. It goes out through the same guarded client as every other
+// provider call, and a run never waits on it: an unread catalog falls through to the floor.
+const catalog = new ModelCatalog(outbound.fetch);
+
+const vault = new Vault(store, box);
+// The store rides along: several consumers read records no single area owns.
+const services = { ...buildServices({ store, vault, catalog }), store };
+const codexLogin = new CodexLogin(services, vault);
+
+const providerModels = new ProviderModels(services, outbound.fetch, { catalog });
 
 // Skill import reaches GitHub through the same guarded client, and only for the owner.
 const skills = new Skills(services.profiles, outbound.fetch);

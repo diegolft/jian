@@ -3,6 +3,7 @@ import type { Clock } from './core/clock.js';
 import { Memories } from './memories/service.js';
 import { Peers } from './peers/service.js';
 import { Profiles } from './profiles/service.js';
+import type { ModelCatalog } from './providers/catalog-source.js';
 import { Providers } from './providers/service.js';
 import { RunLifecycle } from './runs/lifecycle.js';
 import { Runs } from './runs/service.js';
@@ -27,13 +28,15 @@ export function buildServices({
   store,
   vault,
   clock = Date.now,
+  catalog,
 }: {
   store: Store;
   vault: Vault;
   clock?: Clock;
+  catalog?: ModelCatalog;
 }): Services {
   const profiles = new Profiles(store, vault, clock);
-  const providers = new Providers(store, profiles, vault, clock);
+  const providers = new Providers(store, profiles, vault, clock, catalog);
   const sessions = new Sessions(store, profiles, clock);
   const memories = new Memories(store, profiles, sessions, clock);
   const runs = new Runs(store, profiles, sessions, providers, clock);

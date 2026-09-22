@@ -17,6 +17,7 @@ import type { Vault } from '../security/vault.js';
 import type { Queryable, Store } from '../storage/database.js';
 import { modelCapabilities } from './capabilities.js';
 import { environmentProvider, providerKinds } from './catalog.js';
+import type { ModelCatalog } from './catalog-source.js';
 import {
   findProvider,
   insertProvider,
@@ -40,6 +41,7 @@ export class Providers {
     private readonly profiles: ProfileReader,
     private readonly vault: Vault,
     private readonly clock: Clock = Date.now,
+    private readonly catalog?: ModelCatalog,
   ) {}
 
   async providers(profileId: string) {
@@ -185,15 +187,22 @@ export class Providers {
     // Which models exist is the provider's answer and can change between two requests, so a
     // selection is never checked against a list: a provider outage would otherwise revoke a
     // model the owner already chose. Only the provider itself has to be live.
-    const model = modelCapabilities(provider.kind, selection.modelId);
+    const model = modelCapabilities(
+      provider.kind,
+      selection.modelId,
+      undefined,
+      this.catalog?.lookup(provider.kind, selection.modelId),
+    );
 
-    if (selection.reasoningEffort && !model.reasoningEfforts.includes(selection.reasoningEffort)) {
-      throw new GatewayError(
-        409,
-        model.known
-          ? 'This model does not accept the selected reasoning effort'
-          : 'Reasoning effort is not catalogued for this model',
-      );
+    // Only a model whose accepted levels are actually known can have a level refused here.
+    // For anything uncatalogued the provider is the authority: refusing on our own missing
+    // information is how a working model ends up unusable.
+    if (
+      selection.reasoningEffort &&
+      model.reasoningEfforts.length > 0 &&
+      !model.reasoningEfforts.includes(selection.reasoningEffort)
+    ) {
+      throw new GatewayError(409, 'This model does not accept the selected reasoning effort');
     }
 
     // Ceilings, not targets: a large context window must not inflate routine memory/history.
