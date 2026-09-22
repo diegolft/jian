@@ -4,12 +4,12 @@ import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
 import type { Reader, Store } from '../core/store.js';
-import type { Profiles } from '../profiles/service.js';
+import type { ProfileReader } from '../profiles/port.js';
 
 export class Sessions {
   constructor(
     private readonly store: Store,
-    private readonly profiles: Profiles,
+    private readonly profiles: ProfileReader,
     private readonly clock: Clock = Date.now,
   ) {}
 

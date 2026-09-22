@@ -3,14 +3,14 @@ import { type Clock, nowIso } from '../core/clock.js';
 import { GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
 import type { Store } from '../core/store.js';
-import type { Profiles } from '../profiles/service.js';
-import type { Sessions } from '../sessions/service.js';
+import type { ProfileReader } from '../profiles/port.js';
+import type { SessionReader } from '../sessions/port.js';
 
 export class Memories {
   constructor(
     private readonly store: Store,
-    private readonly profiles: Profiles,
-    private readonly sessions: Sessions,
+    private readonly profiles: ProfileReader,
+    private readonly sessions: SessionReader,
     private readonly clock: Clock = Date.now,
   ) {}
 

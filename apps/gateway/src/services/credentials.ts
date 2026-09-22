@@ -9,7 +9,7 @@ import {
 import type { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
 import type { Store } from '../core/store.js';
-import type { Profiles } from '../profiles/service.js';
+import type { ProfileReader } from '../profiles/port.js';
 import type { EncryptedSecret, SecretBox } from '../security/crypto.js';
 import { hashToken, issueToken } from '../security/tokens.js';
 
@@ -22,7 +22,7 @@ export type AccessKeyRecord = z.infer<typeof keyMetadataSchema> & { hash: string
 /** Only metadata leaves this service. AAD prevents copying a secret between profiles or purposes. */
 export class Credentials {
   constructor(
-    private readonly services: { profiles: Profiles; store: Store },
+    private readonly services: { profiles: ProfileReader; store: Store },
     private readonly box: SecretBox,
   ) {}
 

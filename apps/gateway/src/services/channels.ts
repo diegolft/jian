@@ -5,10 +5,10 @@ import type { ChannelRequest, DeliveryOutcome, IncomingMessage } from '../channe
 import { ChannelRegistry } from '../channels/registry.js';
 import { assertFound, GatewayError } from '../core/errors.js';
 import type { Store } from '../core/store.js';
-import type { Profiles } from '../profiles/service.js';
-import type { Runs } from '../runs/service.js';
+import type { ProfileReader } from '../profiles/port.js';
+import type { RunWriter } from '../runs/port.js';
 import { issueToken, verifyToken } from '../security/tokens.js';
-import type { Sessions } from '../sessions/service.js';
+import type { SessionWriter } from '../sessions/port.js';
 import type { Credentials } from './credentials.js';
 
 export type ChannelRecord = z.infer<typeof channelSchema> & { tokenHash: string };
@@ -20,9 +20,9 @@ const UNCERTAIN_DELIVERY_AFTER_MS = 10 * 60_000;
 
 /** Owns access checks and durable delivery state, independently of each protocol adapter. */
 type ChannelServices = {
-  profiles: Profiles;
-  sessions: Sessions;
-  runs: Runs;
+  profiles: ProfileReader;
+  sessions: SessionWriter;
+  runs: RunWriter;
   store: Store;
 };
 

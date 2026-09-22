@@ -12,9 +12,9 @@ import {
 import { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
 import type { Store } from '../core/store.js';
-import type { Profiles } from '../profiles/service.js';
-import type { Runs } from '../runs/service.js';
-import type { Sessions } from '../sessions/service.js';
+import type { ProfileReader } from '../profiles/port.js';
+import type { RunReader } from '../runs/port.js';
+import type { SessionReader } from '../sessions/port.js';
 
 export type ArtifactRecord = z.infer<typeof artifactSchema>;
 
@@ -27,9 +27,9 @@ const releaseSchema = leaseInputSchema
   .extend({ fence: z.number().int().positive() });
 
 type CoordinationServices = {
-  profiles: Profiles;
-  sessions: Sessions;
-  runs: Runs;
+  profiles: ProfileReader;
+  sessions: SessionReader;
+  runs: RunReader;
   store: Store;
 };
 

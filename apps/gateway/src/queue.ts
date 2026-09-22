@@ -1,6 +1,6 @@
 import type { PgBoss } from 'pg-boss';
 import type { Store } from './core/store.js';
-import type { RunLifecycle } from './runs/lifecycle.js';
+import type { RunRecovery } from './runs/port.js';
 import type { AgentRuntime } from './runtime.js';
 
 const queueName = 'elos-agent-runs';
@@ -12,7 +12,7 @@ export class RunQueue {
 
   constructor(
     private boss: PgBoss,
-    private services: { lifecycle: RunLifecycle; store: Store },
+    private services: { lifecycle: RunRecovery; store: Store },
     private runtime: AgentRuntime,
     private report: (message: string) => void = console.error,
   ) {}

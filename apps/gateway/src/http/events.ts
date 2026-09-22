@@ -2,13 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { GatewayError } from '../core/errors.js';
 import type { Store } from '../core/store.js';
-import type { Profiles } from '../profiles/service.js';
+import type { ProfileReader } from '../profiles/port.js';
 import type { Credentials } from '../services/credentials.js';
 
 type ProfileParams = { profileId: string };
 
 interface EventOptions {
-  profiles: Profiles;
+  profiles: ProfileReader;
   store: Store;
   token: string;
   credentials?: Credentials;

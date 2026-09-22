@@ -57,8 +57,8 @@ export class Profiles {
     return profile;
   }
 
-  /** Public because a provider write validates the same references before it lands. */
-  async validateCredentials(profile: Profile, reader: Reader) {
+  /** A profile may only name credentials of its own, unrevoked and of the matching kind. */
+  private async validateCredentials(profile: Profile, reader: Reader) {
     for (const names of [
       profile.skills.map((skill) => skill.name),
       profile.mcpServers.map((server) => server.name),

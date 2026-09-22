@@ -1,14 +1,14 @@
 import type { Run } from '@elos/contracts';
 import type { Store } from '../core/store.js';
-import type { Runs } from '../runs/service.js';
-import type { Sessions } from '../sessions/service.js';
+import type { RunReader } from '../runs/port.js';
+import type { SessionReader } from '../sessions/port.js';
 import { buildContext } from './build.js';
 
 export class Contexts {
   constructor(
     private readonly store: Store,
-    private readonly runs: Runs,
-    private readonly sessions: Sessions,
+    private readonly runs: RunReader,
+    private readonly sessions: SessionReader,
   ) {}
 
   async context(run: Run) {

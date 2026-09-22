@@ -4,7 +4,7 @@ import { type Clock, nowIso } from '../core/clock.js';
 import { GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
 import type { Store } from '../core/store.js';
-import type { Runs } from './service.js';
+import type { RunReader } from './port.js';
 
 /** The lease is the right to apply external effects, so a stale owner must never write. */
 function assertOwned(run: Run, owner: string, clock: Clock): void {
@@ -16,7 +16,7 @@ function assertOwned(run: Run, owner: string, clock: Clock): void {
 export class RunLifecycle {
   constructor(
     private readonly store: Store,
-    private readonly runs: Runs,
+    private readonly runs: RunReader,
     private readonly clock: Clock = Date.now,
   ) {}
 

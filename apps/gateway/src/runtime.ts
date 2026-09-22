@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { MCPClient } from '@ai-sdk/mcp';
 import { stepCountIs, ToolLoopAgent, type ToolSet } from 'ai';
 import { fitPrompt, tokenCounter } from './context/budget.js';
-import type { Contexts } from './context/service.js';
+import type { ContextSource } from './context/port.js';
 import { resolveModel } from './providers/models.js';
 import { connectMcpTools } from './runtime/mcp.js';
 import { boundToolResult, redactOutput, redactText } from './runtime/results.js';
@@ -13,7 +13,7 @@ import { profileTools, type ToolServices } from './tools.js';
 export type { RuntimeOptions } from './runtime/types.js';
 
 /** The run services the runtime drives, plus what it hands to the tool set it builds. */
-export type RuntimeServices = ToolServices & { contexts: Contexts };
+export type RuntimeServices = ToolServices & { contexts: ContextSource };
 
 export class AgentRuntime {
   private controllers = new Map<string, AbortController>();

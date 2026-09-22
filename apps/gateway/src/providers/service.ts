@@ -13,7 +13,7 @@ import { type Clock, nowIso } from '../core/clock.js';
 import { GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
 import type { Reader, Store } from '../core/store.js';
-import type { Profiles } from '../profiles/service.js';
+import type { ProfileReader } from '../profiles/port.js';
 import { environmentProvider, type ProviderKind, providerCatalog } from './catalog.js';
 
 /** The ceilings a run freezes; the run record keeps them optional for pre-selection runs. */
@@ -22,7 +22,7 @@ export type ContextPolicy = NonNullable<Run['contextPolicy']>;
 export class Providers {
   constructor(
     private readonly store: Store,
-    private readonly profiles: Profiles,
+    private readonly profiles: ProfileReader,
     private readonly clock: Clock = Date.now,
   ) {}
 

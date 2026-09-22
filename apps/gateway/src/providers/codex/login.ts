@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { GatewayError } from '../../core/errors.js';
-import type { Profiles } from '../../profiles/service.js';
+import type { ProfileReader } from '../../profiles/port.js';
 import type { Credentials } from '../../services/credentials.js';
-import type { Providers } from '../service.js';
+import type { ProviderAdmin } from '../port.js';
 
 const clientId = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const authOrigin = 'https://auth.openai.com';
@@ -25,7 +25,7 @@ export class CodexLogin {
   private stopped = false;
 
   constructor(
-    private readonly services: { profiles: Profiles; providers: Providers },
+    private readonly services: { profiles: ProfileReader; providers: ProviderAdmin },
     private readonly credentials: Credentials,
     private readonly fetcher: typeof fetch = fetch,
   ) {}

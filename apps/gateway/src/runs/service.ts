@@ -10,19 +10,19 @@ import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound, GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
 import type { Reader, Store } from '../core/store.js';
-import type { Profiles } from '../profiles/service.js';
+import type { ProfileReader } from '../profiles/port.js';
 import { environmentProvider, type ProviderKind, providerCatalog } from '../providers/catalog.js';
-import type { Providers } from '../providers/service.js';
-import type { Sessions } from '../sessions/service.js';
+import type { ProviderSelection } from '../providers/port.js';
+import type { SessionReader } from '../sessions/port.js';
 
 const active = (run: Run) => run.status === 'running' || run.status === 'queued';
 
 export class Runs {
   constructor(
     private readonly store: Store,
-    private readonly profiles: Profiles,
-    private readonly sessions: Sessions,
-    private readonly providers: Providers,
+    private readonly profiles: ProfileReader,
+    private readonly sessions: SessionReader,
+    private readonly providers: ProviderSelection,
     private readonly clock: Clock = Date.now,
   ) {}
 
