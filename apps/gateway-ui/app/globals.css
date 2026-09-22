@@ -1,18 +1,18 @@
 /* The panel's stylesheet, in cascade order. Each import owns one surface. */
 
-@import './styles/base.css';
-@import './styles/brand.css';
-@import './styles/controls.css';
-@import './styles/shell.css';
-@import './styles/overview.css';
-@import './styles/resources.css';
-@import './styles/channels.css';
-@import './styles/memories.css';
-@import './styles/settings.css';
-@import './styles/forms.css';
-@import './styles/feedback.css';
-@import './styles/modal.css';
-@import './styles/conversations.css';
-@import './styles/login.css';
-@import './styles/motion.css';
-@import './styles/responsive.css';
+@import "./styles/base.css";
+@import "./styles/brand.css";
+@import "./styles/controls.css";
+@import "./styles/shell.css";
+@import "./styles/overview.css";
+@import "./styles/resources.css";
+@import "./styles/channels.css";
+@import "./styles/memories.css";
+@import "./styles/settings.css";
+@import "./styles/forms.css";
+@import "./styles/feedback.css";
+@import "./styles/modal.css";
+@import "./styles/conversations.css";
+@import "./styles/login.css";
+@import "./styles/motion.css";
+@import "./styles/responsive.css";
