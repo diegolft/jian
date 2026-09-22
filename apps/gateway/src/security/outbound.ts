@@ -1,7 +1,10 @@
 import { promises as dns } from 'node:dns';
 import { isIP } from 'node:net';
 import ipaddr from 'ipaddr.js';
-import { Agent } from 'undici';
+// The agent and the request have to come from the same undici: Node bundles its own copy,
+// and handing a dispatcher built here to Node's `fetch` pairs two versions that only agree by
+// luck. On Node 24 they do not, and every outbound call fails on the handler interface.
+import { Agent, fetch as undiciFetch } from 'undici';
 
 const METADATA_HOSTS = new Set([
   'metadata',
@@ -148,6 +151,31 @@ export interface SafeFetchOptions {
   lookup?: (hostname: string) => Promise<readonly string[]>;
 }
 
+/**
+ * undici's own `fetch` does not take Node's global `Request`, so one is flattened into a URL
+ * and an init. The body is read here because a stream cannot be handed to both.
+ */
+async function asUndiciRequest(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+): Promise<{ url: string; init: Record<string, unknown> }> {
+  if (!(input instanceof Request)) {
+    return { url: String(input), init: (init ?? {}) as Record<string, unknown> };
+  }
+
+  const body = ['GET', 'HEAD'].includes(input.method) ? undefined : await input.arrayBuffer();
+
+  return {
+    url: input.url,
+    init: {
+      method: input.method,
+      headers: Object.fromEntries(input.headers.entries()),
+      ...(body && body.byteLength > 0 ? { body: Buffer.from(body) } : {}),
+      ...((init ?? {}) as Record<string, unknown>),
+    },
+  };
+}
+
 /** The failure code of an error or of whatever it was raised from, and nothing else of it. */
 function reason(error: unknown): string {
   const codes: string[] = [];
@@ -244,11 +272,13 @@ export function createSafeFetch(options: SafeFetchOptions = {}): {
     }
 
     try {
-      return await globalThis.fetch(input, {
-        ...init,
+      const request = await asUndiciRequest(input, init);
+
+      return (await undiciFetch(request.url, {
+        ...request.init,
         redirect: 'error',
         dispatcher: agent,
-      } as RequestInit);
+      })) as unknown as Response;
     } catch (error) {
       // The cause carries the address and can carry a credential, so only its code travels —
       // which is the part that says whether the host refused, resolved or timed out.
