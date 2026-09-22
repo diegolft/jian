@@ -1,7 +1,8 @@
 name: Image
+# A release publishes the image, and nothing else does: a tag is the only commit anyone
+# has said is worth running. `workflow_dispatch` stays for building one by hand.
 on:
   push:
-    branches: [main]
     tags: ['v*.*.*']
   workflow_dispatch:
 env:
@@ -93,8 +94,6 @@ jobs:
           # Every tag is stated: `latest=auto` would also move latest on a dispatch.
           flavor: latest=false
           tags: |
-            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
-            type=sha,format=short,prefix=,enable=${{ github.ref == 'refs/heads/main' }}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
