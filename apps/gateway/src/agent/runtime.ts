@@ -407,11 +407,10 @@ function executionFailureMessage(error: unknown, uncertain: boolean, aborted: bo
     return 'Execution interrupted. Inspect saved steps before continuing.';
   }
 
-  if (
-    error instanceof Error &&
-    ['Context budget exceeded', 'Run token budget exceeded'].includes(error.message)
-  ) {
-    return 'Context or run token budget exceeded. Reduce context or tool selection before retrying.';
+  // A budget failure is the gateway's own arithmetic, so its numbers are safe to show and are
+  // the only way the owner can tell which limit to raise.
+  if (error instanceof Error && /^(Context|Run token) budget exceeded/.test(error.message)) {
+    return error.message;
   }
 
   // The provider's own status says more than any guess here, and none of these leak a key.

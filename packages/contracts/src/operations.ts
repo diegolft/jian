@@ -21,6 +21,7 @@ import {
   pageQuerySchema,
 } from './coordination.js';
 import {
+  builtinSkillSchema,
   memoryKeySchema,
   profilePatchSchema,
   profileSchema,
@@ -353,6 +354,13 @@ export const operations: Operation[] = [
     operationId: 'endPanelSession',
     access: 'admin',
     response: panelSessionEndSchema,
+  },
+  {
+    method: 'GET',
+    path: `${profile}/built-in-skills`,
+    operationId: 'listBuiltinSkills',
+    access: 'admin',
+    response: z.array(builtinSkillSchema).max(50),
   },
   {
     method: 'GET',

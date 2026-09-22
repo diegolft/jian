@@ -198,7 +198,7 @@ it('stops a run after its cumulative token cap without making another model call
   const services = await testServices();
   const profile = await services.profiles.createProfile({
     ...input,
-    contextPolicy: { maxRunTokens: 8192 },
+    contextPolicy: { maxRunTokens: 32000 },
   });
   const session = await services.sessions.createSession(profile.id, { title: 'Budget' });
   const run = await services.runs.submit(profile.id, session.id, {
@@ -222,7 +222,7 @@ it('stops a run after its cumulative token cap without making another model call
         ],
         finishReason: { unified: 'tool-calls', raw: 'tool-calls' },
         usage: {
-          inputTokens: { total: 8000, noCache: 8000, cacheRead: 0, cacheWrite: 0 },
+          inputTokens: { total: 32000, noCache: 32000, cacheRead: 0, cacheWrite: 0 },
           outputTokens: { total: 300, text: 300, reasoning: 0 },
         },
         warnings: [],
@@ -233,7 +233,7 @@ it('stops a run after its cumulative token cap without making another model call
   await new AgentRuntime(services, () => model).execute(profile.id, run.id);
 
   expect((await services.runs.run(profile.id, run.id)).usage).toEqual({
-    inputTokens: 8000,
+    inputTokens: 32000,
     outputTokens: 300,
     steps: 1,
   });
@@ -246,7 +246,7 @@ it('uses conservative estimates when a provider omits usage counters', async () 
   const services = await testServices();
   const profile = await services.profiles.createProfile({
     ...input,
-    contextPolicy: { maxRunTokens: 8192 },
+    contextPolicy: { maxRunTokens: 32000 },
   });
   const session = await services.sessions.createSession(profile.id, { title: 'Missing usage' });
 
@@ -303,7 +303,8 @@ it('reports a safe context-budget error when required prompt content cannot fit'
   const profile = await services.profiles.createProfile({
     ...input,
     instructions: 'x'.repeat(8000),
-    contextPolicy: { inputTokens: 4096, outputTokens: 256 },
+    // The smallest legal budget that cannot hold the tool definitions and the prompt.
+    contextPolicy: { inputTokens: 16000, outputTokens: 15000 },
   });
 
   const session = await services.sessions.createSession(profile.id, { title: 'Budget' });
@@ -327,7 +328,8 @@ it('reports a safe context-budget error when required prompt content cannot fit'
 
   expect(calls).toBe(0);
   expect(finished.status).toBe('failed');
-  expect(finished.error).toContain('budget exceeded');
+  expect(finished.error).toContain('Context budget exceeded');
+  expect(finished.error).toContain('Tool definitions cost');
   expect(finished.error).not.toContain('credential');
 });
 

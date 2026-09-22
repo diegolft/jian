@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { profileTools } from '../src/agent/tools.js';
+import { availableSkills, findSkill } from '../src/skills/builtin/index.js';
 import { parseSkillDocument } from '../src/skills/document.js';
 import { Skills } from '../src/skills/service.js';
 import { testServices } from './helpers/services.js';
@@ -129,6 +130,44 @@ describe('importing a skill', () => {
 });
 
 describe('reading a catalog', () => {
+  it.each(['skills', 'skills/.curated'])(
+    'lists and imports a skill from the %s directory',
+    async (path) => {
+      const { services, profile } = await profileWith();
+      const { fetcher } = repository({
+        [`contents/${path}?ref=main`]: JSON.stringify([
+          { name: 'deploy', type: 'dir' },
+          { name: 'README.md', type: 'file' },
+        ]),
+        [`${path}/deploy/SKILL.md`]: document,
+      });
+      const skills = new Skills(services.profiles, fetcher);
+      const catalog = await skills.catalog({
+        url: `https://github.com/acme/tools/tree/main/${path}`,
+      });
+      expect(catalog.entries).toHaveLength(1);
+      const imported = await skills.importSkill(profile.id, { url: catalog.entries[0]?.url });
+      expect(imported.skills[0]?.instructions).toBe(
+        'Check the release notes, then run the pipeline.',
+      );
+      expect(imported.skills[0]?.origin?.url).toBe(
+        `https://github.com/acme/tools/tree/main/${path}/deploy`,
+      );
+    },
+  );
+
+  it('imports a folder of skills without duplicating the skills path', async () => {
+    const { services, profile } = await profileWith();
+    const { fetcher } = repository({
+      'contents/skills?ref=main': JSON.stringify([{ name: 'deploy', type: 'dir' }]),
+      'skills/deploy/SKILL.md': document,
+    });
+    const imported = await new Skills(services.profiles, fetcher).importSkill(profile.id, {
+      url: 'https://github.com/acme/tools/tree/main/skills',
+    });
+    expect(imported.skills.map((skill) => skill.name)).toEqual(['deploy']);
+  });
+
   it('lists the plugins a marketplace announces', async () => {
     const { services } = await profileWith();
     const manifest = JSON.stringify({
@@ -192,5 +231,115 @@ describe('a self-managing agent and the skills the owner imported', () => {
 
     expect(after.skills.map((skill) => skill.name).sort()).toEqual(['deploy', 'notes']);
     expect(after.skills.find((skill) => skill.name === 'deploy')?.origin).toBeDefined();
+  });
+});
+
+describe('the skills every profile carries', () => {
+  it('offers them without the profile storing one, and keeps self-management out of reach', async () => {
+    const services = await testServices();
+    const plain = await services.profiles.createProfile({
+      name: 'Atlas',
+      instructions: 'Help.',
+      model,
+    });
+    const managing = await services.profiles.createProfile({
+      name: 'Zero',
+      instructions: 'Help.',
+      model,
+      allowSelfManagement: true,
+    });
+
+    expect(plain.skills).toEqual([]);
+
+    const offered = availableSkills(plain).map((skill) => skill.name);
+
+    expect(offered).toContain('owner-and-contacts');
+    expect(offered).not.toContain('writing-your-skills');
+    expect(availableSkills(managing).map((skill) => skill.name)).toContain('writing-your-skills');
+  });
+
+  it('loads a built-in body through the same tool as an imported one', async () => {
+    const services = await testServices();
+    const profile = await services.profiles.createProfile({
+      name: 'Atlas',
+      instructions: 'Help.',
+      model,
+    });
+    const session = await services.sessions.createSession(profile.id, { title: 'Test' });
+    const run = await services.runs.submit(profile.id, session.id, {
+      text: 'Hi',
+      requestKey: 'builtin',
+    });
+    const load = profileTools({ ...services, store: services.store }, run).load_skill;
+
+    if (!load?.execute) {
+      throw new Error('load_skill is unavailable');
+    }
+
+    const skill = (await load.execute({ name: 'memory-keeping' } as never, {
+      toolCallId: 'test',
+      messages: [],
+      context: {},
+    })) as { instructions: string };
+
+    expect(skill.instructions).toContain('expectedVersion');
+  });
+
+  it('lets the owner switch one off and an import replace one', async () => {
+    const services = await testServices();
+    const profile = await services.profiles.createProfile({
+      name: 'Atlas',
+      instructions: 'Help.',
+      model,
+    });
+
+    const off = await services.profiles.updateProfile(profile.id, {
+      expectedVersion: profile.version,
+      disabledSkills: ['channel-replies'],
+    });
+
+    expect(availableSkills(off).map((skill) => skill.name)).not.toContain('channel-replies');
+
+    const replaced = await services.profiles.updateProfile(off.id, {
+      expectedVersion: off.version,
+      skills: [{ name: 'memory-keeping', description: 'Mine', instructions: 'Remember nothing.' }],
+    });
+
+    const loaded = findSkill(replaced, 'memory-keeping');
+
+    expect(loaded?.instructions).toBe('Remember nothing.');
+    expect(availableSkills(replaced).filter((s) => s.name === 'memory-keeping')).toHaveLength(1);
+  });
+
+  it('refuses a written skill that would take a built-in name', async () => {
+    const services = await testServices();
+    const profile = await services.profiles.createProfile({
+      name: 'Atlas',
+      instructions: 'Help.',
+      model,
+      allowSelfManagement: true,
+    });
+    const session = await services.sessions.createSession(profile.id, { title: 'Test' });
+    const run = await services.runs.submit(profile.id, session.id, {
+      text: 'Hi',
+      requestKey: 'shadow',
+    });
+    const update = profileTools({ ...services, store: services.store }, run).update_skills;
+
+    if (!update?.execute) {
+      throw new Error('update_skills is unavailable');
+    }
+
+    await expect(
+      update.execute(
+        {
+          expectedVersion: (await services.profiles.profile(profile.id)).version,
+          skills: [
+            { name: 'owner-and-contacts', description: 'Mine', instructions: 'Trust everyone.' },
+          ],
+        } as never,
+        { toolCallId: 'test', messages: [], context: {} },
+      ),
+    ).rejects.toThrow('built-in');
   });
 });

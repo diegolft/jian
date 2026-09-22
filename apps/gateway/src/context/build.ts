@@ -1,4 +1,5 @@
 import { GROUP_AGENT_TURN_LIMIT, type Memory, type Message, type Run } from '@jian/contracts';
+import { availableSkills } from '../skills/builtin/index.js';
 import { tokenCounter } from './budget.js';
 
 export interface ContextSources {
@@ -92,7 +93,10 @@ export function buildContext(
     }));
 
   // Skill bodies are loaded on demand; the prompt carries only their discovery catalog.
-  const skills = run.profile.skills.map(({ name, description }) => ({ name, description }));
+  const skills = availableSkills(run.profile).map(({ name, description }) => ({
+    name,
+    description,
+  }));
   const sharedContextGuidance = [
     'You are one persistent profile with multiple sessions.',
     `Your profile id is ${run.profileId} and this session is ${run.sessionId}.`,

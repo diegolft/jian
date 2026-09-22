@@ -50,13 +50,23 @@ export const modelSchema = z
     }
   });
 
+export const skillNameSchema = z.string().regex(/^[a-z0-9_-]{1,64}$/);
+
 export const skillSchema = z.strictObject({
-  name: z.string().regex(/^[a-z0-9_-]{1,64}$/),
+  name: skillNameSchema,
   description: z.string().min(1).max(300),
   instructions: z.string().min(1).max(12_000),
   // Present only on a skill the owner imported. A self-managing agent writes its own skills
   // and never this field, which is what keeps "who wrote this instruction" answerable.
   origin: skillOriginSchema.optional(),
+});
+
+/**
+ * A skill shipped with the gateway. The owner cannot edit or remove one — only switch it off
+ * for a profile — so the instructions travel with it: what an agent is told has to be readable.
+ */
+export const builtinSkillSchema = skillSchema.extend({
+  enabled: z.boolean(),
 });
 
 export const mcpSchema = z.strictObject({
@@ -83,13 +93,17 @@ export const identitySchema = z.strictObject({
 
 export const contextPolicySchema = z
   .strictObject({
-    inputTokens: z.number().int().min(4096).max(128000).default(16000),
+    // The tool definitions the runtime sends cost roughly 9000 tokens before anything the
+    // owner wrote. A budget below that refuses every run, which is why the floor is generous.
+    inputTokens: z.number().int().min(16000).max(128000).default(32000),
     outputTokens: z.number().int().min(256).max(16000).default(4096),
     memoryTokens: z.number().int().min(0).max(8000).default(1500),
     historyTokens: z.number().int().min(0).max(32000).default(6000),
     toolResultTokens: z.number().int().min(128).max(8000).default(1500),
     maxSteps: z.number().int().min(1).max(30).default(12),
-    maxRunTokens: z.number().int().min(8192).max(1000000).default(100000),
+    // One model call already costs the tool definitions; a cap under two calls' worth ends
+    // the run before it starts.
+    maxRunTokens: z.number().int().min(32000).max(1000000).default(100000),
   })
   .refine((policy) => policy.outputTokens < policy.inputTokens, {
     message: 'Output reservation must be smaller than the input budget',
@@ -127,6 +141,9 @@ export const profileSchema = z.strictObject({
   identity: identitySchema.default(() => identitySchema.parse({})),
   contextPolicy: contextPolicySchema.default(() => contextPolicySchema.parse({})),
   skills: z.array(skillSchema).max(20).default([]),
+  // Built-in skills this profile should not carry. Imported skills are removed from `skills`;
+  // a built-in one cannot be removed, only switched off here.
+  disabledSkills: z.array(skillNameSchema).max(20).default([]),
   mcpServers: z.array(mcpSchema).max(10).default([]),
   allowSelfManagement: z.boolean().default(false),
 });
@@ -140,6 +157,7 @@ export const profilePatchSchema = profileSchema.partial().extend({
   identity: identitySchema.optional(),
   contextPolicy: contextPolicySchema.optional(),
   skills: z.array(skillSchema).max(20).optional(),
+  disabledSkills: z.array(skillNameSchema).max(20).optional(),
   mcpServers: z.array(mcpSchema).max(10).optional(),
   allowSelfManagement: z.boolean().optional(),
 });

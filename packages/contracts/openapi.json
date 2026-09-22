@@ -3483,9 +3483,9 @@
                       "type": "object",
                       "properties": {
                         "inputTokens": {
-                          "default": 16000,
+                          "default": 32000,
                           "type": "integer",
-                          "minimum": 4096,
+                          "minimum": 16000,
                           "maximum": 128000
                         },
                         "outputTokens": {
@@ -3521,7 +3521,7 @@
                         "maxRunTokens": {
                           "default": 100000,
                           "type": "integer",
-                          "minimum": 8192,
+                          "minimum": 32000,
                           "maximum": 1000000
                         }
                       },
@@ -10311,6 +10311,274 @@
         }
       }
     },
+    "/v1/profiles/{profileId}/built-in-skills": {
+      "get": {
+        "operationId": "listBuiltinSkills",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required permission: admin.",
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "maxItems": 50,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9_-]{1,64}$"
+                      },
+                      "description": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      },
+                      "instructions": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 12000
+                      },
+                      "origin": {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "maxLength": 600,
+                            "format": "uri"
+                          },
+                          "ref": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "marketplace": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "plugin": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "importedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                          }
+                        },
+                        "required": [
+                          "url",
+                          "importedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "enabled": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "description",
+                      "instructions",
+                      "enabled"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/profiles/{profileId}/skill-catalog": {
       "get": {
         "operationId": "listSkillCatalog",
@@ -10743,7 +11011,7 @@
                     },
                     "contextPolicy": {
                       "default": {
-                        "inputTokens": 16000,
+                        "inputTokens": 32000,
                         "outputTokens": 4096,
                         "memoryTokens": 1500,
                         "historyTokens": 6000,
@@ -10754,9 +11022,9 @@
                       "type": "object",
                       "properties": {
                         "inputTokens": {
-                          "default": 16000,
+                          "default": 32000,
                           "type": "integer",
-                          "minimum": 4096,
+                          "minimum": 16000,
                           "maximum": 128000
                         },
                         "outputTokens": {
@@ -10792,7 +11060,7 @@
                         "maxRunTokens": {
                           "default": 100000,
                           "type": "integer",
-                          "minimum": 8192,
+                          "minimum": 32000,
                           "maximum": 1000000
                         }
                       },
@@ -10867,6 +11135,15 @@
                           "instructions"
                         ],
                         "additionalProperties": false
+                      }
+                    },
+                    "disabledSkills": {
+                      "default": [],
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9_-]{1,64}$"
                       }
                     },
                     "mcpServers": {
@@ -10946,6 +11223,7 @@
                     "identity",
                     "contextPolicy",
                     "skills",
+                    "disabledSkills",
                     "mcpServers",
                     "allowSelfManagement",
                     "id",
@@ -11277,7 +11555,7 @@
                       },
                       "contextPolicy": {
                         "default": {
-                          "inputTokens": 16000,
+                          "inputTokens": 32000,
                           "outputTokens": 4096,
                           "memoryTokens": 1500,
                           "historyTokens": 6000,
@@ -11288,9 +11566,9 @@
                         "type": "object",
                         "properties": {
                           "inputTokens": {
-                            "default": 16000,
+                            "default": 32000,
                             "type": "integer",
-                            "minimum": 4096,
+                            "minimum": 16000,
                             "maximum": 128000
                           },
                           "outputTokens": {
@@ -11326,7 +11604,7 @@
                           "maxRunTokens": {
                             "default": 100000,
                             "type": "integer",
-                            "minimum": 8192,
+                            "minimum": 32000,
                             "maximum": 1000000
                           }
                         },
@@ -11401,6 +11679,15 @@
                             "instructions"
                           ],
                           "additionalProperties": false
+                        }
+                      },
+                      "disabledSkills": {
+                        "default": [],
+                        "maxItems": 20,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9_-]{1,64}$"
                         }
                       },
                       "mcpServers": {
@@ -11480,6 +11767,7 @@
                       "identity",
                       "contextPolicy",
                       "skills",
+                      "disabledSkills",
                       "mcpServers",
                       "allowSelfManagement",
                       "id",
@@ -11801,7 +12089,7 @@
                   },
                   "contextPolicy": {
                     "default": {
-                      "inputTokens": 16000,
+                      "inputTokens": 32000,
                       "outputTokens": 4096,
                       "memoryTokens": 1500,
                       "historyTokens": 6000,
@@ -11812,9 +12100,9 @@
                     "type": "object",
                     "properties": {
                       "inputTokens": {
-                        "default": 16000,
+                        "default": 32000,
                         "type": "integer",
-                        "minimum": 4096,
+                        "minimum": 16000,
                         "maximum": 128000
                       },
                       "outputTokens": {
@@ -11850,7 +12138,7 @@
                       "maxRunTokens": {
                         "default": 100000,
                         "type": "integer",
-                        "minimum": 8192,
+                        "minimum": 32000,
                         "maximum": 1000000
                       }
                     },
@@ -11916,6 +12204,15 @@
                         "instructions"
                       ],
                       "additionalProperties": false
+                    }
+                  },
+                  "disabledSkills": {
+                    "default": [],
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9_-]{1,64}$"
                     }
                   },
                   "mcpServers": {
@@ -12108,7 +12405,7 @@
                     },
                     "contextPolicy": {
                       "default": {
-                        "inputTokens": 16000,
+                        "inputTokens": 32000,
                         "outputTokens": 4096,
                         "memoryTokens": 1500,
                         "historyTokens": 6000,
@@ -12119,9 +12416,9 @@
                       "type": "object",
                       "properties": {
                         "inputTokens": {
-                          "default": 16000,
+                          "default": 32000,
                           "type": "integer",
-                          "minimum": 4096,
+                          "minimum": 16000,
                           "maximum": 128000
                         },
                         "outputTokens": {
@@ -12157,7 +12454,7 @@
                         "maxRunTokens": {
                           "default": 100000,
                           "type": "integer",
-                          "minimum": 8192,
+                          "minimum": 32000,
                           "maximum": 1000000
                         }
                       },
@@ -12232,6 +12529,15 @@
                           "instructions"
                         ],
                         "additionalProperties": false
+                      }
+                    },
+                    "disabledSkills": {
+                      "default": [],
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9_-]{1,64}$"
                       }
                     },
                     "mcpServers": {
@@ -12311,6 +12617,7 @@
                     "identity",
                     "contextPolicy",
                     "skills",
+                    "disabledSkills",
                     "mcpServers",
                     "allowSelfManagement",
                     "id",
@@ -12651,7 +12958,7 @@
                     },
                     "contextPolicy": {
                       "default": {
-                        "inputTokens": 16000,
+                        "inputTokens": 32000,
                         "outputTokens": 4096,
                         "memoryTokens": 1500,
                         "historyTokens": 6000,
@@ -12662,9 +12969,9 @@
                       "type": "object",
                       "properties": {
                         "inputTokens": {
-                          "default": 16000,
+                          "default": 32000,
                           "type": "integer",
-                          "minimum": 4096,
+                          "minimum": 16000,
                           "maximum": 128000
                         },
                         "outputTokens": {
@@ -12700,7 +13007,7 @@
                         "maxRunTokens": {
                           "default": 100000,
                           "type": "integer",
-                          "minimum": 8192,
+                          "minimum": 32000,
                           "maximum": 1000000
                         }
                       },
@@ -12775,6 +13082,15 @@
                           "instructions"
                         ],
                         "additionalProperties": false
+                      }
+                    },
+                    "disabledSkills": {
+                      "default": [],
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9_-]{1,64}$"
                       }
                     },
                     "mcpServers": {
@@ -12854,6 +13170,7 @@
                     "identity",
                     "contextPolicy",
                     "skills",
+                    "disabledSkills",
                     "mcpServers",
                     "allowSelfManagement",
                     "id",
@@ -13176,9 +13493,9 @@
                     "type": "object",
                     "properties": {
                       "inputTokens": {
-                        "default": 16000,
+                        "default": 32000,
                         "type": "integer",
-                        "minimum": 4096,
+                        "minimum": 16000,
                         "maximum": 128000
                       },
                       "outputTokens": {
@@ -13214,7 +13531,7 @@
                       "maxRunTokens": {
                         "default": 100000,
                         "type": "integer",
-                        "minimum": 8192,
+                        "minimum": 32000,
                         "maximum": 1000000
                       }
                     },
@@ -13279,6 +13596,14 @@
                         "instructions"
                       ],
                       "additionalProperties": false
+                    }
+                  },
+                  "disabledSkills": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9_-]{1,64}$"
                     }
                   },
                   "mcpServers": {
@@ -13473,7 +13798,7 @@
                     },
                     "contextPolicy": {
                       "default": {
-                        "inputTokens": 16000,
+                        "inputTokens": 32000,
                         "outputTokens": 4096,
                         "memoryTokens": 1500,
                         "historyTokens": 6000,
@@ -13484,9 +13809,9 @@
                       "type": "object",
                       "properties": {
                         "inputTokens": {
-                          "default": 16000,
+                          "default": 32000,
                           "type": "integer",
-                          "minimum": 4096,
+                          "minimum": 16000,
                           "maximum": 128000
                         },
                         "outputTokens": {
@@ -13522,7 +13847,7 @@
                         "maxRunTokens": {
                           "default": 100000,
                           "type": "integer",
-                          "minimum": 8192,
+                          "minimum": 32000,
                           "maximum": 1000000
                         }
                       },
@@ -13597,6 +13922,15 @@
                           "instructions"
                         ],
                         "additionalProperties": false
+                      }
+                    },
+                    "disabledSkills": {
+                      "default": [],
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9_-]{1,64}$"
                       }
                     },
                     "mcpServers": {
@@ -13676,6 +14010,7 @@
                     "identity",
                     "contextPolicy",
                     "skills",
+                    "disabledSkills",
                     "mcpServers",
                     "allowSelfManagement",
                     "id",
@@ -14029,7 +14364,7 @@
                           },
                           "contextPolicy": {
                             "default": {
-                              "inputTokens": 16000,
+                              "inputTokens": 32000,
                               "outputTokens": 4096,
                               "memoryTokens": 1500,
                               "historyTokens": 6000,
@@ -14040,9 +14375,9 @@
                             "type": "object",
                             "properties": {
                               "inputTokens": {
-                                "default": 16000,
+                                "default": 32000,
                                 "type": "integer",
-                                "minimum": 4096,
+                                "minimum": 16000,
                                 "maximum": 128000
                               },
                               "outputTokens": {
@@ -14078,7 +14413,7 @@
                               "maxRunTokens": {
                                 "default": 100000,
                                 "type": "integer",
-                                "minimum": 8192,
+                                "minimum": 32000,
                                 "maximum": 1000000
                               }
                             },
@@ -14153,6 +14488,15 @@
                                 "instructions"
                               ],
                               "additionalProperties": false
+                            }
+                          },
+                          "disabledSkills": {
+                            "default": [],
+                            "maxItems": 20,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-z0-9_-]{1,64}$"
                             }
                           },
                           "mcpServers": {
@@ -14232,6 +14576,7 @@
                           "identity",
                           "contextPolicy",
                           "skills",
+                          "disabledSkills",
                           "mcpServers",
                           "allowSelfManagement",
                           "id",
@@ -15752,9 +16097,9 @@
                       "type": "object",
                       "properties": {
                         "inputTokens": {
-                          "default": 16000,
+                          "default": 32000,
                           "type": "integer",
-                          "minimum": 4096,
+                          "minimum": 16000,
                           "maximum": 128000
                         },
                         "outputTokens": {
@@ -15790,7 +16135,7 @@
                         "maxRunTokens": {
                           "default": 100000,
                           "type": "integer",
-                          "minimum": 8192,
+                          "minimum": 32000,
                           "maximum": 1000000
                         }
                       },
@@ -16775,9 +17120,9 @@
                         "type": "object",
                         "properties": {
                           "inputTokens": {
-                            "default": 16000,
+                            "default": 32000,
                             "type": "integer",
-                            "minimum": 4096,
+                            "minimum": 16000,
                             "maximum": 128000
                           },
                           "outputTokens": {
@@ -16813,7 +17158,7 @@
                           "maxRunTokens": {
                             "default": 100000,
                             "type": "integer",
-                            "minimum": 8192,
+                            "minimum": 32000,
                             "maximum": 1000000
                           }
                         },
@@ -17303,9 +17648,9 @@
                       "type": "object",
                       "properties": {
                         "inputTokens": {
-                          "default": 16000,
+                          "default": 32000,
                           "type": "integer",
-                          "minimum": 4096,
+                          "minimum": 16000,
                           "maximum": 128000
                         },
                         "outputTokens": {
@@ -17341,7 +17686,7 @@
                         "maxRunTokens": {
                           "default": 100000,
                           "type": "integer",
-                          "minimum": 8192,
+                          "minimum": 32000,
                           "maximum": 1000000
                         }
                       },
@@ -17830,9 +18175,9 @@
                       "type": "object",
                       "properties": {
                         "inputTokens": {
-                          "default": 16000,
+                          "default": 32000,
                           "type": "integer",
-                          "minimum": 4096,
+                          "minimum": 16000,
                           "maximum": 128000
                         },
                         "outputTokens": {
@@ -17868,7 +18213,7 @@
                         "maxRunTokens": {
                           "default": 100000,
                           "type": "integer",
-                          "minimum": 8192,
+                          "minimum": 32000,
                           "maximum": 1000000
                         }
                       },

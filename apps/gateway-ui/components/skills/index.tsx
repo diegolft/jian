@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { lines } from '../../lib/format';
 import type { SectionProps } from '../props';
 import { Button, Confirm, Empty, Field, Modal, SectionHeading } from '../ui';
+import { BuiltinSkills } from './built-in';
+import { SkillCatalog } from './catalog';
 import { SkillImport } from './import';
 
 export function Capabilities({
@@ -45,6 +47,8 @@ export function Capabilities({
         }
       />
       {isSkill && <SkillImport profile={profile} api={api} mutate={mutate} busy={busy} />}
+      {isSkill && <BuiltinSkills profile={profile} api={api} mutate={mutate} busy={busy} />}
+      {isSkill && <h2 className="mb-4 text-2xl">Importadas</h2>}
       {items.length ? (
         <div className="resource-list">
           {items.map((item, index) => (
@@ -90,13 +94,16 @@ export function Capabilities({
             </article>
           ))}
         </div>
+      ) : isSkill ? (
+        <p className="rounded-md bg-surface px-5 py-4 text-sm">
+          Nenhuma skill instalada. Escolha no catálogo abaixo ou importe do seu repositório.
+        </p>
       ) : (
-        <Empty title={isSkill ? 'Ensine um jeito de fazer' : 'Ferramentas, com limites claros'}>
-          {isSkill
-            ? 'Uma skill descreve um procedimento que o agente pode consultar sem carregar todas as instruções em cada mensagem.'
-            : 'Adicione um endpoint MCP HTTP e a lista de ferramentas autorizadas para este perfil.'}
+        <Empty title="Ferramentas, com limites claros">
+          Adicione um endpoint MCP HTTP e a lista de ferramentas autorizadas para este perfil.
         </Empty>
       )}
+      {isSkill && <SkillCatalog profile={profile} api={api} mutate={mutate} busy={busy} />}
       {editing !== undefined && (
         <Modal
           title={isSkill ? 'Configurar skill' : 'Configurar servidor MCP'}

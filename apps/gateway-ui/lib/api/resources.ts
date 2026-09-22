@@ -11,6 +11,8 @@ export const resourceCalls = (client: Client) => ({
         params: { path: { profileId, memoryKey } },
       }),
     ),
+  builtinSkills: (profileId: string) =>
+    result(client.GET('/v1/profiles/{profileId}/built-in-skills', { params: profile(profileId) })),
   skillCatalog: (profileId: string, url: string) =>
     result(
       client.GET('/v1/profiles/{profileId}/skill-catalog', {

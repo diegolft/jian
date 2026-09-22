@@ -9,6 +9,7 @@ import type { PeerAgents } from '../peers/port.js';
 import type { ProfileAdmin } from '../profiles/port.js';
 import type { RunExecution, RunReader } from '../runs/port.js';
 import type { SessionNamer, SessionReader } from '../sessions/port.js';
+import { builtinSkillNames, findSkill } from '../skills/builtin/index.js';
 import type { Store } from '../storage/database.js';
 import { artifacts, checkpoints } from '../storage/schema.js';
 
@@ -79,7 +80,7 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
       description: 'Load instructions for a skill enabled on this profile.',
       inputSchema: z.object({ name: z.string() }),
       execute: async ({ name }) => {
-        const skill = run.profile.skills.find((s) => s.name === name);
+        const skill = findSkill(run.profile, name);
 
         if (!skill) {
           throw new GatewayError(404, 'Skill not found');
@@ -253,6 +254,14 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
         const written = input.skills.filter(
           (skill) => !imported.some((owned) => owned.name === skill.name),
         );
+
+        // A built-in name is the gateway's. Letting a written skill take one would silently
+        // replace instructions the owner never wrote and cannot see in the profile.
+        const shadowed = written.find((skill) => builtinSkillNames.has(skill.name));
+
+        if (shadowed) {
+          throw new GatewayError(409, `${shadowed.name} is a built-in skill of this gateway`);
+        }
 
         const updated = await services.profiles.updateProfile(run.profileId, {
           ...input,

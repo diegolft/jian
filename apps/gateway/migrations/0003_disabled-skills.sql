@@ -1,0 +1,1 @@
+ALTER TABLE "profiles" ADD COLUMN "disabled_skills" jsonb DEFAULT '[]'::jsonb NOT NULL;

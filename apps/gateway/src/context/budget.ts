@@ -115,8 +115,14 @@ export function fitPrompt(input: {
     tokens -= cost;
   }
 
+  // Naming the parts is the whole value of this failure: the fixed cost is what the owner can
+  // act on, and it is almost always the tool schemas rather than anything they wrote.
   if (tokens > limit) {
-    throw new Error('Context budget exceeded');
+    throw new Error(
+      `Context budget exceeded: ${tokens} tokens against a limit of ${limit}. ` +
+        `Tool definitions cost ${count(schema)} and the system prompt ${count(input.instructions)}; ` +
+        'raise inputTokens for this profile or connect fewer MCP tools.',
+    );
   }
 
   return {

@@ -47,6 +47,7 @@ export const profiles = pgTable('profiles', {
   identity: jsonb('identity').$type<Identity>().notNull(),
   contextPolicy: jsonb('context_policy').$type<ContextPolicy>().notNull(),
   skills: jsonb('skills').$type<Skill[]>().notNull().default([]),
+  disabledSkills: jsonb('disabled_skills').$type<string[]>().notNull().default([]),
   mcpServers: jsonb('mcp_servers').$type<McpServer[]>().notNull().default([]),
   allowSelfManagement: boolean('allow_self_management').notNull().default(false),
   version: integer('version').notNull(),
