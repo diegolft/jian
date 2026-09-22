@@ -36,6 +36,20 @@
       "when": 1790092866576,
       "tag": "0004_context-budget",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790094101120,
+      "tag": "0005_run-progress",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790094388291,
+      "tag": "0006_delivery-preview",
+      "breakpoints": true
     }
   ]
 }

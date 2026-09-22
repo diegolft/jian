@@ -1,6 +1,6 @@
-import { MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it } from 'vitest';
 import { AgentRuntime } from '../src/agent/runtime.js';
+import { mockModel } from './helpers/model.js';
 import { events } from './helpers/rows.js';
 import { testServices } from './helpers/services.js';
 
@@ -40,7 +40,7 @@ describe('agent runtime', () => {
     const { services, profile, session, run } = await fixture();
     let step = 0;
 
-    const model = new MockLanguageModelV4({
+    const model = mockModel({
       doGenerate: async (options) => {
         step++;
 
@@ -101,7 +101,7 @@ describe('agent runtime', () => {
   it('persists a safe failure without leaking provider credentials', async () => {
     const { services, profile, run } = await fixture();
 
-    const model = new MockLanguageModelV4({
+    const model = mockModel({
       doGenerate: async () => {
         throw new Error('Bearer secret-api-key');
       },
@@ -170,7 +170,7 @@ it('resolves a provider key from the profile vault and keeps it out of durable e
     requestKey: 'vault',
   });
   let resolvedKey: string | undefined;
-  const model = new MockLanguageModelV4({ doGenerate: async () => answer(`Hello ${vaultSecret}`) });
+  const model = mockModel({ doGenerate: async () => answer(`Hello ${vaultSecret}`) });
 
   await new AgentRuntime(
     services,
@@ -207,7 +207,7 @@ it('stops a run after its cumulative token cap without making another model call
   });
   let calls = 0;
 
-  const model = new MockLanguageModelV4({
+  const model = mockModel({
     doGenerate: async () => {
       calls++;
 
@@ -267,7 +267,7 @@ it('uses conservative estimates when a provider omits usage counters', async () 
     outputTokens: { total: undefined, text: undefined, reasoning: undefined },
   } as unknown as typeof usage;
 
-  const model = new MockLanguageModelV4({
+  const model = mockModel({
     doGenerate: async () => {
       calls++;
 
@@ -314,7 +314,7 @@ it('reports a safe context-budget error when required prompt content cannot fit'
   });
   let calls = 0;
 
-  const model = new MockLanguageModelV4({
+  const model = mockModel({
     doGenerate: async () => {
       calls++;
 
@@ -337,7 +337,7 @@ it('does not mark a local validation failure as an uncertain external effect', a
   const { services, profile, run } = await fixture();
   let calls = 0;
 
-  const model = new MockLanguageModelV4({
+  const model = mockModel({
     doGenerate: async () => {
       calls++;
 
@@ -381,7 +381,7 @@ it('stores a large tool output and sends only a bounded reference to the model',
   let secondPrompt = '';
   let step = 0;
 
-  const model = new MockLanguageModelV4({
+  const model = mockModel({
     doGenerate: async (options) => {
       step++;
 
@@ -447,7 +447,7 @@ it('redacts an escaped host credential from tool prompts, artifacts, checkpoints
     let artifact: unknown;
     let step = 0;
 
-    const model = new MockLanguageModelV4({
+    const model = mockModel({
       doGenerate: async (options) => {
         step++;
 
@@ -514,7 +514,7 @@ it('creates a child profile without inheriting provider access', async () => {
 
   let step = 0;
 
-  const model = new MockLanguageModelV4({
+  const model = mockModel({
     doGenerate: async () => {
       step++;
 
@@ -553,7 +553,7 @@ it('does not report completion when the agent exhausts its tool budget', async (
   const { services, profile, run } = await fixture();
   let calls = 0;
 
-  const model = new MockLanguageModelV4({
+  const model = mockModel({
     doGenerate: async () => ({
       content: [
         { type: 'text', text: 'Still working.' },
@@ -592,7 +592,7 @@ it('versions self-managed skills without accepting new capability grants', async
 
   let calls = 0;
 
-  const model = new MockLanguageModelV4({
+  const model = mockModel({
     doGenerate: async () => {
       calls += 1;
 

@@ -17,7 +17,7 @@ async function setup(fetcher: typeof fetch) {
     model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
   });
 
-  // Connecting asks Telegram which account the bot is; only the deliveries reach the fetcher
+  // Connecting asks Telegram which account the bot is; everything else reaches the fetcher
   // each test inspects.
   const telegram: typeof fetch = async (url, options) =>
     String(url).endsWith('/getMe')
@@ -273,7 +273,12 @@ describe('Telegram transport', () => {
     async (confirmedChunks) => {
       let attempts = 0;
 
-      const f = await setup(async () => {
+      const f = await setup(async (url) => {
+        // The typing bubble is re-armed every tick and is not one of the sends under test.
+        if (String(url).endsWith('/sendChatAction')) {
+          return Response.json({ ok: true, result: true });
+        }
+
         attempts += 1;
 
         if (attempts <= confirmedChunks + 1) {
@@ -318,4 +323,78 @@ describe('Telegram transport', () => {
       }
     },
   );
+});
+
+describe('what a chat sees while the agent is still working', () => {
+  it('shows typing, grows one message, and never names a tool', async () => {
+    const calls: Array<{ path: string; body: Record<string, unknown> }> = [];
+
+    const f = await setup(async (url, options) => {
+      const path = String(url).split('/').pop() ?? '';
+
+      calls.push({ path, body: JSON.parse(String(options?.body ?? '{}')) });
+
+      return Response.json({ ok: true, result: { message_id: 42 } });
+    });
+
+    try {
+      await f.channels.receive(f.channel.id, webhook(f.channel.webhookToken));
+
+      const [pending] = await f.channels.contacts(f.profile.id);
+      if (!pending) throw new Error('Contact request missing');
+
+      await f.channels.approveContact(f.profile.id, pending.id);
+      await f.channels.dispatch();
+
+      const [run] = await f.services.runs.activities(f.profile.id);
+      if (!run) throw new Error('Run missing');
+
+      await f.services.lifecycle.claim(run.id, f.profile.id, 'worker');
+
+      // A tool is running: the panel would name it, a chat gets only the bubble.
+      await f.services.lifecycle.progress(run.id, 'worker', {
+        phase: 'tool',
+        tool: 'read_memories',
+        text: '',
+        steps: 1,
+        updatedAt: new Date().toISOString(),
+      });
+      await f.channels.dispatch();
+
+      await f.services.lifecycle.progress(run.id, 'worker', {
+        phase: 'writing',
+        text: 'Estou verificando o que você me pediu e já te respondo com o resultado.',
+        steps: 2,
+        updatedAt: new Date().toISOString(),
+      });
+      await f.channels.dispatch();
+
+      await f.services.lifecycle.finish(
+        f.profile.id,
+        run.id,
+        'worker',
+        'completed',
+        'Estou verificando o que você me pediu: está tudo certo.',
+      );
+      await f.channels.dispatch();
+
+      const typing = calls.filter((call) => call.path === 'sendChatAction');
+      const sends = calls.filter((call) => call.path === 'sendMessage');
+      const edits = calls.filter((call) => call.path === 'editMessageText');
+
+      expect(typing.length).toBeGreaterThanOrEqual(2);
+      expect(sends.at(-1)?.body.text).toContain('Estou verificando');
+      // The preview was sent once and then finished in place, not sent twice.
+      expect(edits.at(-1)?.body.text).toBe(
+        'Estou verificando o que você me pediu: está tudo certo.',
+      );
+      expect(JSON.stringify(calls)).not.toContain('read_memories');
+
+      expect(
+        (await f.channels.deliveries(f.profile.id)).find((item) => item.runId === run.id)?.status,
+      ).toBe('sent');
+    } finally {
+      await f.app.close();
+    }
+  });
 });

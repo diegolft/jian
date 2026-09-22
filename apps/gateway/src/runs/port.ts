@@ -1,4 +1,4 @@
-import type { AgentCallOrigin, Checkpoint, GroupTurn, Run } from '@jian/contracts';
+import type { AgentCallOrigin, Checkpoint, GroupTurn, Run, RunProgress } from '@jian/contracts';
 import type { Queryable } from '../storage/database.js';
 
 /** What decides a run beyond its text: where it continues from, who asked, what it may cost. */
@@ -28,6 +28,7 @@ export interface RunExecution {
   claim(runId: string, profileId: string, owner: string): Promise<Run | null>;
   heartbeat(profileId: string, runId: string, owner: string): Promise<void>;
   checkpoint(profileId: string, runId: string, owner: string, data: unknown): Promise<void>;
+  progress(runId: string, owner: string, progress: RunProgress | null): Promise<void>;
   checkpoints(profileId: string, runId: string): Promise<Checkpoint[]>;
   recordUsage(
     profileId: string,

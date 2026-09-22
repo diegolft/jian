@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { MockLanguageModelV4 } from 'ai/test';
 import { expect, it } from 'vitest';
 import { AgentRuntime } from '../src/agent/runtime.js';
 import { createSafeFetch } from '../src/security/outbound.js';
+import { mockModel } from './helpers/model.js';
 import { testServices } from './helpers/services.js';
 
 it.each([false, true])(
@@ -100,7 +100,7 @@ it.each([false, true])(
 
     let calls = 0;
 
-    const model = new MockLanguageModelV4({
+    const model = mockModel({
       doGenerate: async (options) => {
         calls++;
 
@@ -331,7 +331,7 @@ it.each(['disconnect', 'isError'])(
       let calls = 0;
       let remoteName = '';
 
-      const model = new MockLanguageModelV4({
+      const model = mockModel({
         doGenerate: async (options) => {
           calls++;
 

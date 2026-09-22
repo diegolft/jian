@@ -9,6 +9,7 @@ import type {
 
 const MESSAGE_CHUNK_SIZE = 4000;
 const REQUEST_TIMEOUT_MS = 15_000;
+const TYPING_TIMEOUT_MS = 1500;
 
 /** Telegram calls a room a group until it is upgraded; both carry the same message shape. */
 const GROUP_CHATS = new Set(['group', 'supergroup']);
@@ -65,6 +66,67 @@ export class TelegramChannel implements Channel {
     return response.ok && result.ok && typeof result.result?.id === 'number'
       ? String(result.result.id)
       : undefined;
+  }
+
+  /** Telegram clears this when a message lands, so it is re-armed on every dispatch tick. */
+  async typing(chatId: string, context: DeliveryContext): Promise<void> {
+    const token = context.credential;
+
+    if (!token || !BOT_TOKEN.test(token)) {
+      return;
+    }
+
+    try {
+      await context.fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Short on purpose: a slow tick must not delay the answer it is announcing.
+        signal: AbortSignal.any([context.signal, AbortSignal.timeout(TYPING_TIMEOUT_MS)]),
+        body: JSON.stringify({ chat_id: chatId, action: 'typing' }),
+      });
+    } catch {
+      // An indicator nobody saw is not worth a failed delivery.
+    }
+  }
+
+  async edit(
+    message: OutgoingMessage & { remoteMessageId: string | number },
+    context: DeliveryContext,
+  ): Promise<DeliveryOutcome> {
+    const token = context.credential;
+    const remoteMessageIds = [message.remoteMessageId];
+
+    if (!token || !BOT_TOKEN.test(token)) {
+      return { status: 'failed', remoteMessageIds };
+    }
+
+    try {
+      const response = await context.fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.any([context.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
+        body: JSON.stringify({
+          chat_id: message.chatId,
+          message_id: message.remoteMessageId,
+          text: message.text.slice(0, MESSAGE_CHUNK_SIZE),
+        }),
+      });
+
+      if (response.ok) {
+        return { status: 'sent', remoteMessageIds };
+      }
+
+      // Editing a message to the text it already carries is refused, and it is not a failure:
+      // what the person sees is exactly what was asked for.
+      const body = (await response.json().catch(() => ({}))) as { description?: string };
+
+      return {
+        status: body.description?.includes('not modified') ? 'sent' : 'unknown',
+        remoteMessageIds,
+      };
+    } catch {
+      return { status: 'unknown', remoteMessageIds };
+    }
   }
 
   async send(message: OutgoingMessage, context: DeliveryContext): Promise<DeliveryOutcome> {

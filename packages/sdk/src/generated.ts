@@ -2401,6 +2401,17 @@ export interface operations {
                             /** @default [] */
                             agents: string[];
                         };
+                        progress?: {
+                            /** @enum {string} */
+                            phase: "thinking" | "tool" | "writing";
+                            tool?: string;
+                            /** @default  */
+                            text: string;
+                            /** @default 0 */
+                            steps: number;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        };
                     };
                 };
             };
@@ -3525,6 +3536,8 @@ export interface operations {
                         updatedAt: string;
                         /** @default [] */
                         remoteMessageIds: (number | string)[];
+                        /** @description The answer as last shown while the run was still writing it. */
+                        preview?: string;
                         /** @description Gateway-authored text sent without a run, such as the approval notice. */
                         notice?: string;
                     }[];
@@ -8291,6 +8304,17 @@ export interface operations {
                             /** @default [] */
                             agents: string[];
                         };
+                        progress?: {
+                            /** @enum {string} */
+                            phase: "thinking" | "tool" | "writing";
+                            tool?: string;
+                            /** @default  */
+                            text: string;
+                            /** @default 0 */
+                            steps: number;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        };
                     };
                 };
             };
@@ -8754,6 +8778,17 @@ export interface operations {
                             /** @default [] */
                             agents: string[];
                         };
+                        progress?: {
+                            /** @enum {string} */
+                            phase: "thinking" | "tool" | "writing";
+                            tool?: string;
+                            /** @default  */
+                            text: string;
+                            /** @default 0 */
+                            steps: number;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        };
                     }[];
                 };
             };
@@ -8953,6 +8988,17 @@ export interface operations {
                             /** @default [] */
                             agents: string[];
                         };
+                        progress?: {
+                            /** @enum {string} */
+                            phase: "thinking" | "tool" | "writing";
+                            tool?: string;
+                            /** @default  */
+                            text: string;
+                            /** @default 0 */
+                            steps: number;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        };
                     };
                 };
             };
@@ -9151,6 +9197,17 @@ export interface operations {
                             turns: number;
                             /** @default [] */
                             agents: string[];
+                        };
+                        progress?: {
+                            /** @enum {string} */
+                            phase: "thinking" | "tool" | "writing";
+                            tool?: string;
+                            /** @default  */
+                            text: string;
+                            /** @default 0 */
+                            steps: number;
+                            /** Format: date-time */
+                            updatedAt: string;
                         };
                     };
                 };

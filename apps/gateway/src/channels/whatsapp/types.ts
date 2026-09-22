@@ -56,6 +56,10 @@ export interface DeviceCallbacks {
 export interface LinkedDevice {
   start(): Promise<void>;
   send(chatId: string, text: string, signal: AbortSignal): Promise<string>;
+  /** Replaces a message this device sent. WhatsApp allows it for about fifteen minutes. */
+  edit(chatId: string, remoteMessageId: string, text: string, signal: AbortSignal): Promise<void>;
+  /** The composing bubble. WhatsApp drops it after a few seconds, so it is re-sent, not held. */
+  typing(chatId: string): Promise<void>;
   stop(logout: boolean): Promise<void>;
 }
 

@@ -1,4 +1,4 @@
-import type { Checkpoint, Profile, Run } from '@jian/contracts';
+import type { Checkpoint, Profile, Run, RunProgress } from '@jian/contracts';
 import { profileRecordSchema } from '@jian/contracts';
 import { and, asc, count, desc, eq, inArray, isNull, lte, or } from 'drizzle-orm';
 import type { Queryable } from '../storage/database.js';
@@ -33,6 +33,7 @@ function toRun(row: RunRow, document: Profile): Run {
     ...(row.contextPolicy ? { contextPolicy: row.contextPolicy } : {}),
     ...(row.call ? { call: row.call } : {}),
     ...(row.group ? { group: row.group } : {}),
+    ...(row.progress ? { progress: row.progress } : {}),
     ...(row.leaseOwner === null ? {} : { leaseOwner: row.leaseOwner }),
     ...(row.leaseUntil === null ? {} : { leaseUntil: row.leaseUntil }),
     createdAt: row.createdAt.toISOString(),
@@ -59,6 +60,7 @@ function toRow(run: Run): typeof runs.$inferInsert {
     contextPolicy: run.contextPolicy ?? null,
     call: run.call ?? null,
     group: run.group ?? null,
+    progress: run.progress ?? null,
     leaseOwner: run.leaseOwner ?? null,
     leaseUntil: run.leaseUntil ?? null,
     createdAt: new Date(run.createdAt),
@@ -133,6 +135,23 @@ export async function insertRun(db: Queryable, run: Run): Promise<Run | null> {
 
 export async function updateRun(db: Queryable, run: Run): Promise<void> {
   await db.update(runs).set(toRow(run)).where(eq(runs.id, run.id));
+}
+
+/**
+ * One column, no read and no lock: progress is overwritten several times a second and owns
+ * nothing else on the row. The lease predicate is the ownership check — a worker that lost the
+ * run updates zero rows instead of overwriting the state of the one that took it over.
+ */
+export async function writeProgress(
+  db: Queryable,
+  runId: string,
+  owner: string,
+  progress: RunProgress | null,
+): Promise<void> {
+  await db
+    .update(runs)
+    .set({ progress })
+    .where(and(eq(runs.id, runId), eq(runs.leaseOwner, owner), eq(runs.status, 'running')));
 }
 
 /** A session admits one run at a time, and `runs_activity` answers without reading the rest. */

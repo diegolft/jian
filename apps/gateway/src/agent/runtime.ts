@@ -10,6 +10,7 @@ import { resolveModel } from '../providers/models.js';
 import { providerSecret } from '../providers/service.js';
 import { createSafeFetch } from '../security/outbound.js';
 import { connectMcpTools } from './mcp.js';
+import { ProgressReporter } from './progress.js';
 import { boundToolResult, redactOutput, redactText } from './results.js';
 import { profileTools, type ToolServices } from './tools.js';
 import type { ModelResolver, RuntimeOptions } from './types.js';
@@ -92,6 +93,10 @@ export class AgentRuntime {
     const ownsOutbound = !this.options.outbound;
     const secrets = new Set<string>();
     let externalUncertain = false;
+
+    const progress = new ProgressReporter((snapshot) =>
+      this.services.lifecycle.progress(runId, owner, snapshot),
+    );
 
     const pulse = setInterval(() => {
       void this.services.lifecycle
@@ -326,17 +331,51 @@ export class AgentRuntime {
         },
       });
 
-      const result = await agent.generate({ messages: context.messages, abortSignal: signal });
+      // Streamed rather than generated so the run can say what it is doing while it does it.
+      // Nothing read here is kept: the answer is `result.text`, written once, below.
+      const stream = await agent.stream({ messages: context.messages, abortSignal: signal });
+      // A step that throws is reported on the stream, not as a rejection: without this the
+      // run would fail with "no output generated" and lose the reason entirely.
+      let streamError: unknown;
+
+      for await (const part of stream.fullStream) {
+        switch (part.type) {
+          case 'error':
+            streamError ??= part.error;
+            break;
+          case 'text-delta':
+            progress.delta(part.text);
+            break;
+          case 'reasoning-start':
+            progress.thinking();
+            break;
+          case 'tool-call':
+            progress.usingTool(part.toolName);
+            break;
+          case 'finish-step':
+            progress.stepEnded();
+            break;
+          default:
+            break;
+        }
+      }
+
+      await progress.flush();
+
+      if (streamError) {
+        throw streamError;
+      }
+
+      const result = stream;
 
       if (externalUncertain) {
         throw new Error('External tool outcome is uncertain');
       }
 
-      if (
-        !result.text.trim() ||
-        result.finishReason === 'tool-calls' ||
-        result.finishReason === 'length'
-      ) {
+      const answer = await result.text;
+      const finishReason = await result.finishReason;
+
+      if (!answer.trim() || finishReason === 'tool-calls' || finishReason === 'length') {
         throw new Error('Agent stopped without a complete final response');
       }
 
@@ -345,7 +384,7 @@ export class AgentRuntime {
         runId,
         owner,
         'completed',
-        redactText(result.text, secrets),
+        redactText(answer, secrets),
       );
 
       await this.nameConversation(run, model, secrets);
@@ -391,6 +430,19 @@ function describe(error: unknown): string {
   return parts.filter(Boolean).join(' · ');
 }
 
+/** An error and everything it was raised from, deduplicated against a cycle. */
+function causes(error: unknown): Error[] {
+  const chain: Error[] = [];
+  let current = error;
+
+  while (current instanceof Error && !chain.includes(current)) {
+    chain.push(current);
+    current = current.cause;
+  }
+
+  return chain;
+}
+
 /** A provider's own status, where it is specific enough to tell the owner what to do. */
 function providerStatus(error: unknown): number | undefined {
   const status = (error as { statusCode?: unknown }).statusCode;
@@ -408,9 +460,14 @@ function executionFailureMessage(error: unknown, uncertain: boolean, aborted: bo
   }
 
   // A budget failure is the gateway's own arithmetic, so its numbers are safe to show and are
-  // the only way the owner can tell which limit to raise.
-  if (error instanceof Error && /^(Context|Run token) budget exceeded/.test(error.message)) {
-    return error.message;
+  // the only way the owner can tell which limit to raise. Streaming wraps what a step threw,
+  // so the chain is walked rather than the top error read.
+  const budget = causes(error).find((cause) =>
+    /^(Context|Run token) budget exceeded/.test(cause.message),
+  );
+
+  if (budget) {
+    return budget.message;
   }
 
   // The provider's own status says more than any guess here, and none of these leak a key.

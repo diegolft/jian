@@ -50,4 +50,19 @@ export interface Channel {
   canSend?(channelId: string): Promise<boolean>;
   // An absent sender describes an ingress-only channel; it is not a fake successful delivery.
   send?(message: OutgoingMessage, context: DeliveryContext): Promise<DeliveryOutcome>;
+
+  /**
+   * Shows the person that the agent is answering. Protocols expire this after a few seconds,
+   * so it is called again on every dispatch tick and never has to be switched off.
+   */
+  typing?(chatId: string, context: DeliveryContext): Promise<void>;
+
+  /**
+   * Replaces a message already sent, which is what turns a stream into one growing answer
+   * instead of a run of fragments. An adapter without it delivers once, when the run ends.
+   */
+  edit?(
+    message: OutgoingMessage & { remoteMessageId: string | number },
+    context: DeliveryContext,
+  ): Promise<DeliveryOutcome>;
 }

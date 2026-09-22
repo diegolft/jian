@@ -5,6 +5,7 @@ import {
   type deliverySchema,
   type Group,
   type GroupTurn,
+  type Run,
 } from '@jian/contracts';
 import type { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
@@ -51,6 +52,8 @@ export const channelSecret = (channelId: string) => `channel:${channelId}`;
 export type DeliveryRecord = z.infer<typeof deliverySchema> & { connectionGeneration?: number };
 
 const DISPATCH_INTERVAL_MS = 2000;
+/** A preview shorter than this reads as a glitch rather than as an answer taking shape. */
+const PREVIEW_MIN_CHARS = 40;
 const UNCERTAIN_DELIVERY_AFTER_MS = 10 * 60_000;
 
 /** Sent once to a sender the owner has not decided on yet. It must never depend on a run. */
@@ -497,6 +500,7 @@ export class Channels {
         const run = await this.services.runs.run(delivery.profileId, delivery.runId);
 
         if (run.status === 'queued' || run.status === 'running') {
+          await this.showProgress(delivery, run);
           continue;
         }
 
@@ -539,6 +543,71 @@ export class Channels {
         });
       });
     }
+  }
+
+  /**
+   * What the person sees while the agent is still working: the composing bubble every tick, and
+   * the answer so far growing inside one message. Only the text crosses — a tool name is for the
+   * panel, never for a chat. None of it is history, so a tick that fails is simply skipped.
+   */
+  private async showProgress(delivery: DeliveryRecord, run: Run): Promise<void> {
+    const channel = await findChannel(this.services.store.db, delivery.channelId);
+
+    if (!channel || channel.revokedAt) {
+      return;
+    }
+
+    const adapter = this.registry.get(channel.type);
+
+    if (adapter.canSend && !(await adapter.canSend(channel.id))) {
+      return;
+    }
+
+    const context = {
+      channelId: delivery.channelId,
+      connectionGeneration: delivery.connectionGeneration,
+      credential: await this.services.vault.read(delivery.profileId, channelSecret(channel.id)),
+      fetch: this.fetcher,
+      signal: this.abort.signal,
+    };
+
+    await adapter.typing?.(delivery.chatId, context).catch(() => undefined);
+
+    const preview = run.progress?.text?.trim() ?? '';
+
+    // Below this a preview is a fragment of a sentence, and the edit costs more than it says.
+    if (!adapter.edit || preview.length < PREVIEW_MIN_CHARS || preview === delivery.preview) {
+      return;
+    }
+
+    const shown = delivery.remoteMessageIds[0];
+
+    const outcome = shown
+      ? await adapter.edit(
+          { chatId: delivery.chatId, text: preview, remoteMessageId: shown },
+          context,
+        )
+      : await adapter.send?.({ chatId: delivery.chatId, text: preview }, context);
+
+    if (outcome?.status !== 'sent') {
+      return;
+    }
+
+    await this.services.store.transaction(delivery.profileId, async (tx) => {
+      const current = await findDelivery(tx, delivery.id);
+
+      // Only a delivery still waiting carries a preview; a claimed one is already being sent.
+      if (current?.status !== 'pending') {
+        return;
+      }
+
+      await updateDelivery(tx, {
+        ...current,
+        preview,
+        remoteMessageIds: outcome.remoteMessageIds,
+        updatedAt: new Date().toISOString(),
+      });
+    });
   }
 
   private async claimDelivery(delivery: DeliveryRecord): Promise<boolean> {
@@ -590,6 +659,23 @@ export class Channels {
       }
 
       attemptedSend = true;
+
+      const shown = delivery.remoteMessageIds[0];
+
+      // The answer is already on screen as a preview: finish it in place rather than sending a
+      // second copy of the same reply.
+      if (shown && adapter.edit) {
+        return await adapter.edit(
+          { chatId: delivery.chatId, text, remoteMessageId: shown },
+          {
+            channelId: delivery.channelId,
+            connectionGeneration: delivery.connectionGeneration,
+            credential,
+            fetch: this.fetcher,
+            signal: this.abort.signal,
+          },
+        );
+      }
 
       return await adapter.send(
         { chatId: delivery.chatId, text },

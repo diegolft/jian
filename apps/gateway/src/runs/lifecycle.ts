@@ -1,12 +1,18 @@
 import { randomUUID } from 'node:crypto';
-import type { Checkpoint, Message, Run } from '@jian/contracts';
+import type { Checkpoint, Message, Run, RunProgress } from '@jian/contracts';
 import { type Clock, nowIso } from '../core/clock.js';
 import { GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
 import { insertMessage } from '../sessions/repository.js';
 import type { Store } from '../storage/database.js';
 import type { RunReader } from './port.js';
-import { insertCheckpoint, listCheckpoints, listExpiredRuns, updateRun } from './repository.js';
+import {
+  insertCheckpoint,
+  listCheckpoints,
+  listExpiredRuns,
+  updateRun,
+  writeProgress,
+} from './repository.js';
 
 /** The lease is the right to apply external effects, so a stale owner must never write. */
 function assertOwned(run: Run, owner: string, clock: Clock): void {
@@ -65,6 +71,14 @@ export class RunLifecycle {
         updatedAt: nowIso(this.clock),
       });
     });
+  }
+
+  /**
+   * What the run is doing, for whoever is watching. It is not an event and not history: a
+   * reader wants the latest state, and the answer itself is written once, when the run ends.
+   */
+  async progress(runId: string, owner: string, progress: RunProgress | null) {
+    await writeProgress(this.store.db, runId, owner, progress);
   }
 
   async checkpoint(profileId: string, runId: string, owner: string, data: unknown) {
@@ -135,6 +149,8 @@ export class RunLifecycle {
         updatedAt: nowIso(this.clock),
         leaseOwner: undefined,
         leaseUntil: undefined,
+        // The answer is the message now; a half-written preview must not outlive the run.
+        progress: undefined,
         ...(status === 'completed' ? { output: content } : { error: content }),
       };
 

@@ -51,6 +51,21 @@ export const usageSchema = z.strictObject({
   steps: z.number().int().nonnegative(),
 });
 
+/**
+ * What the agent is doing right now, while it is doing it. Presentation only: the answer is
+ * written to history when the run ends, so nothing here is ever the record of what was said.
+ * It is a column rather than an event because a reader wants the latest state, not every one.
+ */
+export const runProgressSchema = z.strictObject({
+  phase: z.enum(['thinking', 'tool', 'writing']),
+  /** The tool now running. Chat channels never render it; the panel does. */
+  tool: z.string().max(100).optional(),
+  /** The current answer segment, reset whenever a tool interrupts it, so it converges. */
+  text: z.string().max(8000).default(''),
+  steps: z.number().int().nonnegative().default(0),
+  updatedAt: timestamp,
+});
+
 export const runRecordSchema = z.strictObject({
   id: uuid,
   profileId: uuid,
@@ -71,6 +86,7 @@ export const runRecordSchema = z.strictObject({
   call: agentCallOriginSchema.optional(),
   // Present when a group message started this run; it carries the room's spent budget.
   group: groupTurnSchema.optional(),
+  progress: runProgressSchema.optional(),
 });
 
 export const revisionRecordSchema = z.strictObject({
@@ -100,6 +116,8 @@ export type Session = z.infer<typeof sessionRecordSchema>;
 export type Message = z.infer<typeof messageRecordSchema>;
 
 export type Memory = z.infer<typeof memoryRecordSchema>;
+
+export type RunProgress = z.infer<typeof runProgressSchema>;
 
 export type Run = z.infer<typeof runRecordSchema> & {
   profile: Profile;

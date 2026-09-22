@@ -8,6 +8,7 @@ import type {
   ModelSelection,
   Profile,
   ReasoningEffort,
+  RunProgress,
   Skill,
   Usage,
 } from '@jian/contracts';
@@ -170,6 +171,8 @@ export const runs = pgTable(
     contextPolicy: jsonb('context_policy').$type<ContextPolicy>(),
     call: jsonb('call').$type<AgentCallOrigin>(),
     group: jsonb('group_turn').$type<GroupTurn>(),
+    // Overwritten many times while a run is live and cleared when it ends; never history.
+    progress: jsonb('progress').$type<RunProgress>(),
     leaseOwner: text('lease_owner'),
     leaseUntil: bigint('lease_until', { mode: 'number' }),
     createdAt,
@@ -414,6 +417,9 @@ export const deliveries = pgTable(
     notice: text('notice'),
     status: deliveryStatus('status').notNull(),
     error: text('error'),
+    // The answer as last shown while the run was still writing it, so a tick that changes
+    // nothing sends nothing and the final edit knows what is already on screen.
+    preview: text('preview'),
     // What the protocol called the message it accepted, for a later receipt to match.
     remoteMessageIds: jsonb('remote_message_ids')
       .$type<Array<string | number>>()

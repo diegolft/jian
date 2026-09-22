@@ -1,5 +1,4 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { MockLanguageModelV4 } from 'ai/test';
 import { PgBoss } from 'pg-boss';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AgentRuntime } from '../src/agent/runtime.js';
@@ -13,6 +12,7 @@ import { Vault } from '../src/security/vault.js';
 import { buildServices } from '../src/services.js';
 import { pageMessages } from '../src/sessions/repository.js';
 import { PostgresStore } from '../src/storage/postgres.js';
+import { mockModel } from './helpers/model.js';
 import { events, runRows } from './helpers/rows.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -88,7 +88,7 @@ describe('PostgreSQL durability', () => {
   });
 
   it('dispatches persisted queued work through pg-boss', async () => {
-    const model = new MockLanguageModelV4({
+    const model = mockModel({
       doGenerate: async () => ({
         content: [{ type: 'text', text: 'Hello from the worker' }],
         finishReason: { unified: 'stop', raw: 'stop' },
@@ -129,7 +129,7 @@ describe('PostgreSQL durability', () => {
   }, 30_000);
 
   it('answers concurrent agent calls with one run of the called profile', async () => {
-    const model = new MockLanguageModelV4({
+    const model = mockModel({
       doGenerate: async () => ({
         content: [{ type: 'text', text: 'Feito.' }],
         finishReason: { unified: 'stop', raw: 'stop' },
