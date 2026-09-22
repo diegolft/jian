@@ -1,9 +1,9 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { GatewayError } from '../core/errors.js';
-import { closePanelSession, openPanelSession } from '../http/panel-session.js';
 import type { CredentialParams, KeyParams, ProfileParams } from '../http/params.js';
-import type { Credentials } from '../services/credentials.js';
+import type { Credentials } from './credentials.js';
+import { closePanelSession, openPanelSession } from './panel-session.js';
 
 type SecurityRouteServices = {
   token: string;

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { GatewayError } from '../core/errors.js';
 import type { ChannelParams, ProfileParams } from '../http/params.js';
-import type { Channels } from '../services/channels.js';
+import type { Channels } from './service.js';
 import type { WhatsAppConnections } from './whatsapp/connections.js';
 
 type ChannelRouteServices = {

@@ -1,10 +1,10 @@
 import { MockLanguageModelV4 } from 'ai/test';
 import { PgBoss } from 'pg-boss';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PostgresStore } from '../src/postgres.js';
-import { RunQueue } from '../src/queue.js';
-import { AgentRuntime } from '../src/runtime.js';
+import { AgentRuntime } from '../src/agent/runtime.js';
+import { RunQueue } from '../src/runs/queue.js';
 import { buildServices } from '../src/services.js';
+import { PostgresStore } from '../src/storage/postgres.js';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 

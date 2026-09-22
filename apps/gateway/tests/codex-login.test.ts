@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CodexLogin } from '../src/providers/codex/login.js';
+import { Credentials } from '../src/security/credentials.js';
 import { SecretBox } from '../src/security/crypto.js';
-import { Credentials } from '../src/services/credentials.js';
 import { testServices } from './helpers/services.js';
 
 afterEach(() => vi.useRealTimers());

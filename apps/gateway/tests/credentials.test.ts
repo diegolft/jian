@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { Credentials } from '../src/security/credentials.js';
 import { SecretBox } from '../src/security/crypto.js';
-import { Credentials } from '../src/services/credentials.js';
 import { testServices } from './helpers/services.js';
 
 async function setup() {

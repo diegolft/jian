@@ -3,8 +3,8 @@ import { randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
+import { Credentials } from '../src/security/credentials.js';
 import { SecretBox } from '../src/security/crypto.js';
-import { Credentials } from '../src/services/credentials.js';
 import { testServices } from './helpers/services.js';
 
 const token = 'test-token-that-is-at-least-32-characters';

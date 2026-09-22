@@ -1,13 +1,13 @@
 import { memorySchema, type Run, skillSchema } from '@elos/contracts';
 import { type ToolSet, tool } from 'ai';
 import { z } from 'zod';
-import { GatewayError } from './core/errors.js';
-import type { Store } from './core/store.js';
-import type { MemoryWriter } from './memories/port.js';
-import type { ProfileAdmin } from './profiles/port.js';
-import type { RunExecution, RunReader } from './runs/port.js';
-import { Coordination } from './services/coordination.js';
-import type { SessionReader } from './sessions/port.js';
+import { Coordination } from '../coordination/service.js';
+import { GatewayError } from '../core/errors.js';
+import type { Store } from '../core/store.js';
+import type { MemoryWriter } from '../memories/port.js';
+import type { ProfileAdmin } from '../profiles/port.js';
+import type { RunExecution, RunReader } from '../runs/port.js';
+import type { SessionReader } from '../sessions/port.js';
 
 /** What the tool set reaches for on the profile's behalf during a run. */
 export type ToolServices = {

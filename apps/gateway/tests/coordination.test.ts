@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Coordination } from '../src/services/coordination.js';
+import { Coordination } from '../src/coordination/service.js';
 import { testServices } from './helpers/services.js';
 
 async function setup() {

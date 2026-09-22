@@ -1,7 +1,7 @@
 import type { PgBoss } from 'pg-boss';
-import type { Store } from './core/store.js';
-import type { RunRecovery } from './runs/port.js';
-import type { AgentRuntime } from './runtime.js';
+import type { AgentRuntime } from '../agent/runtime.js';
+import type { Store } from '../core/store.js';
+import type { RunRecovery } from './port.js';
 
 const queueName = 'elos-agent-runs';
 

@@ -1,7 +1,7 @@
 import { Pool, type PoolClient } from 'pg';
-import type { Reader, Selection, Store, Transaction } from './core/store.js';
+import type { Reader, Selection, Store, Transaction } from '../core/store.js';
+import type { GatewayEvent, Kind, Records } from '../records.js';
 import { migrations } from './migrations.js';
-import type { GatewayEvent, Kind, Records } from './records.js';
 
 class PostgresReader implements Reader {
   constructor(protected readonly connection: Pick<Pool, 'query'> | PoolClient) {}

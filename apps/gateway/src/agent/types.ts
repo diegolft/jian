@@ -1,8 +1,8 @@
 import type { ModelConfig, Run } from '@elos/contracts';
 import type { LanguageModel } from 'ai';
 import type { CodexLogin } from '../providers/codex/login.js';
+import type { Credentials } from '../security/credentials.js';
 import type { createSafeFetch } from '../security/outbound.js';
-import type { Credentials } from '../services/credentials.js';
 
 export type ModelResolver = (
   config: ModelConfig,

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ProfileParams, SessionParams } from '../http/params.js';
-import type { Coordination } from '../services/coordination.js';
+import type { Coordination } from './service.js';
 
 type CoordinationRouteServices = {
   coordination: Pick<Coordination, 'artifact' | 'acquire' | 'release' | 'send' | 'inbox'>;

@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { issuePanelSession, verifyPanelSession } from '../security/tokens.js';
+import { issuePanelSession, verifyPanelSession } from './tokens.js';
 
 const NAME = 'elos_panel';
 

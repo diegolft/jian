@@ -1,15 +1,15 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { channelInputSchema, type channelSchema, type deliverySchema } from '@elos/contracts';
 import type { z } from 'zod';
-import type { ChannelRequest, DeliveryOutcome, IncomingMessage } from '../channels/channel.js';
-import { ChannelRegistry } from '../channels/registry.js';
 import { assertFound, GatewayError } from '../core/errors.js';
 import type { Store } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
 import type { RunWriter } from '../runs/port.js';
+import type { Credentials } from '../security/credentials.js';
 import { issueToken, verifyToken } from '../security/tokens.js';
 import type { SessionWriter } from '../sessions/port.js';
-import type { Credentials } from './credentials.js';
+import type { ChannelRequest, DeliveryOutcome, IncomingMessage } from './channel.js';
+import { ChannelRegistry } from './registry.js';
 
 export type ChannelRecord = z.infer<typeof channelSchema> & { tokenHash: string };
 

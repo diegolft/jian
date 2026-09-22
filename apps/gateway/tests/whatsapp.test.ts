@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { ChannelRegistry } from '../src/channels/registry.js';
+import { Channels } from '../src/channels/service.js';
 import { WhatsAppChannel } from '../src/channels/whatsapp/adapter.js';
 import { WhatsAppConnections } from '../src/channels/whatsapp/connections.js';
 import type {
@@ -9,9 +10,8 @@ import type {
   DeviceFactory,
   DeviceSessionStore,
 } from '../src/channels/whatsapp/types.js';
+import { Credentials } from '../src/security/credentials.js';
 import { SecretBox } from '../src/security/crypto.js';
-import { Channels } from '../src/services/channels.js';
-import { Credentials } from '../src/services/credentials.js';
 import { testServices } from './helpers/services.js';
 
 const actorId = '5511999999999@c.us';

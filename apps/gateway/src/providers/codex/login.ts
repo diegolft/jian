@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { GatewayError } from '../../core/errors.js';
 import type { ProfileReader } from '../../profiles/port.js';
-import type { Credentials } from '../../services/credentials.js';
+import type { Credentials } from '../../security/credentials.js';
 import type { ProviderAdmin } from '../port.js';
 
 const clientId = 'app_EMoamEEZ73f0CkXaXp7hrann';

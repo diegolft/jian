@@ -10,8 +10,8 @@ import type { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
 import type { Store } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
-import type { EncryptedSecret, SecretBox } from '../security/crypto.js';
-import { hashToken, issueToken } from '../security/tokens.js';
+import type { EncryptedSecret, SecretBox } from './crypto.js';
+import { hashToken, issueToken } from './tokens.js';
 
 type CredentialMetadata = z.infer<typeof credentialMetadataSchema>;
 

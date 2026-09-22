@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
+import type { Coordination } from '../coordination/service.js';
 import type { ProfileParams, SessionParams } from '../http/params.js';
 import type { RunWriter } from '../runs/port.js';
-import type { Coordination } from '../services/coordination.js';
 import type { SessionWriter } from './port.js';
 
 type SessionRouteServices = {

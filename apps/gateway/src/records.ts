@@ -10,10 +10,10 @@ import type {
   Run,
   Session,
 } from '@elos/contracts';
+import type { ChannelRecord, DeliveryRecord } from './channels/service.js';
 import type { ConnectionRecord, DeviceAuthRecord, InboxRecord } from './channels/whatsapp/types.js';
-import type { ChannelRecord, DeliveryRecord } from './services/channels.js';
-import type { ArtifactRecord, LeaseRecord, MailRecord } from './services/coordination.js';
-import type { AccessKeyRecord, CredentialRecord } from './services/credentials.js';
+import type { ArtifactRecord, LeaseRecord, MailRecord } from './coordination/service.js';
+import type { AccessKeyRecord, CredentialRecord } from './security/credentials.js';
 
 export type { GatewayEvent };
 

@@ -1,23 +1,23 @@
 import { PgBoss } from 'pg-boss';
 import { z } from 'zod';
+import { AgentRuntime } from './agent/runtime.js';
 import { createApp } from './app.js';
 import { GenericChannel } from './channels/generic.js';
 import { ChannelRegistry } from './channels/registry.js';
+import { Channels } from './channels/service.js';
 import { TelegramChannel } from './channels/telegram.js';
 import { WhatsAppChannel } from './channels/whatsapp/adapter.js';
 import { WhatsAppConnections } from './channels/whatsapp/connections.js';
 import { createWhatsAppDeviceFactory } from './channels/whatsapp/driver.js';
-import { PostgresStore } from './postgres.js';
+import { Coordination } from './coordination/service.js';
 import { CodexLogin } from './providers/codex/login.js';
-import { RunQueue } from './queue.js';
-import { AgentRuntime } from './runtime.js';
+import { RunQueue } from './runs/queue.js';
+import { Credentials } from './security/credentials.js';
 import { SecretBox } from './security/crypto.js';
 import { createSafeFetch } from './security/outbound.js';
-import { Channels } from './services/channels.js';
-import { Coordination } from './services/coordination.js';
-import { Credentials } from './services/credentials.js';
 import { buildServices } from './services.js';
 import { type StartupStage, startupFailure } from './startup.js';
+import { PostgresStore } from './storage/postgres.js';
 
 const config = z
   .object({

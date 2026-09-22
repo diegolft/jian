@@ -3,9 +3,9 @@ import SwaggerParser from '@apidevtools/swagger-parser';
 import { createOpenAPI, operations } from '@elos/contracts';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
+import { Channels } from '../src/channels/service.js';
+import { Credentials } from '../src/security/credentials.js';
 import { SecretBox } from '../src/security/crypto.js';
-import { Channels } from '../src/services/channels.js';
-import { Credentials } from '../src/services/credentials.js';
 import { testServices } from './helpers/services.js';
 
 const token = 'synthetic-admin-token-with-32-characters';

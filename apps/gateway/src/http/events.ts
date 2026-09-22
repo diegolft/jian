@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { GatewayError } from '../core/errors.js';
 import type { Store } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
-import type { Credentials } from '../services/credentials.js';
+import type { Credentials } from '../security/credentials.js';
 
 type ProfileParams = { profileId: string };
 

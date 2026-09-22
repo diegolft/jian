@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { MockLanguageModelV4 } from 'ai/test';
 import { expect, it } from 'vitest';
-import { AgentRuntime } from '../src/runtime.js';
+import { AgentRuntime } from '../src/agent/runtime.js';
 import { createSafeFetch } from '../src/security/outbound.js';
 import { testServices } from './helpers/services.js';
 

@@ -1,9 +1,9 @@
 import { randomBytes } from 'node:crypto';
 import { MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it } from 'vitest';
-import { AgentRuntime } from '../src/runtime.js';
+import { AgentRuntime } from '../src/agent/runtime.js';
+import { Credentials } from '../src/security/credentials.js';
 import { SecretBox } from '../src/security/crypto.js';
-import { Credentials } from '../src/services/credentials.js';
 import { testServices } from './helpers/services.js';
 
 const input = {

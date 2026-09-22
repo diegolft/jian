@@ -3,8 +3,8 @@ import { operations } from '@elos/contracts';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 import { GatewayError } from '../core/errors.js';
-import type { Credentials } from '../services/credentials.js';
-import { authorizesPanel } from './panel-session.js';
+import type { Credentials } from '../security/credentials.js';
+import { authorizesPanel } from '../security/panel-session.js';
 
 interface SecurityOptions {
   token: string;
