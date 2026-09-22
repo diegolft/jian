@@ -121,6 +121,19 @@ export function gatewayApi() {
     signIn: (token: string) => result(client.POST('/v1/panel/session', { body: { token } })),
     signOut: () => result(client.DELETE('/v1/panel/session')),
     profiles: () => result(client.GET('/v1/profiles')),
+    skillCatalog: (profileId: string, url: string) =>
+      result(
+        client.GET('/v1/profiles/{profileId}/skill-catalog', {
+          params: { path: { profileId }, query: { url } },
+        }),
+      ),
+    importSkill: (profileId: string, url: string) =>
+      result(
+        client.POST('/v1/profiles/{profileId}/skills/import', {
+          params: profile(profileId),
+          body: { url },
+        }),
+      ),
     createProfile: (body: NewProfile) => result(client.POST('/v1/profiles', { body })),
     updateProfile: (profileId: string, body: ProfilePatch) =>
       result(client.PATCH('/v1/profiles/{profileId}', { params: profile(profileId), body })),

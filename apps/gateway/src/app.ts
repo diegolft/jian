@@ -21,6 +21,8 @@ import { registerRunRoutes } from './runs/routes.js';
 import { registerSecurityRoutes } from './security/routes.js';
 import type { Services } from './services.js';
 import { registerSessionRoutes } from './sessions/routes.js';
+import { registerSkillRoutes } from './skills/routes.js';
+import type { Skills } from './skills/service.js';
 
 export function createApp(
   options: Services & {
@@ -29,6 +31,7 @@ export function createApp(
     logger?: boolean;
     codexLogin?: CodexLogin;
     providerModels?: ProviderModels;
+    skills?: Skills;
     channels?: Channels;
     whatsapp?: WhatsAppConnections;
     maxStreams?: number;
@@ -80,6 +83,7 @@ export function createApp(
   registerProviderRoutes(app, options);
   registerMetaRoutes(app);
   registerSecurityRoutes(app, options);
+  registerSkillRoutes(app, options);
   registerProfileRoutes(app, options);
   registerSessionRoutes(app, { ...options, coordination });
   registerMemoryRoutes(app, options);

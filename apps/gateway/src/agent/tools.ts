@@ -211,14 +211,26 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
         'Version your skill instructions for future runs. Cannot change MCPs, keys or permissions.',
       inputSchema: z.object({
         expectedVersion: z.number().int().positive(),
-        skills: z.array(skillSchema).max(20),
+        skills: z.array(skillSchema.omit({ origin: true })).max(20),
       }),
       execute: async (input) => {
-        if (!(await services.profiles.profile(run.profileId)).allowSelfManagement) {
+        const current = await services.profiles.profile(run.profileId);
+
+        if (!current.allowSelfManagement) {
           throw new GatewayError(403, 'Self-management is disabled');
         }
 
-        const updated = await services.profiles.updateProfile(run.profileId, input);
+        // Imported skills belong to the owner: the agent writes its own and never drops one
+        // it did not write, so "who wrote this instruction" stays answerable.
+        const imported = current.skills.filter((skill) => skill.origin);
+        const written = input.skills.filter(
+          (skill) => !imported.some((owned) => owned.name === skill.name),
+        );
+
+        const updated = await services.profiles.updateProfile(run.profileId, {
+          ...input,
+          skills: [...imported, ...written],
+        });
 
         return {
           version: updated.version,

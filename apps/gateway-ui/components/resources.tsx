@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpen, Pencil, Plug, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, Download, Pencil, Plug, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
   date,
@@ -96,6 +96,54 @@ export function Memories({ profile, data, api, mutate, busy }: Props) {
   );
 }
 
+/**
+ * Import copies the instructions once; the repository is provenance, not a live link. Naming
+ * that in the form keeps the owner from expecting a skill to follow upstream on its own.
+ */
+function SkillImport({
+  profile,
+  api,
+  mutate,
+  busy,
+}: Pick<Props, 'profile' | 'api' | 'mutate' | 'busy'>) {
+  const [url, setUrl] = useState('');
+
+  return (
+    <form
+      className="skill-import"
+      method="post"
+      action="/ui/"
+      onSubmit={async (event) => {
+        event.preventDefault();
+
+        if (!url.trim()) {
+          return;
+        }
+
+        if (await mutate(() => api.importSkill(profile.id, url.trim()), 'Skill importada.')) {
+          setUrl('');
+        }
+      }}
+    >
+      <Field
+        label="Importar de um repositório"
+        hint="Endereço no GitHub de uma skill ou de uma pasta de skills. As instruções são copiadas uma vez."
+      >
+        <input
+          value={url}
+          onChange={(event) => setUrl(event.target.value)}
+          placeholder="https://github.com/dono/repositorio/tree/main/skills/deploy"
+          inputMode="url"
+        />
+      </Field>
+      <Button type="submit" busy={busy} disabled={!url.trim()}>
+        <Download size={16} />
+        Importar
+      </Button>
+    </form>
+  );
+}
+
 export function Capabilities({
   kind,
   profile,
@@ -133,6 +181,7 @@ export function Capabilities({
           </Button>
         }
       />
+      {isSkill && <SkillImport profile={profile} api={api} mutate={mutate} busy={busy} />}
       {items.length ? (
         <div className="resource-list">
           {items.map((item, index) => (
@@ -143,6 +192,13 @@ export function Capabilities({
               <div className="grow">
                 <h3>{item.name}</h3>
                 <p>{'description' in item ? item.description : item.url}</p>
+                {isSkill && profile.skills[index]?.origin && (
+                  <div className="tag-list">
+                    <a href={profile.skills[index].origin.url} target="_blank" rel="noreferrer">
+                      Importada de {new URL(profile.skills[index].origin.url).pathname.slice(1)}
+                    </a>
+                  </div>
+                )}
                 {'allowedTools' in item && (
                   <div className="tag-list">
                     {item.allowedTools.map((tool) => (

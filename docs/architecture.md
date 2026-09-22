@@ -38,7 +38,8 @@ Conversa entre agentes termina, porque cada volta custa dinheiro. O orçamento d
 - Sem múltiplas organizações ou ACL por participante dentro do perfil.
 - Sem sala de canal com vários agentes e sem protocolo público entre instalações.
 - Sem garantia de replay exatamente uma vez de efeitos externos.
-- Sem sandbox de execução de código ou instalador arbitrário de MCPs/skills.
+- Sem sandbox de execução de código ou instalador arbitrário de MCPs. A importação de skills
+  é do dono, só de repositórios do GitHub, e copia o texto em vez de seguir a origem.
 - Sem contabilidade financeira por moeda; uso de tokens e limites são registrados.
 
 Essas extensões devem usar os contratos públicos e preservar as fronteiras de autorização atuais.

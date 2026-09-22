@@ -946,6 +946,16 @@ svg {
   place-items: center;
   color: var(--muted);
 }
+.skill-import {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.skill-import .field {
+  flex: 1;
+  margin-bottom: 0;
+}
 .avatar-field {
   display: flex;
   align-items: flex-start;

@@ -515,6 +515,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/profiles/{profileId}/skill-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Required permission: admin. */
+        get: operations["listSkillCatalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/profiles/{profileId}/skills/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Required permission: admin. */
+        post: operations["importSkill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/profiles": {
         parameters: {
             query?: never;
@@ -5756,6 +5790,369 @@ export interface operations {
             };
         };
     };
+    listSkillCatalog: {
+        parameters: {
+            query?: {
+                url?: string;
+            };
+            header?: never;
+            path: {
+                profileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        marketplace?: string;
+                        entries: {
+                            name: string;
+                            description: string;
+                            /** Format: uri */
+                            url: string;
+                            plugin?: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+        };
+    };
+    importSkill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uri */
+                    url: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        name: string;
+                        instructions: string;
+                        /** @default  */
+                        summary: string;
+                        /** @default null */
+                        avatar: string | null;
+                        /**
+                         * @default {
+                         *       "provider": "openai",
+                         *       "modelId": "unconfigured"
+                         *     }
+                         */
+                        model: {
+                            /** @enum {string} */
+                            provider: "openai" | "anthropic" | "google" | "openai-compatible" | "openai-codex";
+                            modelId: string;
+                            apiKeyEnv?: string;
+                            /** Format: uuid */
+                            providerId?: string;
+                            /** Format: uri */
+                            baseURL?: string;
+                            /** @enum {string} */
+                            reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+                        };
+                        /**
+                         * @default {
+                         *       "role": "",
+                         *       "tone": "",
+                         *       "goals": [],
+                         *       "boundaries": []
+                         *     }
+                         */
+                        identity: {
+                            /** @default  */
+                            role: string;
+                            /** @default  */
+                            tone: string;
+                            /** @default [] */
+                            goals: string[];
+                            /** @default [] */
+                            boundaries: string[];
+                        };
+                        /**
+                         * @default {
+                         *       "inputTokens": 16000,
+                         *       "outputTokens": 4096,
+                         *       "memoryTokens": 1500,
+                         *       "historyTokens": 6000,
+                         *       "toolResultTokens": 1500,
+                         *       "maxSteps": 12,
+                         *       "maxRunTokens": 100000
+                         *     }
+                         */
+                        contextPolicy: {
+                            /** @default 16000 */
+                            inputTokens: number;
+                            /** @default 4096 */
+                            outputTokens: number;
+                            /** @default 1500 */
+                            memoryTokens: number;
+                            /** @default 6000 */
+                            historyTokens: number;
+                            /** @default 1500 */
+                            toolResultTokens: number;
+                            /** @default 12 */
+                            maxSteps: number;
+                            /** @default 100000 */
+                            maxRunTokens: number;
+                        };
+                        /** @default [] */
+                        skills: {
+                            name: string;
+                            description: string;
+                            instructions: string;
+                            origin?: {
+                                /** Format: uri */
+                                url: string;
+                                ref?: string;
+                                marketplace?: string;
+                                plugin?: string;
+                                /** Format: date-time */
+                                importedAt: string;
+                            };
+                        }[];
+                        /** @default [] */
+                        mcpServers: {
+                            name: string;
+                            /** Format: uri */
+                            url: string;
+                            bearerToken?: string;
+                            bearerTokenEnv?: string;
+                            allowedTools: string[];
+                        }[];
+                        /** @default false */
+                        allowSelfManagement: boolean;
+                        /** Format: uuid */
+                        id: string;
+                        version: number;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+        };
+    };
     listProfiles: {
         parameters: {
             query?: never;
@@ -5846,6 +6243,15 @@ export interface operations {
                             name: string;
                             description: string;
                             instructions: string;
+                            origin?: {
+                                /** Format: uri */
+                                url: string;
+                                ref?: string;
+                                marketplace?: string;
+                                plugin?: string;
+                                /** Format: date-time */
+                                importedAt: string;
+                            };
                         }[];
                         /** @default [] */
                         mcpServers: {
@@ -6053,6 +6459,15 @@ export interface operations {
                         name: string;
                         description: string;
                         instructions: string;
+                        origin?: {
+                            /** Format: uri */
+                            url: string;
+                            ref?: string;
+                            marketplace?: string;
+                            plugin?: string;
+                            /** Format: date-time */
+                            importedAt: string;
+                        };
                     }[];
                     /** @default [] */
                     mcpServers?: {
@@ -6150,6 +6565,15 @@ export interface operations {
                             name: string;
                             description: string;
                             instructions: string;
+                            origin?: {
+                                /** Format: uri */
+                                url: string;
+                                ref?: string;
+                                marketplace?: string;
+                                plugin?: string;
+                                /** Format: date-time */
+                                importedAt: string;
+                            };
                         }[];
                         /** @default [] */
                         mcpServers: {
@@ -6365,6 +6789,15 @@ export interface operations {
                             name: string;
                             description: string;
                             instructions: string;
+                            origin?: {
+                                /** Format: uri */
+                                url: string;
+                                ref?: string;
+                                marketplace?: string;
+                                plugin?: string;
+                                /** Format: date-time */
+                                importedAt: string;
+                            };
                         }[];
                         /** @default [] */
                         mcpServers: {
@@ -6547,6 +6980,15 @@ export interface operations {
                         name: string;
                         description: string;
                         instructions: string;
+                        origin?: {
+                            /** Format: uri */
+                            url: string;
+                            ref?: string;
+                            marketplace?: string;
+                            plugin?: string;
+                            /** Format: date-time */
+                            importedAt: string;
+                        };
                     }[];
                     mcpServers?: {
                         name: string;
@@ -6643,6 +7085,15 @@ export interface operations {
                             name: string;
                             description: string;
                             instructions: string;
+                            origin?: {
+                                /** Format: uri */
+                                url: string;
+                                ref?: string;
+                                marketplace?: string;
+                                plugin?: string;
+                                /** Format: date-time */
+                                importedAt: string;
+                            };
                         }[];
                         /** @default [] */
                         mcpServers: {
@@ -6862,6 +7313,15 @@ export interface operations {
                                 name: string;
                                 description: string;
                                 instructions: string;
+                                origin?: {
+                                    /** Format: uri */
+                                    url: string;
+                                    ref?: string;
+                                    marketplace?: string;
+                                    plugin?: string;
+                                    /** Format: date-time */
+                                    importedAt: string;
+                                };
                             }[];
                             /** @default [] */
                             mcpServers: {

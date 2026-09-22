@@ -17,6 +17,7 @@ import { SecretBox } from './security/crypto.js';
 import { createSafeFetch } from './security/outbound.js';
 import { Vault } from './security/vault.js';
 import { buildServices } from './services.js';
+import { Skills } from './skills/service.js';
 import { type StartupStage, startupFailure } from './startup.js';
 import { PostgresStore } from './storage/postgres.js';
 
@@ -75,6 +76,9 @@ const outbound = createSafeFetch({
 // Model listings go out through the same guarded client as every other provider call.
 const providerModels = new ProviderModels(services, outbound.fetch);
 
+// Skill import reaches GitHub through the same guarded client, and only for the owner.
+const skills = new Skills(services.profiles, outbound.fetch);
+
 const coordination = new Coordination(services);
 const whatsapp = new WhatsAppConnections(store, box, createWhatsAppDeviceFactory());
 const channelRegistry = new ChannelRegistry([
@@ -102,6 +106,7 @@ const app =
         ...services,
         codexLogin,
         providerModels,
+        skills,
         channels,
         whatsapp,
         token: config.data.JIAN_API_TOKEN,

@@ -47,6 +47,7 @@ import {
   sessionRecordSchema,
 } from './records.js';
 import { panelSessionEndSchema, panelSessionInputSchema, panelSessionSchema } from './security.js';
+import { catalogQuerySchema, catalogSchema, skillImportSchema } from './skills.js';
 
 /**
  * `access` is the whole authorization model: the host token opens everything marked `admin`,
@@ -351,6 +352,22 @@ export const operations: Operation[] = [
     operationId: 'endPanelSession',
     access: 'admin',
     response: panelSessionEndSchema,
+  },
+  {
+    method: 'GET',
+    path: `${profile}/skill-catalog`,
+    operationId: 'listSkillCatalog',
+    access: 'admin',
+    query: catalogQuerySchema,
+    response: catalogSchema,
+  },
+  {
+    method: 'POST',
+    path: `${profile}/skills/import`,
+    operationId: 'importSkill',
+    access: 'admin',
+    body: skillImportSchema,
+    response: profileRecordSchema,
   },
   {
     method: 'GET',

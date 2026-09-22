@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { modelSelectionSchema, reasoningEffortSchema } from './providers.js';
 import { secretSchema } from './security.js';
+import { skillOriginSchema } from './skills.js';
 
 const endpointSchema = z.url().refine((value) => {
   const url = new URL(value);
@@ -46,6 +47,9 @@ export const skillSchema = z.strictObject({
   name: z.string().regex(/^[a-z0-9_-]{1,64}$/),
   description: z.string().min(1).max(300),
   instructions: z.string().min(1).max(12_000),
+  // Present only on a skill the owner imported. A self-managing agent writes its own skills
+  // and never this field, which is what keeps "who wrote this instruction" answerable.
+  origin: skillOriginSchema.optional(),
 });
 
 export const mcpSchema = z.strictObject({
