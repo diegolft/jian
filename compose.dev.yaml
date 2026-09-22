@@ -1,0 +1,23 @@
+# PostgreSQL alone, for `pnpm dev` running on the host. `make db-up` starts it.
+# Its own project name and volume keep it apart from the production stack in compose.yaml:
+# the two never share data, even on the same machine.
+name: jian-dev
+services:
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: jian
+      POSTGRES_USER: jian
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run make setup first}
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U jian -d jian']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+volumes:
+  postgres_data:

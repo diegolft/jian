@@ -1,16 +1,42 @@
-# PostgreSQL for local development. The Gateway runs on the host with `pnpm dev`.
+# Production stack: the published gateway image and its PostgreSQL. `make up` starts it.
+# For the development database alone, see compose.dev.yaml.
 # Compose would otherwise name the project after the checkout directory, so the container
 # and volume names would follow whatever the clone is called.
 name: jian
 services:
+  gateway:
+    image: ghcr.io/lucasaarch/jian-gateway:${JIAN_VERSION:-latest}
+    # To run your own build instead of the published image, uncomment this and use
+    # `docker compose up -d --build`. The image line above stays, naming the local build.
+    # build:
+    #   context: .
+    environment:
+      # The database is reached over the compose network, never from the host, so this
+      # ignores the DATABASE_URL that `make setup` wrote for local development.
+      DATABASE_URL: postgres://jian:${POSTGRES_PASSWORD:?Run make setup first}@postgres:5432/jian
+      JIAN_API_TOKEN: ${JIAN_API_TOKEN:?Run make setup first}
+      JIAN_ACTIVE_KEY_ID: ${JIAN_ACTIVE_KEY_ID:?Run make setup first}
+      JIAN_MASTER_KEYS: ${JIAN_MASTER_KEYS:?Run make setup first}
+      JIAN_ROLE: ${JIAN_ROLE:-all}
+      JIAN_ALLOW_PRIVATE_ORIGINS: ${JIAN_ALLOW_PRIVATE_ORIGINS:-}
+      # Bound inside the container; JIAN_BIND_ADDRESS decides who reaches it.
+      HOST: 0.0.0.0
+      PORT: 4310
+    ports:
+      # Localhost by default: anything wider belongs behind an HTTPS proxy.
+      - '${JIAN_BIND_ADDRESS:-127.0.0.1}:${JIAN_BIND_PORT:-4310}:4310'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The health check comes from the image's own HEALTHCHECK, which hits /health.
+    restart: unless-stopped
   postgres:
     image: postgres:17-bookworm
     environment:
       POSTGRES_DB: jian
       POSTGRES_USER: jian
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run pnpm run setup first}
-    ports:
-      - '127.0.0.1:5432:5432'
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run make setup first}
+    # No published port: the database is reachable only from the gateway.
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

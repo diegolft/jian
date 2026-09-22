@@ -7,26 +7,35 @@ Everything here assumes a running gateway. See the [README](../README.md) to sta
 Node.js 24+ and pnpm 11.9.0, pinned in `packageManager`.
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm setup
-pnpm check
+make install
+make setup
+make check
 ```
 
-`pnpm setup` creates `.env` with mode `0600`, an admin token, a local database password
+`make` alone lists every target.
+
+`make setup` creates `.env` with mode `0600`, an admin token, a local database password
 and a master encryption key. On an existing setup it only appends a missing keyring. It
 never prints a secret.
 
-`compose.yaml` holds PostgreSQL alone, published on `127.0.0.1:5432`; the gateway runs on
-the host. `pnpm db:up` starts it and `pnpm db:stop` stops it without deleting the volume.
+`compose.dev.yaml` holds PostgreSQL alone, published on `127.0.0.1:5432`; the gateway runs
+on the host. `make db-up` starts it and `make db-stop` stops it without deleting the
+volume. `make db-reset` throws the data away and starts an empty one.
+
+It is a separate database from the production stack in `compose.yaml`, with its own project
+name and its own volume. If you had the development database before this split, its data is
+still in the `jian_postgres_data` volume, which now belongs to production; the development
+volume is `jian-dev_postgres_data` and starts empty. [Deploying](deploy.md) covers the
+production side.
 
 PostgreSQL applies `POSTGRES_PASSWORD` only when it initialises an empty volume. If you
 recreate `.env` afterwards, the gateway fails with `28P01`. Sync the two in one line:
 
 ```bash
-printf "ALTER USER jian WITH PASSWORD '%s';\n" "$POSTGRES_PASSWORD" | docker exec -i jian-postgres-1 psql -U jian -d jian
+printf "ALTER USER jian WITH PASSWORD '%s';\n" "$POSTGRES_PASSWORD" | docker exec -i jian-dev-postgres-1 psql -U jian -d jian
 ```
 
-With PostgreSQL already available, set `DATABASE_URL` and run `pnpm dev`; it does not
+With PostgreSQL already available, set `DATABASE_URL` and run `make dev`; it does not
 start a database for you. Lint, typecheck, build and unit tests need no Docker at all.
 
 `JIAN_ROLE=all` runs the API and the worker in one process. `api` and `worker` split them,
