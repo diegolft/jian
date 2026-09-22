@@ -352,10 +352,7 @@ export class AgentRuntime {
     } catch (error) {
       // The stored message stays generic because a provider error can echo a key back. The
       // operator still needs the cause, so it goes to the log with the known secrets removed.
-      console.error(
-        `jian: execução ${runId} falhou —`,
-        redactText(error instanceof Error ? error.message : String(error), secrets),
-      );
+      console.error(`jian: execução ${runId} falhou — ${redactText(describe(error), secrets)}`);
 
       const current = await this.services.runs.run(profileId, runId);
 
@@ -382,6 +379,25 @@ export class AgentRuntime {
   }
 }
 
+/** What a provider actually answered, for the log. Never stored: a body can echo a key back. */
+function describe(error: unknown): string {
+  const detail = error as { name?: string; statusCode?: number; responseBody?: unknown };
+  const parts = [
+    error instanceof Error ? error.message : String(error),
+    detail.statusCode ? `HTTP ${detail.statusCode}` : '',
+    typeof detail.responseBody === 'string' ? detail.responseBody.slice(0, 500) : '',
+  ];
+
+  return parts.filter(Boolean).join(' · ');
+}
+
+/** A provider's own status, where it is specific enough to tell the owner what to do. */
+function providerStatus(error: unknown): number | undefined {
+  const status = (error as { statusCode?: unknown }).statusCode;
+
+  return typeof status === 'number' ? status : undefined;
+}
+
 function executionFailureMessage(error: unknown, uncertain: boolean, aborted: boolean): string {
   if (uncertain) {
     return 'External tool outcome is uncertain. Inspect checkpoints and reconcile effects before continuing.';
@@ -398,5 +414,18 @@ function executionFailureMessage(error: unknown, uncertain: boolean, aborted: bo
     return 'Context or run token budget exceeded. Reduce context or tool selection before retrying.';
   }
 
-  return 'Agent execution failed. Check the provider key, model access and MCP configuration.';
+  // The provider's own status says more than any guess here, and none of these leak a key.
+  switch (providerStatus(error)) {
+    case 401:
+    case 403:
+      return 'O provider recusou a credencial. Verifique a chave ou o token configurado.';
+    case 429:
+      return 'O provider recusou por limite de uso. Uma assinatura volta a aceitar quando a janela reabre; uma chave por token precisa de cota.';
+    case 404:
+      return 'O provider não reconhece este modelo nesta conta. Escolha outro modelo.';
+    case 400:
+      return 'O provider recusou a requisição. Verifique modelo, esforço e ferramentas selecionadas.';
+    default:
+      return 'A execução falhou. O motivo está no log do gateway.';
+  }
 }

@@ -633,3 +633,32 @@ it('versions self-managed skills without accepting new capability grants', async
   expect(updated.model).toEqual(profile.model);
   expect(updated.mcpServers).toEqual([]);
 });
+
+it('tells the owner what the provider answered instead of a generic failure', async () => {
+  const services = await testServices();
+  const profile = await services.profiles.createProfile({
+    name: 'Atlas',
+    instructions: 'Help.',
+    model: { provider: 'openai' as const, modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
+  });
+  const session = await services.sessions.createSession(profile.id, { title: 'Limite' });
+  const run = await services.runs.submit(profile.id, session.id, {
+    text: 'Oi',
+    requestKey: 'rate-limited',
+  });
+
+  // What a subscription answers once its window is spent: a status, and a body that says
+  // nothing. The status is the part worth repeating to the owner.
+  const refused = Object.assign(new Error('Error'), { statusCode: 429, responseBody: '{}' });
+
+  const runtime = new AgentRuntime(services, async () => {
+    throw refused;
+  });
+
+  await runtime.execute(profile.id, run.id);
+
+  const failed = await services.runs.run(profile.id, run.id);
+
+  expect(failed.status).toBe('failed');
+  expect(failed.error).toContain('limite de uso');
+});
