@@ -23,3 +23,6 @@ buildServer.json
 **/.next/
 apps/gateway-ui/out/
 **/*.tsbuildinfo
+
+# Cópias de trabalho criadas por agentes; existem só enquanto a tarefa roda.
+.claude/worktrees/
