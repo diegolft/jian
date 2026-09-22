@@ -24,6 +24,7 @@ import {
   findRunByRequestKey,
   insertRun,
   listActiveRuns,
+  listRecentRuns,
   updateRun,
 } from './repository.js';
 
@@ -206,10 +207,18 @@ export class Runs {
     return assertFound(await findRun(reader, profileId, runId), 'Run');
   }
 
+  /** What is in flight right now. The agent reads this to avoid repeating work under way. */
   async activities(profileId: string) {
     await this.profiles.profile(profileId);
 
     return listActiveRuns(this.store.db, profileId, 200);
+  }
+
+  /** What the profile has been doing, finished runs included, newest first. */
+  async recent(profileId: string) {
+    await this.profiles.profile(profileId);
+
+    return listRecentRuns(this.store.db, profileId, 100);
   }
 
   async continueRun(profileId: string, runId: string, input: unknown) {

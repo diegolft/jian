@@ -1,177 +1,107 @@
 'use client';
 
-import { Activity, ArrowRight, BookOpen, Check, MessageSquare, Smartphone } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { Activity, ArrowRight, ArrowUpRight, Settings2 } from 'lucide-react';
+import Link from 'next/link';
 import type { Profile, ProfileData } from '../../lib/api';
 import { date } from '../../lib/format';
 import { Avatar } from '../profile/avatar-field';
-import { Badge, Button, SectionHeading } from '../ui';
+import { Badge, SectionHeading } from '../ui';
 
+const number = (value: number) => value.toLocaleString('pt-BR');
 export function Overview({ profile, data }: { profile: Profile; data: ProfileData }) {
-  const router = useRouter();
-  const go = (href: string) => router.push(href);
-
-  const connected = data.channels.filter((item) => !item.revokedAt);
-
-  const providerReady = data.providers.some((item) => !item.revokedAt) || !!profile.model.apiKeyEnv;
-
-  const steps = [
-    {
-      label: 'Definir identidade',
-      description: 'Propósito e instruções do seu agente.',
-      done: true,
-      href: '/identity',
-    },
-    {
-      label: 'Conectar inteligência',
-      description: 'Adicione os providers que processam as conversas.',
-      done: providerReady,
-      href: '/providers',
-    },
-    {
-      label: 'Criar uma conversa',
-      description: 'Uma sessão para testar. As dos canais nascem sozinhas.',
-      done: data.sessions.length > 0,
-      href: '/conversations',
-    },
-    {
-      label: 'Abrir um canal',
-      description: 'WhatsApp, Telegram ou o API Server.',
-      done: connected.length > 0,
-      href: '/channels',
-    },
-  ];
-
-  const complete = steps.filter((step) => step.done).length;
-
+  const active = data.activities.filter((run) => ['running', 'queued'].includes(run.status)).length;
+  const input = data.activities.reduce((sum, run) => sum + (run.usage?.inputTokens ?? 0), 0);
+  const output = data.activities.reduce((sum, run) => sum + (run.usage?.outputTokens ?? 0), 0);
+  const recent = [...data.activities]
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 5);
   return (
     <>
       <SectionHeading
-        title={`Seu espaço, ${profile.name}.`}
-        description="Uma visão do seu agente e dos lugares onde ele atua."
+        title="Visão geral"
         action={
-          <Button variant="secondary" onClick={() => go('/conversations')}>
-            <MessageSquare size={16} />
-            Abrir conversas
-          </Button>
+          <span className="overview-live">
+            <span className="live-dot" />
+            {active ? `${active} em execução` : 'Nenhuma execução ativa'}
+          </span>
         }
       />
-      <section className="profile-summary">
-        <Avatar name={profile.name} avatar={profile.avatar} className="profile-avatar" />
-        <div className="grow">
-          <div className="eyebrow">PERFIL ATIVO</div>
+      <section className="overview-profile" aria-label="Perfil em uso">
+        <div className="flex min-w-0 items-center gap-5">
+          <Avatar name={profile.name} avatar={profile.avatar} className="profile-avatar" />
           <h2>{profile.name}</h2>
-          <p>{profile.instructions.slice(0, 130)}</p>
-          <div className="tag-list">
-            <span>{data.providers.filter((item) => !item.revokedAt).length} providers</span>
-            <span>{data.sessions.length} conversas</span>
-          </div>
         </div>
-        <button className="text-button" type="button" onClick={() => go('/identity')}>
-          Configurar perfil
-          <ArrowRight size={16} />
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/identity" className="button quiet">
+            <Settings2 size={16} />
+            Editar perfil
+          </Link>
+        </div>
       </section>
-      <div className="metric-strip">
+      <section className="overview-metrics" aria-label="Atividade do perfil">
         {[
-          { label: 'Conversas', value: data.sessions.length, icon: MessageSquare },
-          { label: 'Canais configurados', value: connected.length, icon: Smartphone },
-          { label: 'Memórias', value: data.memories.length, icon: BookOpen },
           {
-            label: 'Execuções ativas',
-            value: data.activities.filter((run) => ['running', 'queued'].includes(run.status))
-              .length,
-            icon: Activity,
+            label: 'Sessões',
+            value: data.sessions.length,
+            href: '/sessions',
+            detail: 'Sessões do perfil',
+          },
+          {
+            label: 'Memórias',
+            value: data.memories.length,
+            href: '/memories',
+            detail: 'Conhecimento preservado',
+          },
+          {
+            label: 'Execuções',
+            value: data.activities.length,
+            href: '/sessions',
+            detail: 'Nas últimas 100',
+          },
+          {
+            label: 'Tokens',
+            value: input + output,
+            href: '/models',
+            detail: 'Somados nessas execuções',
           },
         ].map((item) => (
-          <div key={item.label}>
-            <item.icon size={18} />
-            <strong>{item.value}</strong>
-            <span>{item.label}</span>
-          </div>
-        ))}
-      </div>
-      <div className="overview-columns">
-        <section className="setup-panel">
-          <header>
-            <div>
-              <span className="eyebrow">PRÓXIMOS PASSOS</span>
-              <h2>{complete === steps.length ? 'Pronto para conversar' : 'Prepare seu espaço'}</h2>
-            </div>
-            <span className="step-count">
-              {complete}/{steps.length}
+          <Link href={item.href} className="overview-metric" key={item.label}>
+            <span>
+              {item.label}
+              <ArrowUpRight size={15} />
             </span>
+            <strong>{number(item.value)}</strong>
+            <small>{item.detail}</small>
+          </Link>
+        ))}
+      </section>
+      <div className="overview-columns">
+        <section className="overview-activity">
+          <header className="section-row">
+            <h2>Atividade recente</h2>
+            <Link href="/sessions" className="text-button">
+              Ver sessões
+              <ArrowRight size={14} />
+            </Link>
           </header>
-          <div className="progress-track">
-            <span style={{ width: `${(complete / steps.length) * 100}%` }} />
-          </div>
-          {steps.map((step, index) => (
-            <button
-              type="button"
-              className="setup-step"
-              key={step.label}
-              onClick={() => go(step.href)}
-            >
-              <span className={`step-number ${step.done ? 'done' : ''}`}>
-                {step.done ? <Check size={15} /> : index + 1}
-              </span>
-              <span className="grow">
-                <strong>{step.label}</strong>
-                <small>{step.description}</small>
-              </span>
-              <ArrowRight size={16} />
-            </button>
-          ))}
-        </section>
-        <section className="context-panel">
-          <div className="eyebrow">CONTEXTO COM PROPÓSITO</div>
-          <BookOpen size={29} strokeWidth={1.4} />
-          <h2>
-            O que importa
-            <br />
-            continua com ele.
-          </h2>
-          <p>
-            Memórias relevantes entram na conversa quando fazem sentido. O contexto se adapta ao
-            modelo usado em cada execução.
-          </p>
-          <button type="button" className="text-button" onClick={() => go('/models')}>
-            Definir modelos padrão
-            <ArrowRight size={16} />
-          </button>
-        </section>
-      </div>
-      <section className="subsection">
-        <header className="section-row">
-          <h2>Execuções em andamento</h2>
-          <button type="button" className="text-button" onClick={() => go('/conversations')}>
-            Ver conversas
-            <ArrowRight size={15} />
-          </button>
-        </header>
-        {data.activities.length ? (
-          <div className="resource-list">
-            {data.activities
-              .slice(-5)
-              .reverse()
-              .map((run) => (
-                <div className="resource-row" key={run.id}>
-                  <div className="resource-icon">
-                    <MessageSquare size={18} />
-                  </div>
+          {recent.length ? (
+            <div className="activity-list">
+              {recent.map((run) => (
+                <div className="activity-row" key={run.id}>
+                  <Activity size={17} />
                   <div className="grow">
                     <h3>
-                      {data.sessions.find((session) => session.id === run.sessionId)?.title ??
-                        'Conversa'}
+                      {data.sessions.find((session) => session.id === run.sessionId)?.title ||
+                        'Conversa sem título'}
                     </h3>
                     <p className="truncate">{run.input}</p>
+                    <small>{date(run.updatedAt)}</small>
                   </div>
-                  <span className="muted small">{date(run.updatedAt)}</span>
                   <Badge
                     tone={
                       run.status === 'completed'
                         ? 'good'
-                        : run.status === 'failed'
+                        : ['failed', 'interrupted'].includes(run.status)
                           ? 'bad'
                           : 'neutral'
                     }
@@ -189,15 +119,49 @@ export function Overview({ profile, data }: { profile: Profile; data: ProfileDat
                   </Badge>
                 </div>
               ))}
+            </div>
+          ) : (
+            <div className="activity-empty">
+              <Activity size={25} />
+              <h3>Sem execuções recentes</h3>
+              <p>As próximas atividades e seus resultados aparecerão aqui.</p>
+            </div>
+          )}
+        </section>
+        <section className="usage-panel" aria-label="Uso de tokens">
+          <span className="eyebrow">Consumo</span>
+          <h2>
+            {number(input + output)}
+            <small>tokens</small>
+          </h2>
+          <p>Nas últimas 100 execuções</p>
+          <div className="usage-bar" aria-hidden="true">
+            <span style={{ width: `${input + output ? (input / (input + output)) * 100 : 0}%` }} />
+            <span style={{ width: `${input + output ? (output / (input + output)) * 100 : 0}%` }} />
           </div>
-        ) : (
-          <div className="activity-empty">
-            <Activity size={20} />
-            <p>Nenhuma execução em andamento.</p>
-            <span>Pronto quando você estiver.</span>
-          </div>
-        )}
-      </section>
+          <dl>
+            <div>
+              <dt>
+                <span className="usage-dot" />
+                Entrada
+              </dt>
+              <dd>{number(input)}</dd>
+            </div>
+            <div>
+              <dt>
+                <span className="usage-dot output" />
+                Saída
+              </dt>
+              <dd>{number(output)}</dd>
+            </div>
+          </dl>
+          <p className="usage-footnote">
+            {input + output
+              ? 'Inclui o contexto enviado e as respostas geradas.'
+              : 'O consumo é registrado quando um modelo informa uso.'}
+          </p>
+        </section>
+      </div>
     </>
   );
 }

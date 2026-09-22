@@ -197,6 +197,23 @@ export async function listActiveRuns(
   return rows.map((row) => toRun(row.run, row.document));
 }
 
+/**
+ * The last runs of a profile, whatever became of them. `listActiveRuns` answers what is in
+ * flight; this answers what has been done, which is what a reader of the panel is looking at.
+ */
+export async function listRecentRuns(
+  db: Queryable,
+  profileId: string,
+  limit: number,
+): Promise<Run[]> {
+  const rows = await hydrated(db)
+    .where(eq(runs.profileId, profileId))
+    .orderBy(desc(runs.createdAt))
+    .limit(limit);
+
+  return rows.map((row) => toRun(row.run, row.document));
+}
+
 /** Dispatch and recovery need the address of a run, not the run: no revision is joined. */
 export type RunAddress = { id: string; profileId: string };
 

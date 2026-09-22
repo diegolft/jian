@@ -1,4 +1,5 @@
 import type { Profile, Skill } from '@jian/contracts';
+import { aboutJian } from './about-jian.js';
 import { channelReplies } from './channel-replies.js';
 import { longRunningWork } from './long-running-work.js';
 import { memoryKeeping } from './memory-keeping.js';
@@ -14,6 +15,7 @@ import { writingYourSkills } from './writing-your-skills.js';
  * which instructions an installation was actually running.
  */
 const ALWAYS: readonly Skill[] = [
+  aboutJian,
   ownerAndContacts,
   channelReplies,
   memoryKeeping,

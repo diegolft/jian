@@ -5,7 +5,7 @@ import type { RunReader } from './port.js';
 import type { Runs } from './service.js';
 
 type RunRouteServices = {
-  runs: RunReader & Pick<Runs, 'cancel' | 'continueRun'>;
+  runs: RunReader & Pick<Runs, 'cancel' | 'continueRun' | 'recent'>;
   lifecycle: Pick<RunLifecycle, 'checkpoints'>;
   // The runtime holds the in-process abort handle; cancelling the record alone cannot reach it.
   onCancel?: (runId: string) => void;
@@ -13,7 +13,7 @@ type RunRouteServices = {
 
 export function registerRunRoutes(app: FastifyInstance, deps: RunRouteServices): void {
   app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/activities', async (request) =>
-    deps.runs.activities(request.params.profileId),
+    deps.runs.recent(request.params.profileId),
   );
 
   app.get<{ Params: RunParams }>('/v1/profiles/:profileId/runs/:runId', async (request) =>
