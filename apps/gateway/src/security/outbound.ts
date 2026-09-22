@@ -158,8 +158,10 @@ function reason(error: unknown): string {
 
     if (typeof code === 'string') {
       codes.push(code);
-    } else if (cursor.message && codes.length === 0) {
-      codes.push(cursor.message.slice(0, 80));
+    }
+
+    if (cursor.message) {
+      codes.push(cursor.message.slice(0, 120));
     }
 
     cursor = cursor.cause;
