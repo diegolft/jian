@@ -7,7 +7,18 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!!**/dist", "!!**/coverage", "!**/pnpm-lock.yaml"]
+    "includes": [
+      "**",
+      "!!**/dist",
+      "!!**/coverage",
+      "!**/pnpm-lock.yaml",
+      "!packages/sdk/src/generated.ts",
+      "!packages/contracts/openapi.json",
+      "!apps/apple",
+      "!!**/.next",
+      "!!apps/gateway-ui/out",
+      "!apps/gateway-ui/next-env.d.ts"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -18,9 +29,17 @@
   },
   "linter": {
     "enabled": true,
-    "rules": { "preset": "recommended" }
+    "rules": {
+      "preset": "recommended"
+    }
   },
-  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
   "javascript": {
     "formatter": {
       "quoteStyle": "single",

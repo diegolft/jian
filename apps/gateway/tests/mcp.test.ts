@@ -1,0 +1,410 @@
+import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { MockLanguageModelV4 } from 'ai/test';
+import { expect, it } from 'vitest';
+import { Gateway } from '../src/gateway.js';
+import { AgentRuntime } from '../src/runtime.js';
+import { createSafeFetch } from '../src/security/outbound.js';
+import { MemoryStore } from './helpers/memory-store.js';
+
+it.each([false, true])(
+  'executes only allowlisted tools through HTTP MCP (large catalog: %s)',
+  async (largeCatalog) => {
+    const called: string[] = [];
+
+    const extraTools = largeCatalog
+      ? Array.from({ length: 20 }, (_, index) => ({
+          name: `archive_${index}`,
+          description: `Archived documents ${index}`,
+          inputSchema: { type: 'object', properties: {} },
+        }))
+      : [];
+
+    const server = createServer(async (req, res) => {
+      if (req.method !== 'POST') {
+        res.writeHead(405).end();
+
+        return;
+      }
+
+      let body = '';
+
+      for await (const chunk of req) {
+        body += chunk;
+      }
+
+      const message = JSON.parse(body);
+
+      if (message.id === undefined) {
+        res.writeHead(202).end();
+
+        return;
+      }
+
+      let result: unknown;
+
+      if (message.method === 'initialize') {
+        result = {
+          protocolVersion: '2025-03-26',
+          capabilities: { tools: {} },
+          serverInfo: { name: 'test', version: '1' },
+        };
+      } else if (message.method === 'tools/list') {
+        result = {
+          tools: [
+            ...extraTools,
+            {
+              name: 'search',
+              description: 'Search docs',
+              inputSchema: { type: 'object', properties: {} },
+            },
+            {
+              name: 'delete_everything',
+              description: 'Must not be available',
+              inputSchema: { type: 'object', properties: {} },
+            },
+          ],
+        };
+      } else if (message.method === 'tools/call') {
+        called.push(message.params.name);
+        result = { content: [{ type: 'text', text: 'Documentation found' }] };
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' }).end(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: message.id,
+            error: { code: -32601, message: 'Method not found' },
+          }),
+        );
+
+        return;
+      }
+
+      res
+        .writeHead(200, { 'Content-Type': 'application/json' })
+        .end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result }));
+    });
+
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const outbound = createSafeFetch({ allowPrivateOrigins: [origin] });
+    const gateway = new Gateway(new MemoryStore());
+
+    const usage = {
+      inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+      outputTokens: { total: 1, text: 1, reasoning: 0 },
+    };
+
+    let calls = 0;
+
+    const model = new MockLanguageModelV4({
+      doGenerate: async (options) => {
+        calls++;
+
+        if (largeCatalog && calls === 1) {
+          const exposed = options.tools?.filter((tool) => tool.type === 'function') ?? [];
+
+          expect(exposed.find((tool) => tool.name === 'load_mcp_tools')?.description).not.toContain(
+            'archive_19',
+          );
+
+          expect(exposed.some((tool) => tool.name === 'search_mcp_tools')).toBe(true);
+
+          return {
+            content: [
+              {
+                type: 'tool-call',
+                toolCallId: 'discover',
+                toolName: 'search_mcp_tools',
+                input: JSON.stringify({ query: 'archive_19' }),
+              },
+            ],
+            finishReason: { unified: 'tool-calls', raw: 'tool-calls' },
+            usage,
+            warnings: [],
+          };
+        }
+
+        const phase = calls - (largeCatalog ? 1 : 0);
+
+        if (phase === 1) {
+          const tools = options.tools?.filter((t) => t.type === 'function') ?? [];
+
+          if (tools.some((t) => t.name.includes('delete_everything'))) {
+            throw new Error('Forbidden tool exposed');
+          }
+
+          expect(tools.some((t) => t.name.startsWith('mcp_docs_search_'))).toBe(false);
+
+          const selector = tools.find((t) => t.name === 'load_mcp_tools');
+
+          assert.ok(selector, 'The selector must be available before MCP schemas');
+
+          const searchName = largeCatalog
+            ? JSON.stringify(options.prompt).match(/mcp_docs_archive_19_[a-f0-9]{8}/)?.[0]
+            : selector.description?.match(/mcp_docs_search_[a-f0-9]{8}/)?.[0];
+
+          assert.ok(searchName, 'The allowlisted tool must be in the catalog');
+
+          return {
+            content: [
+              {
+                type: 'tool-call',
+                toolCallId: 'select',
+                toolName: selector.name,
+                input: JSON.stringify({ names: [searchName] }),
+              },
+            ],
+            finishReason: { unified: 'tool-calls', raw: 'tool-calls' },
+            usage,
+            warnings: [],
+          };
+        }
+
+        if (phase === 2) {
+          const tools = options.tools?.filter((t) => t.type === 'function') ?? [];
+
+          if (tools.some((t) => t.name.includes('delete_everything'))) {
+            throw new Error('Forbidden tool exposed');
+          }
+
+          const search = tools.find((t) =>
+            t.name.startsWith(largeCatalog ? 'mcp_docs_archive_19_' : 'mcp_docs_search_'),
+          );
+
+          assert.ok(search, 'The selected search tool must now be available');
+
+          return {
+            content: [{ type: 'tool-call', toolCallId: 'one', toolName: search.name, input: '{}' }],
+            finishReason: { unified: 'tool-calls', raw: 'tool-calls' },
+            usage,
+            warnings: [],
+          };
+        }
+
+        return {
+          content: [{ type: 'text', text: 'Found the documentation.' }],
+          finishReason: { unified: 'stop', raw: 'stop' },
+          usage,
+          warnings: [],
+        };
+      },
+    });
+
+    try {
+      const profile = await gateway.createProfile({
+        name: 'MCP test',
+        instructions: 'Help.',
+        model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+        mcpServers: [
+          {
+            name: 'docs',
+            url: `${origin}/mcp`,
+            allowedTools: ['search', ...extraTools.map((tool) => tool.name)],
+          },
+        ],
+      });
+
+      const session = await gateway.createSession(profile.id, { title: 'MCP' });
+
+      const run = await gateway.submit(profile.id, session.id, {
+        text: 'Find docs',
+        requestKey: 'mcp',
+      });
+
+      await new AgentRuntime(gateway, () => model, { outbound }).execute(profile.id, run.id);
+      expect((await gateway.run(profile.id, run.id)).status).toBe('completed');
+      expect(called).toEqual([largeCatalog ? 'archive_19' : 'search']);
+    } finally {
+      await outbound.close();
+      server.closeAllConnections();
+
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err ? reject(err) : resolve())),
+      );
+    }
+  },
+);
+
+it.each(['disconnect', 'isError'])(
+  'interrupts uncertain remote effects (%s) without retries',
+  async (failure) => {
+    let effects = 0;
+
+    const server = createServer(async (req, res) => {
+      if (req.method !== 'POST') {
+        res.writeHead(405).end();
+
+        return;
+      }
+
+      let body = '';
+
+      for await (const chunk of req) {
+        body += chunk;
+      }
+
+      const message = JSON.parse(body);
+
+      if (message.id === undefined) {
+        res.writeHead(202).end();
+
+        return;
+      }
+
+      if (message.method === 'tools/call') {
+        effects++;
+
+        if (failure === 'disconnect') {
+          req.socket.destroy();
+        } else {
+          res.writeHead(200, { 'Content-Type': 'application/json' }).end(
+            JSON.stringify({
+              jsonrpc: '2.0',
+              id: message.id,
+              result: {
+                isError: true,
+                content: [{ type: 'text', text: 'Effect applied; verification failed.' }],
+              },
+            }),
+          );
+        }
+
+        return;
+      }
+
+      const result =
+        message.method === 'initialize'
+          ? {
+              protocolVersion: '2025-03-26',
+              capabilities: { tools: {} },
+              serverInfo: { name: 'effect', version: '1' },
+            }
+          : message.method === 'tools/list'
+            ? {
+                tools: [
+                  {
+                    name: 'mutate',
+                    description: 'External mutation',
+                    inputSchema: { type: 'object', properties: {} },
+                  },
+                ],
+              }
+            : undefined;
+
+      res
+        .writeHead(200, { 'Content-Type': 'application/json' })
+        .end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result }));
+    });
+
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const outbound = createSafeFetch({ allowPrivateOrigins: [origin] });
+
+    try {
+      const gateway = new Gateway(new MemoryStore());
+
+      const profile = await gateway.createProfile({
+        name: 'Effect test',
+        instructions: 'Help.',
+        model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+        mcpServers: [{ name: 'effects', url: `${origin}/mcp`, allowedTools: ['mutate'] }],
+      });
+
+      const session = await gateway.createSession(profile.id, { title: 'Effects' });
+
+      const run = await gateway.submit(profile.id, session.id, {
+        text: 'Do it',
+        requestKey: 'effect',
+      });
+
+      const usage = {
+        inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+        outputTokens: { total: 1, text: 1, reasoning: 0 },
+      };
+
+      let calls = 0;
+      let remoteName = '';
+
+      const model = new MockLanguageModelV4({
+        doGenerate: async (options) => {
+          calls++;
+
+          if (calls === 1) {
+            const selector = options.tools
+              ?.filter((item) => item.type === 'function')
+              .find((item) => item.name === 'load_mcp_tools');
+
+            assert.ok(selector);
+            remoteName = selector.description?.match(/mcp_effects_mutate_[a-f0-9]{8}/)?.[0] ?? '';
+            assert.ok(remoteName);
+
+            return {
+              content: [
+                {
+                  type: 'tool-call',
+                  toolCallId: 'select',
+                  toolName: 'load_mcp_tools',
+                  input: JSON.stringify({ names: [remoteName] }),
+                },
+              ],
+              finishReason: { unified: 'tool-calls', raw: 'tool-calls' },
+              usage,
+              warnings: [],
+            };
+          }
+
+          return {
+            content: [
+              {
+                type: 'tool-call',
+                toolCallId: `effect-${calls}-a`,
+                toolName: remoteName,
+                input: '{}',
+              },
+              {
+                type: 'tool-call',
+                toolCallId: `effect-${calls}-b`,
+                toolName: remoteName,
+                input: '{}',
+              },
+            ],
+            finishReason: { unified: 'tool-calls', raw: 'tool-calls' },
+            usage,
+            warnings: [],
+          };
+        },
+      });
+
+      await new AgentRuntime(gateway, () => model, { outbound }).execute(profile.id, run.id);
+
+      const finished = await gateway.run(profile.id, run.id);
+
+      expect(finished.status).toBe('interrupted');
+      expect(effects).toBe(1);
+      expect(calls).toBe(2);
+      expect(finished.error).toContain('reconcil');
+
+      expect(
+        (await gateway.checkpoints(profile.id, run.id)).filter((checkpoint) => {
+          const data = checkpoint.data as { phase?: string; toolName?: string };
+
+          return data.phase === 'tool-started' && data.toolName === remoteName;
+        }),
+      ).toHaveLength(1);
+    } finally {
+      await outbound.close();
+      server.closeAllConnections();
+
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  },
+);

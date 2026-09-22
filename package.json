@@ -1,6 +1,6 @@
 {
   "name": "elos",
-  "description": "Gateway de agentes com identidade e contexto compartilhados entre sessões",
+  "description": "Gateway de agentes com identidade e contexto compartilhados entre sess\u00f5es",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,44 +9,40 @@
     "pnpm": ">=11 <12"
   },
   "scripts": {
-    "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
-    "build": "tsc -p tsconfig.build.json",
-    "start": "node --env-file-if-exists=.env dist/main.js",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run --exclude tests/postgres.test.ts",
-    "test:integration": "vitest run tests/postgres.test.ts",
-    "check": "pnpm run lint && pnpm run typecheck && pnpm test && pnpm run build",
+    "dev": "pnpm --filter @elos/contracts build && pnpm --filter @elos/sdk build && pnpm --parallel --filter @elos/gateway --filter @elos/gateway-ui dev",
+    "db:up": "docker compose up -d --wait postgres",
+    "db:stop": "docker compose stop postgres",
+    "build": "pnpm --filter @elos/gateway build",
+    "start": "pnpm --filter @elos/gateway start",
+    "typecheck": "pnpm --filter @elos/contracts build && pnpm --filter @elos/sdk build && pnpm -r --if-present run typecheck",
+    "test": "pnpm --filter @elos/contracts build && pnpm --filter @elos/gateway test",
+    "test:integration": "pnpm --filter @elos/contracts build && pnpm --filter @elos/gateway test:integration",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm contracts:check",
     "setup": "node scripts/setup.mjs",
     "lint": "biome check . --error-on-warnings",
     "lint:fix": "biome check --write . --error-on-warnings",
     "format": "biome format --write .",
     "lint:staged": "lint-staged",
-    "prepare": "node .husky/install.mjs"
-  },
-  "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.58",
-    "@ai-sdk/google": "^4.0.76",
-    "@ai-sdk/mcp": "^2.0.55",
-    "@ai-sdk/openai": "^4.0.72",
-    "@ai-sdk/openai-compatible": "^3.0.53",
-    "ai": "^7.0.108",
-    "fastify": "^5.12.5",
-    "pg": "^8.23.0",
-    "pg-boss": "^12.33.4",
-    "zod": "^4.6.5"
+    "prepare": "node .husky/install.mjs",
+    "contracts:generate": "pnpm --filter @elos/contracts build && node packages/sdk/scripts/generate.mjs",
+    "contracts:check": "pnpm --filter @elos/contracts build && node packages/sdk/scripts/generate.mjs --check",
+    "apple:test": "cd apps/apple/Packages/ElosKit && swift test",
+    "apple:build": "xcodebuild -project apps/apple/ElosAgent.xcodeproj -scheme ElosAgent -destination 'generic/platform=iOS Simulator' -skipPackagePluginValidation build",
+    "apple:lint": "cd apps/apple && swiftlint lint --quiet --strict",
+    "apple:lint:fix": "cd apps/apple && swiftlint lint --quiet --fix",
+    "apple:index": "cd apps/apple && xcode-build-server config -project ElosAgent.xcodeproj -scheme ElosAgent && xcodebuild -project ElosAgent.xcodeproj -scheme ElosAgent -destination 'platform=macOS' -skipPackagePluginValidation build | xcode-build-server parse -a"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
     "@types/node": "^26.6.2",
-    "@types/pg": "^8.23.1",
     "husky": "9.1.7",
     "lint-staged": "17.5.1",
-    "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
-    "vitest": "^5.0.1"
+    "typescript": "^7.0.2"
   },
   "lint-staged": {
-    "*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc}": "biome check --write --no-errors-on-unmatched --error-on-warnings"
+    "*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc}": "biome check --write --no-errors-on-unmatched --error-on-warnings",
+    "apps/apple/**/*.swift": "sh -c 'pnpm apple:lint'"
   },
-  "packageManager": "pnpm@11.9.0"
+  "packageManager": "pnpm@11.9.0",
+  "license": "Apache-2.0"
 }

@@ -1,0 +1,243 @@
+import { promises as dns } from 'node:dns';
+import { isIP } from 'node:net';
+import ipaddr from 'ipaddr.js';
+import { Agent } from 'undici';
+
+const METADATA_HOSTS = new Set([
+  'metadata',
+  'metadata.google.internal',
+  'metadata.azure.internal',
+  'instance-data',
+  'instance-data.ec2.internal',
+]);
+
+const METADATA_ADDRESSES = new Set(['169.254.169.254', '100.100.100.200', 'fd00:ec2::254']);
+
+function parsedAddress(address: string): ipaddr.IPv4 | ipaddr.IPv6 | undefined {
+  try {
+    return ipaddr.parse(address);
+  } catch {
+    return undefined;
+  }
+}
+
+function isMetadataAddress(address: string): boolean {
+  const parsed = parsedAddress(address);
+
+  if (!parsed) {
+    return false;
+  }
+
+  if (parsed instanceof ipaddr.IPv6 && parsed.isIPv4MappedAddress()) {
+    return isMetadataAddress(parsed.toIPv4Address().toString());
+  }
+
+  return parsed.range() === 'linkLocal' || METADATA_ADDRESSES.has(parsed.toString());
+}
+
+export function isPublicAddress(address: string): boolean {
+  const parsed = parsedAddress(address);
+
+  if (!parsed || isMetadataAddress(address)) {
+    return false;
+  }
+
+  if (parsed instanceof ipaddr.IPv6 && parsed.isIPv4MappedAddress()) {
+    return isPublicAddress(parsed.toIPv4Address().toString());
+  }
+
+  return parsed.range() === 'unicast';
+}
+
+function isMetadataHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, '');
+
+  return (
+    METADATA_HOSTS.has(host) ||
+    host.split('.').includes('metadata') ||
+    host.startsWith('instance-data.')
+  );
+}
+
+function parseEndpoint(input: string | URL): URL {
+  const value = String(input);
+
+  if (value.length === 0 || value.length > 8192) {
+    throw new Error('Invalid outbound endpoint');
+  }
+
+  let url: URL;
+
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error('Invalid outbound endpoint');
+  }
+
+  const rawAuthority = value.match(/^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)/i)?.[1];
+
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    !url.hostname ||
+    url.username ||
+    url.password ||
+    url.hash ||
+    value.includes('#') ||
+    rawAuthority?.includes('@') ||
+    isMetadataHost(url.hostname)
+  ) {
+    throw new Error('Outbound endpoint is not permitted');
+  }
+
+  const rawHost = rawAuthority
+    ?.replace(/^.*@/, '')
+    .replace(/^\[([^\]]+)\](?::\d+)?$/, '$1')
+    .replace(/:\d+$/, '');
+
+  const hostname = url.hostname.startsWith('[') ? url.hostname.slice(1, -1) : url.hostname;
+
+  if (isIP(hostname) === 4 && rawHost?.toLowerCase() !== hostname.toLowerCase()) {
+    throw new Error('Ambiguous IP address is not permitted');
+  }
+
+  if (isIP(hostname) && isMetadataAddress(hostname)) {
+    throw new Error('Metadata endpoint is not permitted');
+  }
+
+  return url;
+}
+
+function configuredOrigins(origins: readonly string[]): Set<string> {
+  const allowed = new Set<string>();
+
+  for (const origin of origins) {
+    const url = parseEndpoint(origin);
+
+    if (url.pathname !== '/' || url.search || url.hash) {
+      throw new Error('Private origin must be an exact origin');
+    }
+
+    allowed.add(url.origin);
+  }
+
+  return allowed;
+}
+
+export function validateEndpoint(
+  input: string | URL,
+  allowPrivateOrigins: readonly string[] = [],
+): URL {
+  const url = parseEndpoint(input);
+  const allowed = configuredOrigins(allowPrivateOrigins).has(url.origin);
+
+  if (url.protocol !== 'https:' && !allowed) {
+    throw new Error('HTTPS is required for outbound requests');
+  }
+
+  const hostname = url.hostname.startsWith('[') ? url.hostname.slice(1, -1) : url.hostname;
+
+  if (isIP(hostname) && !isPublicAddress(hostname) && !allowed) {
+    throw new Error('Private endpoint is not permitted');
+  }
+
+  return url;
+}
+
+export interface SafeFetchOptions {
+  allowPrivateOrigins?: string[];
+  lookup?: (hostname: string) => Promise<readonly string[]>;
+}
+
+export function createSafeFetch(options: SafeFetchOptions = {}): {
+  fetch: typeof globalThis.fetch;
+  close(): Promise<void>;
+} {
+  const allowed = configuredOrigins(options.allowPrivateOrigins ?? []);
+  const agents = new Map<string, Agent>();
+  let closed = false;
+
+  const safeFetch: typeof globalThis.fetch = async (input, init) => {
+    if (closed) {
+      throw new Error('Outbound client is closed');
+    }
+
+    const url = validateEndpoint(input instanceof Request ? input.url : input, [...allowed]);
+    const allowPrivate = allowed.has(url.origin);
+    let agent = agents.get(url.origin);
+
+    if (!agent) {
+      agent = new Agent({
+        connect: {
+          lookup(hostname, lookupOptions, callback) {
+            const resolve = async () => {
+              const addresses = options.lookup
+                ? await options.lookup(hostname)
+                : (await dns.lookup(hostname, { all: true })).map((answer) => answer.address);
+
+              if (
+                addresses.length === 0 ||
+                addresses.some(
+                  (address) =>
+                    !parsedAddress(address) ||
+                    isMetadataAddress(address) ||
+                    (!allowPrivate && !isPublicAddress(address)),
+                )
+              ) {
+                throw new Error('Outbound DNS address is not permitted');
+              }
+
+              const matching = addresses.filter(
+                (address) => !lookupOptions.family || isIP(address) === lookupOptions.family,
+              );
+
+              if (matching.length === 0) {
+                throw new Error('Outbound DNS family is unavailable');
+              }
+
+              return matching;
+            };
+
+            resolve().then(
+              (addresses) => {
+                if (lookupOptions.all) {
+                  callback(
+                    null,
+                    addresses.map((address) => ({ address, family: isIP(address) })),
+                  );
+                } else {
+                  const address = addresses[0];
+
+                  if (address) {
+                    callback(null, address, isIP(address));
+                  }
+                }
+              },
+              (error) => callback(error as Error, '', 0),
+            );
+          },
+        },
+      });
+
+      agents.set(url.origin, agent);
+    }
+
+    try {
+      return await globalThis.fetch(input, {
+        ...init,
+        redirect: 'error',
+        dispatcher: agent,
+      } as RequestInit);
+    } catch {
+      throw new Error('Outbound request failed');
+    }
+  };
+
+  return {
+    fetch: safeFetch,
+    async close() {
+      closed = true;
+      await Promise.all([...agents.values()].map((agent) => agent.close()));
+      agents.clear();
+    },
+  };
+}

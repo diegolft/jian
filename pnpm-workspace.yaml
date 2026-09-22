@@ -1,11 +1,17 @@
 packages:
-  - '.'
+  - 'apps/*'
+  - 'packages/*'
 allowBuilds:
   esbuild: true
   fsevents: false
+  puppeteer: false
 minimumReleaseAgeExclude:
   - '@ai-sdk/gateway@4.0.88'
   - '@ai-sdk/mcp@2.0.55'
   - '@ai-sdk/openai@4.0.72'
   - ai@7.0.108
   - pg-boss@12.33.4
+
+# Avoid the vulnerable extract-zip dependency in Puppeteer 24.
+overrides:
+  whatsapp-web.js>puppeteer: 25.11.0

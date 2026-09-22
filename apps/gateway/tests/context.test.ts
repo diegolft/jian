@@ -1,0 +1,178 @@
+import { tool } from 'ai';
+import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import { fitPrompt, tokenCounter } from '../src/context/budget.js';
+import { buildContext } from '../src/context/build.js';
+import { Gateway } from '../src/gateway.js';
+import { MemoryStore } from './helpers/memory-store.js';
+
+async function fixture() {
+  const gateway = new Gateway(new MemoryStore());
+
+  const profile = await gateway.createProfile({
+    name: 'Atlas',
+    instructions: 'Help the owner.',
+    identity: {
+      role: 'Researcher',
+      tone: 'Concise',
+      goals: ['Find deployment facts'],
+      boundaries: ['No external writes'],
+    },
+    model: { provider: 'openai', modelId: 'gpt-4o', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+    skills: [
+      { name: 'lookup', description: 'Search the catalog', instructions: 'Private skill body' },
+    ],
+  });
+
+  const session = await gateway.createSession(profile.id, { title: 'Test' });
+
+  const run = await gateway.submit(profile.id, session.id, {
+    text: 'When was the deployment?',
+    requestKey: 'one',
+  });
+
+  return { gateway, profile, session, run };
+}
+
+describe('context', () => {
+  it('retains a Unicode current turn when the older-history budget is zero', async () => {
+    const gateway = new Gateway(new MemoryStore());
+
+    const profile = await gateway.createProfile({
+      name: 'Zero history',
+      instructions: 'Help.',
+      model: { provider: 'openai', modelId: 'gpt-4o', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+      contextPolicy: { historyTokens: 0 },
+    });
+
+    const session = await gateway.createSession(profile.id, { title: 'Unicode' });
+
+    const run = await gateway.submit(profile.id, session.id, {
+      text: 'Olá 世界 🌍',
+      requestKey: 'current',
+    });
+
+    const context = await gateway.context(run);
+
+    expect(context.messages).toEqual([{ role: 'user', content: 'Olá 世界 🌍' }]);
+  });
+
+  it('includes structured identity and a skill catalog while selecting relevant memories', async () => {
+    const { gateway, profile, run } = await fixture();
+
+    await gateway.remember(profile.id, {
+      key: 'deployment',
+      content: 'Deployment completed at 21:00',
+      expectedVersion: 0,
+    });
+
+    await gateway.remember(profile.id, {
+      key: 'weather',
+      content: 'Forecast is sunny',
+      expectedVersion: 0,
+    });
+
+    const context = buildContext(run, {
+      memories: await gateway.memories(profile.id),
+      activities: [],
+      history: await gateway.messages(profile.id, run.sessionId),
+    });
+
+    expect(context.system).toContain('Researcher');
+    expect(context.system).toContain('No external writes');
+    expect(context.system).toContain('Deployment completed at 21:00');
+    expect(context.system).not.toContain('Forecast is sunny');
+    expect(context.system).toContain('Search the catalog');
+    expect(context.system).not.toContain('Private skill body');
+    expect(context.messages.at(-1)?.content).toBe('When was the deployment?');
+  });
+
+  it('keeps complete tool-call/result pairs while trimming old blocks to fit the total budget', () => {
+    const messages = [
+      { role: 'user' as const, content: 'old'.repeat(5000) },
+      { role: 'assistant' as const, content: 'old answer'.repeat(3000) },
+      { role: 'user' as const, content: 'current question' },
+      {
+        role: 'assistant' as const,
+        content: [
+          { type: 'tool-call' as const, toolCallId: 'latest', toolName: 'search', input: {} },
+        ],
+      },
+      {
+        role: 'tool' as const,
+        content: [
+          {
+            type: 'tool-result' as const,
+            toolCallId: 'latest',
+            toolName: 'search',
+            output: { type: 'text' as const, value: 'answer' },
+          },
+        ],
+      },
+    ];
+
+    const fitted = fitPrompt({
+      provider: 'anthropic',
+      modelId: 'test',
+      policy: { inputTokens: 4096, outputTokens: 256 },
+      instructions: 'Answer carefully.',
+      messages,
+      tools: {},
+    });
+
+    expect(fitted.messages.some((m) => m.role === 'user' && m.content === 'current question')).toBe(
+      true,
+    );
+
+    expect(
+      fitted.messages.some((m) => m.role === 'user' && m.content === messages[0]?.content),
+    ).toBe(false);
+
+    expect(fitted.messages.filter((m) => m.role === 'tool')).toHaveLength(1);
+
+    expect(
+      fitted.messages.filter((m) => m.role === 'assistant' && Array.isArray(m.content)),
+    ).toHaveLength(1);
+
+    expect(fitted.tokens).toBeLessThanOrEqual(4096 - 256);
+  });
+
+  it('fails if the mandatory current turn and tool schemas cannot fit with output reserved', () => {
+    expect(() =>
+      fitPrompt({
+        provider: 'anthropic',
+        modelId: 'test',
+        policy: { inputTokens: 4096, outputTokens: 256 },
+        instructions: 'x'.repeat(5000),
+        messages: [{ role: 'user', content: 'current' }],
+        tools: {},
+      }),
+    ).toThrow('Context budget exceeded');
+  });
+
+  it('charges exposed tool descriptions and schemas against the input budget', () => {
+    const tools = {
+      oversized: tool({
+        description: 'x'.repeat(5000),
+        inputSchema: z.object({ query: z.string() }),
+      }),
+    };
+
+    expect(() =>
+      fitPrompt({
+        provider: 'anthropic',
+        modelId: 'test',
+        policy: { inputTokens: 4096, outputTokens: 256 },
+        instructions: 'Answer.',
+        messages: [{ role: 'user', content: 'Find this' }],
+        tools,
+      }),
+    ).toThrow('Context budget exceeded');
+  });
+});
+
+it('counts special-token literals as ordinary input', () => {
+  const first = tokenCounter('openai', 'gpt-4o');
+
+  expect(first('Explain <|endoftext|> literally.')).toBeGreaterThan(0);
+});

@@ -5,3 +5,21 @@ dist/
 !.env.example
 coverage/
 .DS_Store
+
+work/
+secrets/
+
+# Xcode / SwiftPM
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# sourcekit-lsp bridge for the Xcode target (absolute, machine-specific paths)
+buildServer.json
+.compile
+
+# Gateway UI static export
+**/.next/
+apps/gateway-ui/out/
+**/*.tsbuildinfo
