@@ -25,7 +25,12 @@ export interface DeliveryContext {
 }
 
 export interface DeliveryOutcome {
-  status: 'sent' | 'failed' | 'unknown';
+  /**
+   * `pending` is the one outcome that asks to be tried again: the protocol said the message
+   * was not delivered and named a wait. Every other status is terminal, because a message
+   * that may have landed must never be sent twice.
+   */
+  status: 'sent' | 'failed' | 'unknown' | 'pending';
   remoteMessageIds: Array<string | number>;
 }
 

@@ -1,3 +1,4 @@
+import type { ApiMethods, ApiResponse } from '@grammyjs/types';
 import { telegramUpdateSchema } from '@jian/contracts';
 import type {
   Channel,
@@ -10,15 +11,32 @@ import type {
 const MESSAGE_CHUNK_SIZE = 4000;
 const REQUEST_TIMEOUT_MS = 15_000;
 const TYPING_TIMEOUT_MS = 1500;
+/** Telegram asks for a wait it chooses; this only stops a wrong answer from parking the bot. */
+const MAX_COOLDOWN_MS = 60_000;
+/** What to wait when Telegram refuses for flood control without saying for how long. */
+const DEFAULT_COOLDOWN_MS = 5_000;
 
 /** Telegram calls a room a group until it is upgraded; both carry the same message shape. */
 const GROUP_CHATS = new Set(['group', 'supergroup']);
 
 const BOT_TOKEN = /^\d+:[A-Za-z0-9_-]+$/;
 
+// The Bot API is plain HTTP, so there is no client to adopt — but its method table is published
+// as types. Parameters and results are read from it, which is what keeps the bodies below honest
+// without putting a framework between the gateway and the network it already owns.
+type Methods = ApiMethods<never>;
+type Method = keyof Methods;
+type Params<M extends Method> = Parameters<Methods[M]>[0];
+type Result<M extends Method> = ReturnType<Methods[M]>;
+
 export class TelegramChannel implements Channel {
   readonly type = 'telegram';
   readonly webhookHeader = 'x-telegram-bot-api-secret-token';
+
+  /** Per channel, when Telegram said it would accept requests again. Transport state only. */
+  private readonly coolUntil = new Map<string, number>();
+
+  constructor(private readonly clock: () => number = Date.now) {}
 
   receive(payload: unknown): IncomingMessage | null {
     const update = telegramUpdateSchema.parse(payload);
@@ -46,6 +64,56 @@ export class TelegramChannel implements Channel {
     };
   }
 
+  /**
+   * False while Telegram is still refusing this bot for flood control. The dispatcher reads it
+   * before claiming anything, so a rate-limited answer waits in the queue instead of burning
+   * its one attempt against a closed door.
+   */
+  async canSend(channelId: string): Promise<boolean> {
+    return (this.coolUntil.get(channelId) ?? 0) <= this.clock();
+  }
+
+  /**
+   * One call to the Bot API. Returns undefined when the request itself did not complete, which
+   * is not the same as Telegram refusing it, and never lets the URL reach a log: the bot
+   * credential lives in the path.
+   */
+  private async request<M extends Method>(
+    method: M,
+    token: string,
+    params: Params<M>,
+    options: {
+      fetch: typeof globalThis.fetch;
+      signal: AbortSignal;
+      timeout?: number;
+      channelId?: string;
+    },
+  ): Promise<ApiResponse<Result<M>> | undefined> {
+    try {
+      const response = await options.fetch(`https://api.telegram.org/bot${token}/${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.any([
+          options.signal,
+          AbortSignal.timeout(options.timeout ?? REQUEST_TIMEOUT_MS),
+        ]),
+        body: JSON.stringify(params ?? {}),
+      });
+
+      const body = (await response.json()) as ApiResponse<Result<M>>;
+
+      if (!body.ok && body.error_code === 429 && options.channelId) {
+        const wait = (body.parameters?.retry_after ?? 0) * 1000 || DEFAULT_COOLDOWN_MS;
+
+        this.coolUntil.set(options.channelId, this.clock() + Math.min(wait, MAX_COOLDOWN_MS));
+      }
+
+      return body;
+    } catch {
+      return undefined;
+    }
+  }
+
   /** The bot's own numeric id, which is how its messages are recognised in a group. */
   async identify(
     credential: string,
@@ -56,16 +124,9 @@ export class TelegramChannel implements Channel {
       return undefined;
     }
 
-    // Never log the request URL: Telegram places the bot credential in its path.
-    const response = await fetch(`https://api.telegram.org/bot${credential}/getMe`, {
-      signal: AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
-    });
+    const body = await this.request('getMe', credential, undefined, { fetch, signal });
 
-    const result = (await response.json()) as { ok?: boolean; result?: { id?: number } };
-
-    return response.ok && result.ok && typeof result.result?.id === 'number'
-      ? String(result.result.id)
-      : undefined;
+    return body?.ok ? String(body.result.id) : undefined;
   }
 
   /** Telegram clears this when a message lands, so it is re-armed on every dispatch tick. */
@@ -76,17 +137,19 @@ export class TelegramChannel implements Channel {
       return;
     }
 
-    try {
-      await context.fetch(`https://api.telegram.org/bot${token}/sendChatAction`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+    // An indicator nobody saw is not worth a failed delivery, so the answer is not read.
+    await this.request(
+      'sendChatAction',
+      token,
+      { chat_id: chatId, action: 'typing' },
+      {
+        fetch: context.fetch,
+        signal: context.signal,
         // Short on purpose: a slow tick must not delay the answer it is announcing.
-        signal: AbortSignal.any([context.signal, AbortSignal.timeout(TYPING_TIMEOUT_MS)]),
-        body: JSON.stringify({ chat_id: chatId, action: 'typing' }),
-      });
-    } catch {
-      // An indicator nobody saw is not worth a failed delivery.
-    }
+        timeout: TYPING_TIMEOUT_MS,
+        channelId: context.channelId,
+      },
+    );
   }
 
   async edit(
@@ -100,33 +163,29 @@ export class TelegramChannel implements Channel {
       return { status: 'failed', remoteMessageIds };
     }
 
-    try {
-      const response = await context.fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.any([context.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
-        body: JSON.stringify({
-          chat_id: message.chatId,
-          message_id: message.remoteMessageId,
-          text: message.text.slice(0, MESSAGE_CHUNK_SIZE),
-        }),
-      });
+    const body = await this.request(
+      'editMessageText',
+      token,
+      {
+        chat_id: message.chatId,
+        message_id: Number(message.remoteMessageId),
+        text: message.text.slice(0, MESSAGE_CHUNK_SIZE),
+      },
+      { fetch: context.fetch, signal: context.signal, channelId: context.channelId },
+    );
 
-      if (response.ok) {
-        return { status: 'sent', remoteMessageIds };
-      }
-
-      // Editing a message to the text it already carries is refused, and it is not a failure:
-      // what the person sees is exactly what was asked for.
-      const body = (await response.json().catch(() => ({}))) as { description?: string };
-
-      return {
-        status: body.description?.includes('not modified') ? 'sent' : 'unknown',
-        remoteMessageIds,
-      };
-    } catch {
-      return { status: 'unknown', remoteMessageIds };
+    if (body?.ok) {
+      return { status: 'sent', remoteMessageIds };
     }
+
+    // Editing a message to the text it already carries is refused, and it is not a failure:
+    // what the person sees is exactly what was asked for.
+    if (body && !body.ok && body.description.includes('not modified')) {
+      return { status: 'sent', remoteMessageIds };
+    }
+
+    // The message already on screen is stale, never wrong, so the next tick may edit it again.
+    return { status: refused(body) ? 'pending' : 'unknown', remoteMessageIds };
   }
 
   async send(message: OutgoingMessage, context: DeliveryContext): Promise<DeliveryOutcome> {
@@ -137,35 +196,38 @@ export class TelegramChannel implements Channel {
       return { status: 'failed', remoteMessageIds };
     }
 
-    try {
-      for (let offset = 0; offset < message.text.length; offset += MESSAGE_CHUNK_SIZE) {
-        const response = await context.fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.any([context.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
-          body: JSON.stringify({
-            chat_id: message.chatId,
-            text: message.text.slice(offset, offset + MESSAGE_CHUNK_SIZE),
-          }),
-        });
+    for (let offset = 0; offset < message.text.length; offset += MESSAGE_CHUNK_SIZE) {
+      const body = await this.request(
+        'sendMessage',
+        token,
+        {
+          chat_id: message.chatId,
+          text: message.text.slice(offset, offset + MESSAGE_CHUNK_SIZE),
+        },
+        { fetch: context.fetch, signal: context.signal, channelId: context.channelId },
+      );
 
-        const result = (await response.json()) as {
-          ok?: boolean;
-          result?: { message_id?: number };
-        };
-
-        if (!response.ok || !result.ok || typeof result.result?.message_id !== 'number') {
-          return { status: 'unknown', remoteMessageIds };
-        }
-
-        remoteMessageIds.push(result.result.message_id);
+      if (body?.ok) {
+        remoteMessageIds.push(body.result.message_id);
+        continue;
       }
 
-      return { status: 'sent', remoteMessageIds };
-    } catch {
-      // A lost response does not prove the message was absent. Preserve confirmed chunks and stop.
-      // Never log the request URL: Telegram places the bot credential in its path.
+      // Flood control is the one refusal that says the message was not delivered and asks to
+      // be repeated. With nothing sent yet there is nothing to duplicate, so it goes back in
+      // the queue; once a chunk has landed, replaying the whole answer would repeat it.
+      if (refused(body) && remoteMessageIds.length === 0) {
+        return { status: 'pending', remoteMessageIds };
+      }
+
+      // A lost response does not prove the message was absent. Preserve confirmed chunks.
       return { status: 'unknown', remoteMessageIds };
     }
+
+    return { status: 'sent', remoteMessageIds };
   }
+}
+
+/** Refused for flood control: not delivered, and Telegram asked for it to be repeated. */
+function refused(body: ApiResponse<unknown> | undefined): boolean {
+  return body !== undefined && !body.ok && body.error_code === 429;
 }

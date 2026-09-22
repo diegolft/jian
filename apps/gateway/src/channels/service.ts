@@ -539,6 +539,10 @@ export class Channels {
         await updateDelivery(tx, {
           ...current,
           ...outcome,
+          // A retry keeps the ids of what is already on screen; the attempt confirmed none.
+          remoteMessageIds: outcome.remoteMessageIds.length
+            ? outcome.remoteMessageIds
+            : current.remoteMessageIds,
           updatedAt: new Date().toISOString(),
         });
       });

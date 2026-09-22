@@ -1,14 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
+import { ApiChannel } from '../src/channels/api.js';
 import type { ChannelRequest } from '../src/channels/channel.js';
+import { ChannelRegistry } from '../src/channels/registry.js';
 import { Channels } from '../src/channels/service.js';
+import { TelegramChannel } from '../src/channels/telegram.js';
 import { testServices } from './helpers/services.js';
 
 const token = 'synthetic-telegram-admin-token-32-chars';
 const admin = { authorization: `Bearer ${token}` };
 
-async function setup(fetcher: typeof fetch) {
+async function setup(fetcher: typeof fetch, clock: () => number = Date.now) {
   const services = await testServices();
 
   const profile = await services.profiles.createProfile({
@@ -24,7 +27,8 @@ async function setup(fetcher: typeof fetch) {
       ? Response.json({ ok: true, result: { id: 700 } })
       : fetcher(url, options);
 
-  const channels = new Channels(services, telegram);
+  const registry = new ChannelRegistry([new ApiChannel(), new TelegramChannel(clock)]);
+  const channels = new Channels(services, telegram, registry);
 
   const channel = await channels.connect(profile.id, {
     type: 'telegram',
@@ -390,6 +394,82 @@ describe('what a chat sees while the agent is still working', () => {
       );
       expect(JSON.stringify(calls)).not.toContain('read_memories');
 
+      expect(
+        (await f.channels.deliveries(f.profile.id)).find((item) => item.runId === run.id)?.status,
+      ).toBe('sent');
+    } finally {
+      await f.app.close();
+    }
+  });
+});
+
+describe('when Telegram refuses for flood control', () => {
+  it('waits the time it asked for and delivers the answer afterwards', async () => {
+    let refuse = true;
+    let now = Date.now();
+    const sends: string[] = [];
+
+    const f = await setup(
+      async (url, options) => {
+        const path = String(url).split('/').pop() ?? '';
+
+        if (path === 'sendChatAction') {
+          return Response.json({ ok: true, result: true });
+        }
+
+        if (refuse) {
+          return Response.json(
+            {
+              ok: false,
+              error_code: 429,
+              description: 'Too Many Requests',
+              parameters: { retry_after: 30 },
+            },
+            { status: 429 },
+          );
+        }
+
+        sends.push(String(JSON.parse(String(options?.body ?? '{}')).text));
+
+        return Response.json({ ok: true, result: { message_id: 9 } });
+      },
+      () => now,
+    );
+
+    try {
+      await f.channels.receive(f.channel.id, webhook(f.channel.webhookToken));
+
+      const [pending] = await f.channels.contacts(f.profile.id);
+      if (!pending) throw new Error('Contact request missing');
+
+      await f.channels.approveContact(f.profile.id, pending.id);
+
+      const [run] = await f.services.runs.activities(f.profile.id);
+      if (!run) throw new Error('Run missing');
+
+      await f.services.lifecycle.claim(run.id, f.profile.id, 'worker');
+      await f.services.lifecycle.finish(f.profile.id, run.id, 'worker', 'completed', 'A resposta.');
+
+      // Refused: nothing left the gateway, so the answer stays queued instead of being lost.
+      await f.channels.dispatch();
+
+      const refused = (await f.channels.deliveries(f.profile.id)).find(
+        (item) => item.runId === run.id,
+      );
+
+      expect(refused?.status).toBe('pending');
+      expect(sends).toEqual([]);
+
+      // The cooldown is still running, so the tick does not even try.
+      await f.channels.dispatch();
+      expect(sends).toEqual([]);
+
+      refuse = false;
+      // Past the wait Telegram named, the same delivery goes out exactly once.
+      now += 31_000;
+      await f.channels.dispatch();
+
+      expect(sends.filter((text) => text === 'A resposta.')).toEqual(['A resposta.']);
       expect(
         (await f.channels.deliveries(f.profile.id)).find((item) => item.runId === run.id)?.status,
       ).toBe('sent');

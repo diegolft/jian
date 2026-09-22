@@ -40,6 +40,7 @@
   "devDependencies": {
     "@apidevtools/swagger-parser": "^13.1.0",
     "@electric-sql/pglite": "^0.5.8",
+    "@grammyjs/types": "^5.0.0",
     "@types/node": "^26.6.2",
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.10",
