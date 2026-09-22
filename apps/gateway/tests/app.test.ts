@@ -68,7 +68,7 @@ describe('HTTP services', () => {
     };
     const created = await app.inject({
       method: 'POST',
-      url: `${base}/providers`,
+      url: '/v1/providers',
       headers,
       payload,
     });
@@ -76,7 +76,7 @@ describe('HTTP services', () => {
     expect(created.statusCode).toBe(201);
     expect(created.body).not.toContain('synthetic-secret');
 
-    const listed = await app.inject({ url: `${base}/providers`, headers });
+    const listed = await app.inject({ url: '/v1/providers', headers });
 
     expect(listed.body).not.toContain('synthetic-secret');
 

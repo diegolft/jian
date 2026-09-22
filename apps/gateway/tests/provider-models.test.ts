@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
@@ -31,16 +32,20 @@ async function setup(respond: () => Promise<Response>, catalog?: ModelCatalog) {
   let now = 1_700_000_000_000;
   const services = await testServices(() => now, catalog);
   const profile = await services.profiles.createProfile({ name: 'Atlas', instructions: 'Help.' });
-  const provider = await services.providers.createProvider(profile.id, {
+  const provider = await services.providers.createProvider({
     name: 'Anthropic',
     kind: 'anthropic',
     secret: 'synthetic-anthropic-key',
   });
-  const models = new ProviderModels(services, respond, {
-    ttlMs: 60_000,
-    clock: () => now,
-    ...(catalog ? { catalog } : {}),
-  });
+  const models = new ProviderModels(
+    { providers: services.providers, vault: services.gatewayVault },
+    respond,
+    {
+      ttlMs: 60_000,
+      clock: () => now,
+      ...(catalog ? { catalog } : {}),
+    },
+  );
 
   return {
     services,
@@ -65,7 +70,7 @@ it('keeps the saved default and the last list when the provider is unreachable',
     conversation: { providerId: provider.id, modelId: 'claude-sonnet-4-5', reasoningEffort: 'low' },
   });
 
-  const fresh = await models.list(profile.id, provider.id);
+  const fresh = await models.list(provider.id);
 
   expect(fresh.stale).toBe(false);
   expect(fresh.models.map((model) => model.id)).toEqual(['claude-opus-4-5', 'claude-sonnet-4-5']);
@@ -73,7 +78,7 @@ it('keeps the saved default and the last list when the provider is unreachable',
   reachable = false;
   advance(120_000);
 
-  const offline = await models.list(profile.id, provider.id);
+  const offline = await models.list(provider.id);
 
   expect(offline.stale).toBe(true);
   expect(offline.reason).toBeDefined();
@@ -87,17 +92,16 @@ it('keeps the saved default and the last list when the provider is unreachable',
     reasoningEffort: 'low',
   });
   expect(
-    (await services.providers.providers(profile.id)).find((item) => item.id === provider.id)
-      ?.revokedAt,
+    (await services.providers.providers()).find((item) => item.id === provider.id)?.revokedAt,
   ).toBeUndefined();
 });
 
 it('reports an unreachable provider as empty instead of inventing a list', async () => {
-  const { profile, provider, models } = await setup(async () => {
+  const { provider, models } = await setup(async () => {
     throw new Error('connect ECONNREFUSED');
   });
 
-  const list = await models.list(profile.id, provider.id);
+  const list = await models.list(provider.id);
 
   expect(list).toMatchObject({ providerId: provider.id, models: [], stale: true });
   expect(list.reason).toBeDefined();
@@ -105,17 +109,17 @@ it('reports an unreachable provider as empty instead of inventing a list', async
 
 it('answers inside the cache window without reaching the provider again', async () => {
   let reachable = true;
-  const { profile, provider, models, advance } = await setup(async () => {
+  const { provider, models, advance } = await setup(async () => {
     if (!reachable) throw new Error('connect ECONNREFUSED');
 
     return listing('claude-sonnet-4-5');
   });
 
-  await models.list(profile.id, provider.id);
+  await models.list(provider.id);
   reachable = false;
   advance(30_000);
 
-  expect(await models.list(profile.id, provider.id)).toMatchObject({ stale: false });
+  expect(await models.list(provider.id)).toMatchObject({ stale: false });
 });
 
 it('takes what the public catalog knows and marks the model it does not cover', async () => {
@@ -131,7 +135,7 @@ it('takes what the public catalog knows and marks the model it does not cover', 
     }),
   );
 
-  const list = await models.list(profile.id, provider.id);
+  const list = await models.list(provider.id);
   const known = list.models.find((model) => model.id === 'claude-sonnet-4-5');
   const unknown = list.models.find((model) => model.id === 'claude-next-experimental');
 
@@ -175,14 +179,12 @@ it('takes what the public catalog knows and marks the model it does not cover', 
   ).rejects.toMatchObject({ statusCode: 409 });
 });
 
-it('keeps model discovery admin-only and inside the profile', async () => {
-  const { services, profile, provider, models } = await setup(async () =>
-    listing('claude-sonnet-4-5'),
-  );
+it('keeps model discovery admin-only and never echoes the key behind it', async () => {
+  const { services, provider, models } = await setup(async () => listing('claude-sonnet-4-5'));
   const app = createApp({ ...services, providerModels: models, token, logger: false });
   apps.push(app);
 
-  const path = `/v1/profiles/${profile.id}/providers/${provider.id}/models`;
+  const path = `/v1/providers/${provider.id}/models`;
 
   expect((await app.inject({ url: path })).statusCode).toBe(401);
 
@@ -191,20 +193,17 @@ it('keeps model discovery admin-only and inside the profile', async () => {
   expect(allowed.statusCode).toBe(200);
   expect(allowed.body).not.toContain('synthetic-anthropic-key');
 
-  const stranger = await services.profiles.createProfile({ name: 'Other', instructions: 'Help.' });
-  const crossed = await app.inject({
-    url: `/v1/profiles/${stranger.id}/providers/${provider.id}/models`,
-    headers,
-  });
+  // A provider that is not configured is not found, whoever asks.
+  const missing = await app.inject({ url: `/v1/providers/${randomUUID()}/models`, headers });
 
-  expect(crossed.statusCode).toBe(404);
+  expect(missing.statusCode).toBe(404);
 });
 
 it('takes the router listing as the whole truth about a model', async () => {
   const services = await testServices();
-  const profile = await services.profiles.createProfile({ name: 'Atlas', instructions: 'Help.' });
+  const _profile = await services.profiles.createProfile({ name: 'Atlas', instructions: 'Help.' });
 
-  const provider = await services.providers.createProvider(profile.id, {
+  const provider = await services.providers.createProvider({
     name: 'OpenRouter',
     kind: 'openrouter',
     secret: 'synthetic-key',
@@ -231,7 +230,10 @@ it('takes the router listing as the whole truth about a model', async () => {
       ],
     })) as typeof globalThis.fetch;
 
-  const list = await new ProviderModels(services, fetcher).list(profile.id, provider.id);
+  const list = await new ProviderModels(
+    { providers: services.providers, vault: services.gatewayVault },
+    fetcher,
+  ).list(provider.id);
   const sonnet = list.models.find((model) => model.id === 'anthropic/claude-sonnet-5');
   const plain = list.models.find((model) => model.id === 'some/plain-model');
 
@@ -251,9 +253,9 @@ it('takes the router listing as the whole truth about a model', async () => {
 
 it('reads a catalog that carries a malformed entry among the good ones', async () => {
   const services = await testServices();
-  const profile = await services.profiles.createProfile({ name: 'Atlas', instructions: 'Help.' });
+  const _profile = await services.profiles.createProfile({ name: 'Atlas', instructions: 'Help.' });
 
-  const provider = await services.providers.createProvider(profile.id, {
+  const provider = await services.providers.createProvider({
     name: 'Anthropic',
     kind: 'anthropic',
     secret: 'synthetic-key',
@@ -281,8 +283,12 @@ it('reads a catalog that carries a malformed entry among the good ones', async (
     'https://models.test/api.json',
   );
 
-  const models = new ProviderModels(services, async () => listing('claude-sonnet-5'), { catalog });
-  const list = await models.list(profile.id, provider.id);
+  const models = new ProviderModels(
+    { providers: services.providers, vault: services.gatewayVault },
+    async () => listing('claude-sonnet-5'),
+    { catalog },
+  );
+  const list = await models.list(provider.id);
 
   expect(list.models[0]).toMatchObject({ known: true, contextWindow: 1_000_000 });
 });

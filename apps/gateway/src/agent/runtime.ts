@@ -113,10 +113,10 @@ export class AgentRuntime {
 
       if (config.provider === 'openai-codex' && config.providerId) {
         if (!this.options.codexLogin) throw new Error('ChatGPT login is unavailable');
-        providerKey = await this.options.codexLogin.accessToken(profileId, config.providerId);
+        providerKey = await this.options.codexLogin.accessToken(config.providerId);
         secrets.add(providerKey);
       } else if (config.providerId) {
-        providerKey = await this.options.vault?.read(profileId, providerSecret(config.providerId));
+        providerKey = await this.options.gatewayVault?.read(providerSecret(config.providerId));
 
         if (!providerKey) {
           throw new Error('Provider key is not configured');

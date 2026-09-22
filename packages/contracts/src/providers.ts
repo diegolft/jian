@@ -53,11 +53,14 @@ export const providerInputSchema = z.strictObject({
   secret: secretSchema,
 });
 
+/**
+ * A credential belongs to the installation, which has one owner: signing in to the same vendor
+ * once per agent is work nobody would do twice. Which model an agent uses is still its own.
+ */
 export const providerRecordSchema = providerInputSchema.omit({ secret: true }).extend({
   apiKeyEnv: z.string().optional(),
   authMode: z.enum(['api', 'codex']).optional(),
   id: z.uuid(),
-  profileId: z.uuid(),
   createdAt: z.iso.datetime(),
   revokedAt: z.iso.datetime().optional(),
 });

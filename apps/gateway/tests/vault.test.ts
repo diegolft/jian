@@ -52,29 +52,27 @@ describe('profile vault', () => {
   });
 
   it('discards a provider key when the provider is revoked or replaced', async () => {
-    const { services, profile } = await setup();
+    const { services } = await setup();
 
-    const first = await services.providers.createProvider(profile.id, {
+    const first = await services.providers.createProvider({
       name: 'OpenAI',
       kind: 'openai',
       secret: 'synthetic-first-key',
     });
 
-    expect(await services.vault.read(profile.id, providerSecret(first.id))).toBe(
-      'synthetic-first-key',
-    );
+    expect(await services.gatewayVault.read(providerSecret(first.id))).toBe('synthetic-first-key');
 
-    const second = await services.providers.createProvider(profile.id, {
+    const second = await services.providers.createProvider({
       name: 'OpenAI',
       kind: 'openai',
       secret: 'synthetic-second-key',
     });
 
-    expect(await services.vault.read(profile.id, providerSecret(first.id))).toBeUndefined();
+    expect(await services.gatewayVault.read(providerSecret(first.id))).toBeUndefined();
 
-    await services.providers.revokeProvider(profile.id, second.id);
+    await services.providers.revokeProvider(second.id);
 
-    expect(await services.vault.read(profile.id, providerSecret(second.id))).toBeUndefined();
+    expect(await services.gatewayVault.read(providerSecret(second.id))).toBeUndefined();
   });
 
   it('stores an MCP token with its server and forgets it when the server goes', async () => {

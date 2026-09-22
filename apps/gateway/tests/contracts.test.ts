@@ -101,7 +101,7 @@ describe('public API contracts', () => {
 
       const provider = await app.inject({
         method: 'POST',
-        url: `${prefix}/providers`,
+        url: '/v1/providers',
         headers: admin,
         payload: {
           name: 'OpenAI',

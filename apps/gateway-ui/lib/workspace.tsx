@@ -77,7 +77,7 @@ async function profileData(api: GatewayApi, id: string): Promise<ProfileData> {
     api.memories(id),
     api.activities(id),
     api.deliveries(id),
-    api.providers(id),
+    api.providers(),
     api.modelDefaults(id),
   ]);
 
@@ -87,7 +87,7 @@ async function profileData(api: GatewayApi, id: string): Promise<ProfileData> {
     providers
       .filter((provider) => !provider.revokedAt)
       .map(async (provider) =>
-        api.providerModels(id, provider.id).catch(
+        api.providerModels(provider.id).catch(
           (error): ProviderModelList => ({
             providerId: provider.id,
             models: [],

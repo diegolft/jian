@@ -111,7 +111,7 @@ export class Profiles {
     }
 
     const fromEnvironment = (Object.keys(providerCatalog) as ProviderKind[]).some(
-      (kind) => environmentProvider(profile.id, kind)?.id === providerId,
+      (kind) => environmentProvider(kind)?.id === providerId,
     );
 
     if (fromEnvironment) {
@@ -121,17 +121,11 @@ export class Profiles {
     const [live] = await reader
       .select({ id: providers.id })
       .from(providers)
-      .where(
-        and(
-          eq(providers.id, providerId),
-          eq(providers.profileId, profile.id),
-          isNull(providers.revokedAt),
-        ),
-      )
+      .where(and(eq(providers.id, providerId), isNull(providers.revokedAt)))
       .limit(1);
 
     if (!live) {
-      throw new GatewayError(400, 'Provider reference is not available to this profile');
+      throw new GatewayError(400, 'Provider reference is not configured on this gateway');
     }
   }
 

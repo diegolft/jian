@@ -1,6 +1,6 @@
 'use client';
 
-import { Save, Trash2 } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, KeyRound, Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { GatewayApi } from '../../lib/api';
 import { date } from '../../lib/format';
@@ -8,14 +8,15 @@ import type { SectionProps } from '../props';
 import { Badge, Button, Field, SectionHeading } from '../ui';
 import { providers } from './catalog';
 
-export function Providers({ profile, data, api, mutate, busy }: SectionProps) {
+export function Providers({ data, api, mutate, busy }: SectionProps) {
+  const [editing, setEditing] = useState<string>();
   const [formError, setFormError] = useState('');
   const [codexLogin, setCodexLogin] = useState<Awaited<ReturnType<GatewayApi['codexLogin']>>>();
 
   useEffect(() => {
     let active = true;
     void api
-      .codexLogin(profile.id)
+      .codexLogin()
       .then((state) => {
         if (active) setCodexLogin(state);
       })
@@ -23,13 +24,13 @@ export function Providers({ profile, data, api, mutate, busy }: SectionProps) {
     return () => {
       active = false;
     };
-  }, [api, profile.id]);
+  }, [api]);
 
   useEffect(() => {
     if (codexLogin?.status !== 'pending') return;
     const timer = setInterval(() => {
       void api
-        .codexLogin(profile.id)
+        .codexLogin()
         .then((state) => {
           setCodexLogin(state);
           if (state.status === 'connected') void mutate(async () => {}, 'ChatGPT conectado.');
@@ -39,15 +40,15 @@ export function Providers({ profile, data, api, mutate, busy }: SectionProps) {
         );
     }, 5000);
     return () => clearInterval(timer);
-  }, [api, profile.id, codexLogin?.status, mutate]);
+  }, [api, codexLogin?.status, mutate]);
 
   return (
     <>
       <SectionHeading
         title="Providers"
-        description="Configure uma chave para cada serviço. As variáveis do ambiente são detectadas automaticamente. A lista de modelos vem da conta, não daqui."
+        description="Conecte uma vez, use em todos os perfis. Cada perfil escolhe o próprio modelo em Modelos padrão."
       />
-      <div className="resource-list">
+      <div className="connections-grid providers-grid">
         {providers.map((entry) => {
           const configured = data.providers.find(
             (provider) => provider.kind === entry.kind && !provider.revokedAt,
@@ -55,135 +56,185 @@ export function Providers({ profile, data, api, mutate, busy }: SectionProps) {
           const list = configured ? data.providerModels[configured.id] : undefined;
           const uncatalogued = list?.models.filter((model) => !model.known).length ?? 0;
           return (
-            <div className="settings-section" key={entry.kind}>
-              <div className="settings-caption">
-                <h2>{entry.name}</h2>
-                <p>{entry.variables}</p>
+            <article className="connection-card" data-connected={!!configured} key={entry.kind}>
+              <header className="connection-card-header">
+                <span className="provider-symbol" aria-hidden="true">
+                  {{ openai: '◎', anthropic: 'A', google: '✦', openrouter: '⇄' }[entry.kind]}
+                </span>
                 <Badge tone={configured ? 'good' : 'neutral'}>
                   {configured
                     ? configured.authMode === 'codex'
                       ? 'ChatGPT conectado'
-                      : 'Configurado'
-                    : 'Sem chave'}
+                      : 'Conectado'
+                    : 'Não configurado'}
                 </Badge>
-                {configured?.apiKeyEnv ? (
-                  <p>Variável: {configured.apiKeyEnv}</p>
+              </header>
+              <h2>{entry.name}</h2>
+              <p className="connection-description">
+                {
+                  {
+                    openrouter: 'Uma conta, múltiplos modelos.',
+                    anthropic: 'Modelos Claude para seus agentes.',
+                    google: 'Modelos Gemini do Google.',
+                    openai: 'API da OpenAI ou sua conta ChatGPT.',
+                  }[entry.kind]
+                }
+              </p>
+              <div className="connection-meta">
+                {configured ? (
+                  <>
+                    <KeyRound size={13} />
+                    <span>
+                      {configured.apiKeyEnv
+                        ? 'Credencial do ambiente'
+                        : configured.authMode === 'codex'
+                          ? 'Login ChatGPT'
+                          : `Chave salva em ${date(configured.createdAt)}`}
+                    </span>
+                  </>
                 ) : (
-                  configured && <p>Chave guardada em {date(configured.createdAt)}</p>
+                  <span>Credenciais criptografadas</span>
                 )}
                 {list && !list.stale && (
-                  <p>
-                    {list.models.length} modelos nesta conta, lidos em {date(list.fetchedAt)}
+                  <span>
+                    {list.models.length} modelos disponíveis
                     {uncatalogued > 0 && ` · ${uncatalogued} sem capacidades catalogadas`}
-                  </p>
-                )}
-                {list?.stale && (
-                  <p className="note" role="status">
-                    {list.models.length
-                      ? `Não foi possível atualizar a lista; mostrando a leitura de ${date(list.fetchedAt)}. ${list.reason ?? ''}`
-                      : `Nenhuma lista disponível. ${list.reason ?? ''}`}
-                  </p>
+                  </span>
                 )}
               </div>
-              <form
-                className="settings-fields"
-                method="post"
-                action="/ui/"
-                onSubmit={async (event) => {
-                  event.preventDefault();
+              {list?.stale && (
+                <p className="note" role="status">
+                  {list.models.length ? `Lista de ${date(list.fetchedAt)}. ` : ''}
+                  {list.reason ?? 'Não foi possível atualizar os modelos.'}
+                </p>
+              )}
+              <button
+                type="button"
+                className="connection-action"
+                aria-expanded={editing === entry.kind}
+                aria-controls={`provider-${entry.kind}`}
+                disabled={busy}
+                onClick={() => {
+                  setEditing(editing === entry.kind ? undefined : entry.kind);
                   setFormError('');
-                  const element = event.currentTarget;
-                  const secret = String(new FormData(element).get('secret') ?? '').trim();
-                  if (!secret) {
-                    setFormError(`Informe a chave de ${entry.name}.`);
-                    return;
-                  }
-                  // Registering replaces the provider of this vendor, key included.
-                  const ok = await mutate(
-                    () =>
-                      api.createProvider(profile.id, {
-                        name: entry.name,
-                        kind: entry.kind,
-                        secret,
-                      }),
-                    `${entry.name} configurado.`,
-                  );
-                  if (ok) element.reset();
                 }}
               >
-                <Field
-                  label={`Chave de ${entry.name}`}
-                  hint="O valor salvo fica criptografado e não aparece novamente."
+                {editing === entry.kind
+                  ? 'Fechar configuração'
+                  : configured
+                    ? 'Gerenciar conexão'
+                    : 'Conectar'}
+                {editing === entry.kind ? <ChevronDown size={16} /> : <ArrowUpRight size={16} />}
+              </button>
+              <div
+                id={`provider-${entry.kind}`}
+                className="connection-disclosure"
+                hidden={editing !== entry.kind}
+              >
+                <form
+                  className="connection-form"
+                  method="post"
+                  action="/ui/"
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    setFormError('');
+                    const element = event.currentTarget;
+                    const secret = String(new FormData(element).get('secret') ?? '').trim();
+                    if (!secret) {
+                      setFormError(`Informe a chave de ${entry.name}.`);
+                      return;
+                    }
+                    // Registering replaces the provider of this vendor, key included.
+                    const ok = await mutate(
+                      () =>
+                        api.createProvider({
+                          name: entry.name,
+                          kind: entry.kind,
+                          secret,
+                        }),
+                      `${entry.name} configurado.`,
+                    );
+                    if (ok) element.reset();
+                  }}
                 >
-                  <input name="secret" type="password" autoComplete="off" required />
-                </Field>
-                <div className="save-bar">
-                  <Button type="submit" busy={busy}>
-                    <Save size={16} />
-                    {configured ? 'Trocar chave' : 'Salvar chave'}
-                  </Button>
-                  {configured && !configured.apiKeyEnv && (
-                    <Button
-                      type="button"
-                      variant="quiet"
-                      disabled={busy}
-                      onClick={() =>
-                        void mutate(
-                          () => api.revokeProvider(profile.id, configured.id),
-                          `${entry.name} desconectado.`,
-                        )
-                      }
-                    >
-                      <Trash2 size={16} />
-                      {configured.authMode === 'codex' ? 'Desconectar ChatGPT' : 'Remover chave'}
+                  <Field
+                    label={`Chave de ${entry.name}`}
+                    hint={
+                      configured?.apiKeyEnv
+                        ? `Chave atual: ${configured.apiKeyEnv}. A nova chave substitui a do ambiente.`
+                        : 'O valor salvo não aparece novamente.'
+                    }
+                  >
+                    <input name="secret" type="password" autoComplete="off" required />
+                  </Field>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button type="submit" busy={busy}>
+                      <Save size={16} />
+                      {configured ? 'Trocar chave' : 'Salvar chave'}
                     </Button>
-                  )}
-                </div>
-                {entry.kind === 'openai' && (
-                  <div className="settings-fields">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      disabled={busy || codexLogin?.status === 'pending'}
-                      onClick={() =>
-                        void api
-                          .startCodexLogin(profile.id)
-                          .then(setCodexLogin)
-                          .catch((error) =>
-                            setFormError(
-                              error instanceof Error ? error.message : 'Login indisponível.',
-                            ),
+                    {configured && !configured.apiKeyEnv && (
+                      <Button
+                        type="button"
+                        variant="quiet"
+                        disabled={busy}
+                        onClick={() =>
+                          void mutate(
+                            () => api.revokeProvider(configured.id),
+                            `${entry.name} desconectado.`,
                           )
-                      }
-                    >
-                      Entrar com ChatGPT
-                    </Button>
-                    {codexLogin?.status === 'pending' && (
-                      <p className="note">
-                        Abra{' '}
-                        <a href={codexLogin.verificationUrl} target="_blank" rel="noreferrer">
-                          o login da OpenAI
-                        </a>{' '}
-                        e informe o código <strong>{codexLogin.userCode}</strong>.
-                      </p>
-                    )}
-                    {codexLogin?.status === 'failed' && codexLogin.error && (
-                      <p className="form-error" role="alert">
-                        {codexLogin.error}
-                      </p>
+                        }
+                      >
+                        <Trash2 size={16} />
+                        {configured.authMode === 'codex' ? 'Desconectar ChatGPT' : 'Remover chave'}
+                      </Button>
                     )}
                   </div>
-                )}
-              </form>
-            </div>
+                  {entry.kind === 'openai' && (
+                    <div className="mt-5 border-t border-line pt-5">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={busy || codexLogin?.status === 'pending'}
+                        onClick={() =>
+                          void api
+                            .startCodexLogin()
+                            .then(setCodexLogin)
+                            .catch((error) =>
+                              setFormError(
+                                error instanceof Error ? error.message : 'Login indisponível.',
+                              ),
+                            )
+                        }
+                      >
+                        Entrar com ChatGPT
+                      </Button>
+                      {codexLogin?.status === 'pending' && (
+                        <p className="note">
+                          Abra{' '}
+                          <a href={codexLogin.verificationUrl} target="_blank" rel="noreferrer">
+                            o login da OpenAI
+                          </a>{' '}
+                          e informe o código <strong>{codexLogin.userCode}</strong>.
+                        </p>
+                      )}
+                      {codexLogin?.status === 'failed' && codexLogin.error && (
+                        <p className="form-error" role="alert">
+                          {codexLogin.error}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {formError && editing === entry.kind && (
+                    <p className="form-error" role="alert">
+                      {formError}
+                    </p>
+                  )}
+                </form>
+              </div>
+            </article>
           );
         })}
       </div>
-      {formError && (
-        <p className="form-error" role="alert">
-          {formError}
-        </p>
-      )}
     </>
   );
 }

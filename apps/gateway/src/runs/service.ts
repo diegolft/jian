@@ -90,7 +90,7 @@ export class Runs {
       let chosen: Awaited<ReturnType<typeof this.providers.selectedModel>> | null = null;
       if (selection) {
         try {
-          chosen = await this.providers.selectedModel(profileId, selection, tx);
+          chosen = await this.providers.selectedModel(selection, tx);
         } catch (error) {
           if (data.model) throw error;
           selection = null;

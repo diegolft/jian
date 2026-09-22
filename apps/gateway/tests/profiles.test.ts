@@ -18,8 +18,8 @@ it.each([
   if (name === 'ANTHROPIC_API_TOKEN') vi.stubEnv('ANTHROPIC_API_KEY', '');
   vi.stubEnv(name, `synthetic-${name}`);
   const services = await testServices();
-  const profile = await services.profiles.createProfile({ name: 'Env', instructions: 'Help.' });
-  const providers = await services.providers.providers(profile.id);
+  const _profile = await services.profiles.createProfile({ name: 'Env', instructions: 'Help.' });
+  const providers = await services.providers.providers();
   expect(providers.find((provider) => provider.kind === kind)?.apiKeyEnv).toBe(name);
   expect(JSON.stringify(providers)).not.toContain(`synthetic-${name}`);
 });

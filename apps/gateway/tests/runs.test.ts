@@ -24,7 +24,7 @@ it('runs on a host provider credential without registering a provider by hand', 
   vi.stubEnv('ANTHROPIC_API_TOKEN', 'synthetic-anthropic-token');
   const services = await testServices();
   const profile = await services.profiles.createProfile({ name: 'Host', instructions: 'Help.' });
-  const providers = await services.providers.providers(profile.id);
+  const providers = await services.providers.providers();
   const anthropic = providers.find((provider) => provider.kind === 'anthropic');
 
   expect(anthropic?.apiKeyEnv).toBe('ANTHROPIC_API_TOKEN');
@@ -61,7 +61,7 @@ it('replaces one provider key and refuses the model default left behind', async 
   const services = await testServices();
   const profile = await services.profiles.createProfile({ name: 'Replace', instructions: 'Help.' });
   const add = (name: string) =>
-    services.providers.createProvider(profile.id, {
+    services.providers.createProvider({
       name,
       kind: 'openai',
       secret: `synthetic-${name}`,
@@ -90,17 +90,16 @@ it('replaces one provider key and refuses the model default left behind', async 
 
   expect(run.model?.providerId).toBe(current.id);
   expect(
-    (await services.providers.providers(profile.id)).find((item) => item.id === old.id)?.revokedAt,
+    (await services.providers.providers()).find((item) => item.id === old.id)?.revokedAt,
   ).toBeDefined();
   expect(
-    (await services.providers.providers(profile.id)).find((item) => item.id === current.id)
-      ?.revokedAt,
+    (await services.providers.providers()).find((item) => item.id === current.id)?.revokedAt,
   ).toBeUndefined();
 });
 
-it('isolates providers and freezes the chosen model and its context budget per run', async () => {
+it('freezes the chosen model and its context budget per run', async () => {
   const { services, profile, session } = await setup();
-  const provider = await services.providers.createProvider(profile.id, {
+  const provider = await services.providers.createProvider({
     name: 'Personal',
     kind: 'openai',
     secret: 'synthetic-api-key',
@@ -138,12 +137,14 @@ it('isolates providers and freezes the chosen model and its context budget per r
     }),
   ).rejects.toMatchObject({ statusCode: 409 });
 
-  const stranger = await services.profiles.createProfile({ name: 'Other', instructions: 'Help.' });
-  await expect(
-    services.providers.setModelDefaults(stranger.id, { conversation: large }),
-  ).rejects.toMatchObject({ statusCode: 409 });
+  // A credential belongs to the installation, so a second profile chooses the same one.
+  const other = await services.profiles.createProfile({ name: 'Other', instructions: 'Help.' });
 
-  await services.providers.revokeProvider(profile.id, provider.id);
+  await expect(
+    services.providers.setModelDefaults(other.id, { conversation: large }),
+  ).resolves.toMatchObject({ profileId: other.id });
+
+  await services.providers.revokeProvider(provider.id);
   await expect(
     services.runs.submit(profile.id, otherSession.id, {
       text: 'Third',

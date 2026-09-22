@@ -23,7 +23,6 @@ export type RoleSelections = Record<ModelRole, ModelSelection | null>;
 export function toProviderRecord(row: Row): ProviderRecord {
   return providerRecordSchema.parse({
     id: row.id,
-    profileId: row.profileId,
     name: row.name,
     kind: row.kind,
     ...(row.authMode ? { authMode: row.authMode } : {}),
@@ -57,13 +56,8 @@ export async function findProvider(db: Queryable, id: string): Promise<ProviderR
   return row ? toProviderRecord(row) : null;
 }
 
-export async function listProviders(db: Queryable, profileId: string): Promise<ProviderRecord[]> {
-  const rows = await db
-    .select()
-    .from(providers)
-    .where(eq(providers.profileId, profileId))
-    .orderBy(providers.createdAt)
-    .limit(100);
+export async function listProviders(db: Queryable): Promise<ProviderRecord[]> {
+  const rows = await db.select().from(providers).orderBy(providers.createdAt).limit(100);
 
   return rows.map(toProviderRecord);
 }
@@ -71,7 +65,6 @@ export async function listProviders(db: Queryable, profileId: string): Promise<P
 export async function insertProvider(db: Queryable, provider: ProviderRecord): Promise<void> {
   await db.insert(providers).values({
     id: provider.id,
-    profileId: provider.profileId,
     name: provider.name,
     kind: provider.kind,
     authMode: provider.authMode ?? null,
@@ -88,20 +81,13 @@ export async function insertProvider(db: Queryable, provider: ProviderRecord): P
  */
 export async function revokeLiveProviders(
   db: Queryable,
-  profileId: string,
   kind: ProviderRecord['kind'],
   at: Date,
 ): Promise<string[]> {
   const rows = await db
     .update(providers)
     .set({ revokedAt: at })
-    .where(
-      and(
-        eq(providers.profileId, profileId),
-        eq(providers.kind, kind),
-        isNull(providers.revokedAt),
-      ),
-    )
+    .where(and(eq(providers.kind, kind), isNull(providers.revokedAt)))
     .returning({ id: providers.id });
 
   return rows.map((row) => row.id);

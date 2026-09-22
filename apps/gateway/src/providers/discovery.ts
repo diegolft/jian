@@ -7,7 +7,7 @@ import type {
 import { z } from 'zod';
 import { type Clock, nowIso } from '../core/clock.js';
 import { GatewayError } from '../core/errors.js';
-import type { Vault } from '../security/vault.js';
+import type { GatewayVault } from '../security/gateway-vault.js';
 import { bareModelId, modelCapabilities } from './capabilities.js';
 import type { ProviderKind } from './catalog.js';
 import type { ModelCatalog } from './catalog-source.js';
@@ -163,7 +163,7 @@ export class ProviderModels {
   private readonly clock: Clock;
 
   constructor(
-    private readonly services: { providers: ProviderAdmin; vault: Vault },
+    private readonly services: { providers: ProviderAdmin; vault: GatewayVault },
     private readonly fetcher: typeof globalThis.fetch = fetch,
     options: ProviderModelOptions = {},
   ) {
@@ -173,8 +173,8 @@ export class ProviderModels {
     this.clock = options.clock ?? Date.now;
   }
 
-  async list(profileId: string, providerId: string): Promise<ProviderModelList> {
-    const provider = (await this.services.providers.providers(profileId)).find(
+  async list(providerId: string): Promise<ProviderModelList> {
+    const provider = (await this.services.providers.providers()).find(
       (item) => item.id === providerId && !item.revokedAt,
     );
 
@@ -182,7 +182,7 @@ export class ProviderModels {
       throw new GatewayError(404, 'Provider not found');
     }
 
-    const key = `${profileId}:${providerId}`;
+    const key = providerId;
     const cached = this.cache.get(key);
 
     if (cached && cached.expiresAt > this.clock()) {
@@ -195,9 +195,7 @@ export class ProviderModels {
       return pending;
     }
 
-    const request = this.refresh(profileId, provider, key, cached).finally(() =>
-      this.inflight.delete(key),
-    );
+    const request = this.refresh(provider, key, cached).finally(() => this.inflight.delete(key));
 
     this.inflight.set(key, request);
 
@@ -205,13 +203,12 @@ export class ProviderModels {
   }
 
   private async refresh(
-    profileId: string,
     provider: ProviderRecord,
     key: string,
     cached: Entry | undefined,
   ): Promise<ProviderModelList> {
     try {
-      const models = await this.fetchModels(profileId, provider);
+      const models = await this.fetchModels(provider);
       const list: ProviderModelList = {
         providerId: provider.id,
         models,
@@ -242,14 +239,14 @@ export class ProviderModels {
     }
   }
 
-  private async fetchModels(profileId: string, provider: ProviderRecord) {
+  private async fetchModels(provider: ProviderRecord) {
     if (provider.authMode === 'codex') {
       // The ChatGPT device login talks to the Codex backend, which publishes no model index.
       throw new Error('O login ChatGPT não expõe uma lista de modelos; informe o ID do modelo.');
     }
 
     const kind = provider.kind as ProviderKind;
-    const key = await this.apiKey(profileId, provider);
+    const key = await this.apiKey(provider);
     const bearer =
       provider.kind === 'openai' ||
       provider.kind === 'openrouter' ||
@@ -277,7 +274,7 @@ export class ProviderModels {
     return parse(kind, await response.json(), this.catalog);
   }
 
-  private async apiKey(profileId: string, provider: ProviderRecord) {
+  private async apiKey(provider: ProviderRecord) {
     if (provider.apiKeyEnv) {
       const value = this.env[provider.apiKeyEnv]?.trim();
 
@@ -288,7 +285,7 @@ export class ProviderModels {
       return value;
     }
 
-    const secret = await this.services.vault.read(profileId, providerSecret(provider.id));
+    const secret = await this.services.vault.read(providerSecret(provider.id));
 
     if (!secret) {
       throw new Error('Provider key is not configured');

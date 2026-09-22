@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { GatewayError } from '../../core/errors.js';
 import type { ProfileReader } from '../../profiles/port.js';
-import type { Vault } from '../../security/vault.js';
+import { GATEWAY_SCOPE, type GatewayVault } from '../../security/gateway-vault.js';
 import type { ProviderAdmin } from '../port.js';
 import { providerSecret } from '../service.js';
 
@@ -27,7 +27,7 @@ export class CodexLogin {
 
   constructor(
     private readonly services: { profiles: ProfileReader; providers: ProviderAdmin },
-    private readonly vault: Vault,
+    private readonly vault: GatewayVault,
     private readonly fetcher: typeof fetch = fetch,
   ) {}
 
@@ -36,36 +36,34 @@ export class CodexLogin {
     this.pending.clear();
   }
 
-  async status(profileId: string): Promise<LoginState> {
-    await this.services.profiles.profile(profileId);
-    const pending = this.pending.get(profileId);
+  async status(): Promise<LoginState> {
+    const pending = this.pending.get(GATEWAY_SCOPE);
     if (pending) return pending;
 
-    const providers = await this.services.providers.providers(profileId);
+    const providers = await this.services.providers.providers();
 
     return providers.some((provider) => provider.authMode === 'codex' && !provider.revokedAt)
       ? { status: 'connected' }
       : { status: 'failed' };
   }
 
-  async start(profileId: string): Promise<LoginState> {
+  async start(): Promise<LoginState> {
     if (this.stopped) throw new GatewayError(503, 'Codex login is unavailable');
-    await this.services.profiles.profile(profileId);
-    const existing = this.pending.get(profileId);
+    const existing = this.pending.get(GATEWAY_SCOPE);
     if (existing?.status === 'pending') return existing;
 
-    const current = this.starting.get(profileId);
+    const current = this.starting.get(GATEWAY_SCOPE);
     if (current) return current;
-    const request = this.requestCode(profileId);
-    this.starting.set(profileId, request);
+    const request = this.requestCode();
+    this.starting.set(GATEWAY_SCOPE, request);
     try {
       return await request;
     } finally {
-      this.starting.delete(profileId);
+      this.starting.delete(GATEWAY_SCOPE);
     }
   }
 
-  private async requestCode(profileId: string): Promise<LoginState> {
+  private async requestCode(): Promise<LoginState> {
     const response = await this.fetcher(`${authOrigin}/api/accounts/deviceauth/usercode`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -86,18 +84,18 @@ export class CodexLogin {
       verificationUrl: `${authOrigin}/codex/device`,
       userCode: payload.user_code,
     };
-    this.pending.set(profileId, state);
-    void this.poll(profileId, payload.device_auth_id, payload.user_code, payload.interval);
+    this.pending.set(GATEWAY_SCOPE, state);
+    void this.poll(payload.device_auth_id, payload.user_code, payload.interval);
     return state;
   }
 
-  private async poll(profileId: string, deviceId: string, userCode: string, interval: number) {
+  private async poll(deviceId: string, userCode: string, interval: number) {
     const deadline = Date.now() + 15 * 60_000;
     try {
       while (
         !this.stopped &&
         Date.now() < deadline &&
-        this.pending.get(profileId)?.status === 'pending'
+        this.pending.get(GATEWAY_SCOPE)?.status === 'pending'
       ) {
         await new Promise((resolve) => {
           const timer = setTimeout(resolve, interval * 1000);
@@ -118,14 +116,14 @@ export class CodexLogin {
         const tokens = await this.exchange(code.authorization_code, code.code_verifier);
         if (this.stopped) return;
         // Registering the provider revokes any previous one of the same vendor with its key.
-        await this.services.providers.configureCodexProvider(profileId, JSON.stringify(tokens));
-        this.pending.delete(profileId);
+        await this.services.providers.configureCodexProvider(JSON.stringify(tokens));
+        this.pending.delete(GATEWAY_SCOPE);
         return;
       }
       throw new Error('Login expired');
     } catch {
       if (this.stopped) return;
-      this.pending.set(profileId, {
+      this.pending.set(GATEWAY_SCOPE, {
         status: 'failed',
         error: 'Login não concluído. Tente novamente.',
       });
@@ -149,37 +147,33 @@ export class CodexLogin {
     return tokensSchema.parse(await response.json());
   }
 
-  async accessToken(profileId: string, providerId: string) {
-    const secret = await this.vault.refresh(
-      profileId,
-      providerSecret(providerId),
-      async (current: string) => {
-        const tokens = tokensSchema.parse(JSON.parse(current));
-        const payload = JSON.parse(
-          Buffer.from(tokens.access_token.split('.')[1] ?? '', 'base64url').toString('utf8'),
-        ) as { exp?: number };
-        if ((payload.exp ?? 0) > Math.floor(Date.now() / 1000) + 120) return current;
+  async accessToken(providerId: string) {
+    const secret = await this.vault.refresh(providerSecret(providerId), async (current: string) => {
+      const tokens = tokensSchema.parse(JSON.parse(current));
+      const payload = JSON.parse(
+        Buffer.from(tokens.access_token.split('.')[1] ?? '', 'base64url').toString('utf8'),
+      ) as { exp?: number };
+      if ((payload.exp ?? 0) > Math.floor(Date.now() / 1000) + 120) return current;
 
-        const response = await this.fetcher(`${authOrigin}/oauth/token`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: tokens.refresh_token,
-            client_id: clientId,
-          }),
-          signal: AbortSignal.timeout(20_000),
-        });
-        if (!response.ok) throw new Error('ChatGPT login expired; sign in again');
-        const fresh = z
-          .object({ access_token: z.string().min(1), refresh_token: z.string().optional() })
-          .parse(await response.json());
-        return JSON.stringify({
-          access_token: fresh.access_token,
-          refresh_token: fresh.refresh_token ?? tokens.refresh_token,
-        });
-      },
-    );
+      const response = await this.fetcher(`${authOrigin}/oauth/token`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: tokens.refresh_token,
+          client_id: clientId,
+        }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!response.ok) throw new Error('ChatGPT login expired; sign in again');
+      const fresh = z
+        .object({ access_token: z.string().min(1), refresh_token: z.string().optional() })
+        .parse(await response.json());
+      return JSON.stringify({
+        access_token: fresh.access_token,
+        refresh_token: fresh.refresh_token ?? tokens.refresh_token,
+      });
+    });
     return tokensSchema.parse(JSON.parse(secret)).access_token;
   }
 }

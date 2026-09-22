@@ -80,13 +80,15 @@ export const providerKind = pgEnum('provider_kind', [
   'openrouter',
 ]);
 
+/**
+ * A vendor credential belongs to the installation, not to a profile. There is one owner, and
+ * signing in to the same vendor once per agent is work nobody would do twice. Which model an
+ * agent uses stays its own choice, in `model_defaults`.
+ */
 export const providers = pgTable(
   'providers',
   {
     id: uuid('id').primaryKey(),
-    profileId: uuid('profile_id')
-      .notNull()
-      .references(() => profiles.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     kind: providerKind('kind').notNull(),
     authMode: text('auth_mode').$type<'api' | 'codex'>(),
@@ -96,11 +98,20 @@ export const providers = pgTable(
   },
   (table) => [
     // One live provider per vendor: the rule the service enforced by scanning.
-    uniqueIndex('providers_live_per_kind')
-      .on(table.profileId, table.kind)
-      .where(sql`${table.revokedAt} is null`),
+    uniqueIndex('providers_live_per_kind').on(table.kind).where(sql`${table.revokedAt} is null`),
   ],
 );
+
+/**
+ * Secrets the installation owns, kept apart from the per-profile ones so that deleting a
+ * profile still takes its own secrets with it and leaves the shared credentials alone.
+ */
+export const gatewaySecrets = pgTable('gateway_secrets', {
+  name: text('name').primaryKey(),
+  envelope: jsonb('envelope').notNull(),
+  createdAt,
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 /** A role per row, so a role added later needs no column. */
 export const modelDefaults = pgTable(

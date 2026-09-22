@@ -71,6 +71,13 @@
       "when": 1790095956370,
       "tag": "0009_drop-delivery-preview",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790097836586,
+      "tag": "0010_providers-per-gateway",
+      "breakpoints": true
     }
   ]
 }

@@ -35,20 +35,23 @@ export function providerEnvironment(kind: ProviderKind, env: NodeJS.ProcessEnv =
   return providerCatalog[kind].env.find((name) => !!env[name]?.trim());
 }
 
+/**
+ * A vendor the host environment already has a key for, offered as a provider nobody had to
+ * configure. Its id is derived from the vendor, so it is the same across restarts and can be
+ * stored as a model default like any other.
+ */
 export function environmentProvider(
-  profileId: string,
   kind: ProviderKind,
   env: NodeJS.ProcessEnv = process.env,
 ): ProviderRecord | null {
   const apiKeyEnv = providerEnvironment(kind, env);
   if (!apiKeyEnv) return null;
 
-  const hash = createHash('sha256').update(`${profileId}:${kind}`).digest('hex');
+  const hash = createHash('sha256').update(`gateway:${kind}`).digest('hex');
   const id = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
 
   return {
     id,
-    profileId,
     name: providerCatalog[kind].name,
     kind,
     apiKeyEnv,

@@ -30,35 +30,23 @@ export function registerProviderRoutes(app: FastifyInstance, deps: ProviderRoute
     return deps.providerModels;
   }
 
-  app.post<{ Params: ProfileParams }>(
-    '/v1/profiles/:profileId/providers/openai/oauth',
-    async (request) => codexLogin().start(request.params.profileId),
+  // Credentials belong to the installation; the model each profile picks with them does not.
+  app.post('/v1/providers/openai/oauth', async () => codexLogin().start());
+
+  app.get('/v1/providers/openai/oauth', async () => codexLogin().status());
+
+  app.get('/v1/providers', async () => deps.providers.providers());
+
+  app.post('/v1/providers', async (request, reply) =>
+    reply.code(201).send(await deps.providers.createProvider(request.body)),
   );
 
-  app.get<{ Params: ProfileParams }>(
-    '/v1/profiles/:profileId/providers/openai/oauth',
-    async (request) => codexLogin().status(request.params.profileId),
+  app.get<{ Params: { providerId: string } }>('/v1/providers/:providerId/models', async (request) =>
+    providerModels().list(request.params.providerId),
   );
 
-  app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/providers', async (request) =>
-    deps.providers.providers(request.params.profileId),
-  );
-
-  app.post<{ Params: ProfileParams }>('/v1/profiles/:profileId/providers', async (request, reply) =>
-    reply
-      .code(201)
-      .send(await deps.providers.createProvider(request.params.profileId, request.body)),
-  );
-
-  app.get<{ Params: ProfileParams & { providerId: string } }>(
-    '/v1/profiles/:profileId/providers/:providerId/models',
-    async (request) => providerModels().list(request.params.profileId, request.params.providerId),
-  );
-
-  app.delete<{ Params: ProfileParams & { providerId: string } }>(
-    '/v1/profiles/:profileId/providers/:providerId',
-    async (request) =>
-      deps.providers.revokeProvider(request.params.profileId, request.params.providerId),
+  app.delete<{ Params: { providerId: string } }>('/v1/providers/:providerId', async (request) =>
+    deps.providers.revokeProvider(request.params.providerId),
   );
 
   app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/model-defaults', async (request) =>

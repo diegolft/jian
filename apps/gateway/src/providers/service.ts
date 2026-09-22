@@ -13,7 +13,7 @@ import { type Clock, nowIso } from '../core/clock.js';
 import { GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
 import type { ProfileReader } from '../profiles/port.js';
-import type { Vault } from '../security/vault.js';
+import { GATEWAY_SCOPE, type GatewayVault } from '../security/gateway-vault.js';
 import type { Queryable, Store } from '../storage/database.js';
 import { modelCapabilities } from './capabilities.js';
 import { environmentProvider, providerKinds } from './catalog.js';
@@ -38,41 +38,34 @@ export type ContextPolicy = NonNullable<Run['contextPolicy']>;
 export class Providers {
   constructor(
     private readonly store: Store,
+    // Credentials need no profile; the model each profile chooses with them does.
     private readonly profiles: ProfileReader,
-    private readonly vault: Vault,
+    private readonly vault: GatewayVault,
     private readonly clock: Clock = Date.now,
     private readonly catalog?: ModelCatalog,
   ) {}
 
-  async providers(profileId: string) {
-    await this.profiles.profile(profileId);
-
-    const stored = await listProviders(this.store.db, profileId);
+  async providers() {
+    const stored = await listProviders(this.store.db);
     // A configured provider hides the host environment's key for the same vendor.
     const environment = providerKinds
-      .map((kind) => environmentProvider(profileId, kind))
+      .map((kind) => environmentProvider(kind))
       .filter((provider) => provider !== null)
       .filter((provider) => !stored.some((item) => !item.revokedAt && item.kind === provider.kind));
 
     return [...stored, ...environment];
   }
 
-  async createProvider(profileId: string, input: unknown) {
+  async createProvider(input: unknown) {
     const { secret, ...data } = providerInputSchema.parse(input);
 
-    return this.register(
-      profileId,
-      { ...data, id: randomUUID(), profileId, createdAt: nowIso(this.clock) },
-      secret,
-    );
+    return this.register({ ...data, id: randomUUID(), createdAt: nowIso(this.clock) }, secret);
   }
 
-  configureCodexProvider(profileId: string, secret: string) {
+  configureCodexProvider(secret: string) {
     return this.register(
-      profileId,
       providerRecordSchema.parse({
         id: randomUUID(),
-        profileId,
         name: 'OpenAI',
         kind: 'openai',
         authMode: 'codex',
@@ -82,18 +75,20 @@ export class Providers {
     );
   }
 
-  /** One live provider per vendor: configuring another revokes the old one and its key. */
-  private async register(profileId: string, provider: ProviderRecord, secret: string) {
-    return this.store.transaction(profileId, async (tx) => {
-      await this.profiles.profile(profileId, tx);
-
+  /**
+   * One live provider per vendor: configuring another revokes the old one and its key.
+   * Nothing is announced — an installation credential belongs to no profile's event stream,
+   * and the row's own timestamps are what says when it arrived and when it went.
+   */
+  private async register(provider: ProviderRecord, secret: string) {
+    return this.store.transaction(GATEWAY_SCOPE, async (tx) => {
       const now = new Date(this.clock());
 
-      for (const revoked of await revokeLiveProviders(tx, profileId, provider.kind, now)) {
-        await this.vault.discard(profileId, providerSecret(revoked), tx);
+      for (const revoked of await revokeLiveProviders(tx, provider.kind, now)) {
+        await this.vault.discard(providerSecret(revoked), tx);
       }
 
-      await this.vault.put(profileId, providerSecret(provider.id), secret, tx);
+      await this.vault.put(providerSecret(provider.id), secret, tx);
 
       try {
         await insertProvider(tx, provider);
@@ -111,28 +106,22 @@ export class Providers {
         throw error;
       }
 
-      await recordEvent(tx, this.clock, profileId, 'provider.created', {
-        id: provider.id,
-        kind: provider.kind,
-      });
-
       return provider;
     });
   }
 
-  async revokeProvider(profileId: string, providerId: string) {
-    return this.store.transaction(profileId, async (tx) => {
+  async revokeProvider(providerId: string) {
+    return this.store.transaction(GATEWAY_SCOPE, async (tx) => {
       const provider = await findProvider(tx, providerId);
 
-      if (!provider || provider.profileId !== profileId) {
+      if (!provider) {
         throw new GatewayError(404, 'Provider not found');
       }
 
       const revoked = { ...provider, revokedAt: provider.revokedAt ?? nowIso(this.clock) };
 
       await markProviderRevoked(tx, providerId, new Date(revoked.revokedAt));
-      await this.vault.discard(profileId, providerSecret(providerId), tx);
-      await recordEvent(tx, this.clock, profileId, 'provider.revoked', { id: providerId });
+      await this.vault.discard(providerSecret(providerId), tx);
 
       return revoked;
     });
@@ -156,7 +145,7 @@ export class Providers {
       // cannot resolve today would fail silently the day its runtime lands.
       for (const selection of Object.values(data)) {
         if (selection) {
-          await this.selectedModel(profileId, selection, tx);
+          await this.selectedModel(selection, tx);
         }
       }
 
@@ -170,17 +159,16 @@ export class Providers {
   }
 
   async selectedModel(
-    profileId: string,
     selection: ModelSelection,
     reader: Queryable,
   ): Promise<{ config: ModelConfig; policy: ContextPolicy }> {
     const provider =
       (await findProvider(reader, selection.providerId)) ??
       providerKinds
-        .map((kind) => environmentProvider(profileId, kind))
+        .map((kind) => environmentProvider(kind))
         .find((item) => item?.id === selection.providerId);
 
-    if (!provider || provider.profileId !== profileId || provider.revokedAt) {
+    if (!provider || provider.revokedAt) {
       throw new GatewayError(409, 'Selected provider or model is unavailable');
     }
 

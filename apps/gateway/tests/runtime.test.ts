@@ -149,11 +149,11 @@ describe('agent runtime', () => {
   });
 });
 
-it('resolves a provider key from the profile vault and keeps it out of durable events', async () => {
+it('resolves a provider key from the installation vault and keeps it out of durable events', async () => {
   const { services, profile } = await fixture();
   const vaultSecret = 'vault"\\\nsecret';
 
-  const provider = await services.providers.createProvider(profile.id, {
+  const provider = await services.providers.createProvider({
     name: 'Model',
     kind: 'openai',
     secret: vaultSecret,
@@ -179,7 +179,7 @@ it('resolves a provider key from the profile vault and keeps it out of durable e
 
       return model;
     },
-    { vault: services.vault },
+    { gatewayVault: services.gatewayVault },
   ).execute(updated.id, run.id);
 
   expect(resolvedKey).toBe(vaultSecret);

@@ -15,6 +15,7 @@ import { CodexLogin } from './providers/codex/login.js';
 import { ProviderModels } from './providers/discovery.js';
 import { RunQueue } from './runs/queue.js';
 import { SecretBox } from './security/crypto.js';
+import { GatewayVault } from './security/gateway-vault.js';
 import { createSafeFetch } from './security/outbound.js';
 import { Vault } from './security/vault.js';
 import { buildServices } from './services.js';
@@ -75,11 +76,17 @@ const outbound = createSafeFetch({
 const catalog = new ModelCatalog(outbound.fetch);
 
 const vault = new Vault(store, box);
+// Vendor credentials belong to the installation; everything else a profile types is its own.
+const gatewayVault = new GatewayVault(store, box);
 // The store rides along: several consumers read records no single area owns.
-const services = { ...buildServices({ store, vault, catalog }), store };
-const codexLogin = new CodexLogin(services, vault);
+const services = { ...buildServices({ store, vault, gatewayVault, catalog }), store };
+const codexLogin = new CodexLogin(services, gatewayVault);
 
-const providerModels = new ProviderModels(services, outbound.fetch, { catalog });
+const providerModels = new ProviderModels(
+  { providers: services.providers, vault: gatewayVault },
+  outbound.fetch,
+  { catalog },
+);
 
 // Skill import reaches GitHub through the same guarded client, and only for the owner.
 const skills = new Skills(services.profiles, outbound.fetch);
@@ -95,6 +102,7 @@ const channels = new Channels(services, outbound.fetch, channelRegistry);
 
 const runtime = new AgentRuntime(services, undefined, {
   vault,
+  gatewayVault,
   codexLogin,
   outbound,
   storeArtifact: (run, toolName, output) => coordination.storeArtifact(run, toolName, output),

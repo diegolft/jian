@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { ModelCatalog } from '../../src/providers/catalog-source.js';
 import { SecretBox } from '../../src/security/crypto.js';
+import { GatewayVault } from '../../src/security/gateway-vault.js';
 import { Vault } from '../../src/security/vault.js';
 import { buildServices, type Services } from '../../src/services.js';
 import { TestStore } from './database.js';
@@ -14,7 +15,13 @@ export async function testServices(
   const box = new SecretBox({ activeKeyId: 'test', keys: { test: randomBytes(32) } });
 
   return {
-    ...buildServices({ store, vault: new Vault(store, box, clock), clock, catalog }),
+    ...buildServices({
+      store,
+      vault: new Vault(store, box, clock),
+      gatewayVault: new GatewayVault(store, box, clock),
+      clock,
+      catalog,
+    }),
     store,
   };
 }

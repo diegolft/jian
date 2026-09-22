@@ -8,6 +8,7 @@ import type { ModelCatalog } from './providers/catalog-source.js';
 import { Providers } from './providers/service.js';
 import { RunLifecycle } from './runs/lifecycle.js';
 import { Runs } from './runs/service.js';
+import type { GatewayVault } from './security/gateway-vault.js';
 import type { Vault } from './security/vault.js';
 import { Sessions } from './sessions/service.js';
 import type { Store } from './storage/database.js';
@@ -23,22 +24,25 @@ export type Services = {
   contexts: Contexts;
   errands: Errands;
   vault: Vault;
+  gatewayVault: GatewayVault;
 };
 
 /** One wiring point: every area gets the same store, vault and clock. */
 export function buildServices({
   store,
   vault,
+  gatewayVault,
   clock = Date.now,
   catalog,
 }: {
   store: Store;
   vault: Vault;
+  gatewayVault: GatewayVault;
   clock?: Clock;
   catalog?: ModelCatalog;
 }): Services {
   const profiles = new Profiles(store, vault, clock);
-  const providers = new Providers(store, profiles, vault, clock, catalog);
+  const providers = new Providers(store, profiles, gatewayVault, clock, catalog);
   const sessions = new Sessions(store, profiles, clock);
   const memories = new Memories(store, profiles, sessions, clock);
   const runs = new Runs(store, profiles, sessions, providers, clock);
@@ -54,5 +58,6 @@ export function buildServices({
     contexts: new Contexts(store, runs, sessions),
     errands: new Errands(store, clock),
     vault,
+    gatewayVault,
   };
 }

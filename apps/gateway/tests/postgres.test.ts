@@ -8,6 +8,7 @@ import { Peers } from '../src/peers/service.js';
 import { updateProfileRow } from '../src/profiles/repository.js';
 import { RunQueue } from '../src/runs/queue.js';
 import { SecretBox } from '../src/security/crypto.js';
+import { GatewayVault } from '../src/security/gateway-vault.js';
 import { Vault } from '../src/security/vault.js';
 import { buildServices } from '../src/services.js';
 import { pageMessages } from '../src/sessions/repository.js';
@@ -24,7 +25,14 @@ if (!databaseUrl) {
 const connectionString = databaseUrl;
 const box = new SecretBox({ activeKeyId: 'test', keys: { test: randomBytes(32) } });
 const store = new PostgresStore(connectionString);
-const services = { ...buildServices({ store, vault: new Vault(store, box) }), store };
+const services = {
+  ...buildServices({
+    store,
+    vault: new Vault(store, box),
+    gatewayVault: new GatewayVault(store, box),
+  }),
+  store,
+};
 
 const input = {
   name: 'CI',
@@ -57,7 +65,11 @@ describe('PostgreSQL durability', () => {
     const second = new PostgresStore(connectionString);
 
     try {
-      const reopened = buildServices({ store: second, vault: new Vault(second, box) });
+      const reopened = buildServices({
+        store: second,
+        vault: new Vault(second, box),
+        gatewayVault: new GatewayVault(second, box),
+      });
 
       expect((await reopened.profiles.profile(profile.id)).name).toBe('CI');
     } finally {
