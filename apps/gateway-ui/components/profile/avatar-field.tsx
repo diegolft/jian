@@ -2,7 +2,7 @@
 
 import { ImageUp, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { Button } from './ui';
+import { Button } from '../ui';
 
 /** Square side in pixels. Large enough for the overview card on a retina screen. */
 const SIZE = 256;

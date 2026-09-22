@@ -3,7 +3,7 @@
 import { LoaderCircle, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
-import { NewProfileDialog } from '../../components/profile-editor';
+import { NewProfileDialog } from '../../components/profile/editor';
 import { NoticeBar } from '../../components/shell/notice';
 import { Sidebar } from '../../components/shell/sidebar';
 import { Topbar } from '../../components/shell/topbar';

@@ -2,9 +2,9 @@
 
 import { Check, Plus, Save } from 'lucide-react';
 import { useState } from 'react';
-import type { GatewayApi, Mutation, Profile } from '../lib/api';
+import type { GatewayApi, Mutation, Profile } from '../../lib/api';
+import { Button, Field, Modal, SectionHeading } from '../ui';
 import { AvatarField } from './avatar-field';
-import { Button, Field, Modal, SectionHeading } from './ui';
 
 const lines = (value: string) =>
   value

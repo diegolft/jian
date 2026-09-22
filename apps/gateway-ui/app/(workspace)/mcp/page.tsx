@@ -1,6 +1,6 @@
 'use client';
 
-import { Capabilities } from '../../../components/resources';
+import { Capabilities } from '../../../components/skills/index';
 import { useSection } from '../../../lib/workspace';
 
 export default function Page() {

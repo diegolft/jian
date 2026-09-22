@@ -2,7 +2,7 @@
 
 import { ChevronDown, Plus } from 'lucide-react';
 import { useWorkspace } from '../../lib/workspace';
-import { Avatar } from '../avatar-field';
+import { Avatar } from '../profile/avatar-field';
 
 export function ProfileSwitcher({ onCreate }: { onCreate: () => void }) {
   const { profiles, profile, selected, select, busy } = useWorkspace();
