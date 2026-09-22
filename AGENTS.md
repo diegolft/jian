@@ -36,6 +36,10 @@ document through a symlink and regenerates its types on every Xcode build. Never
 generated file, and never hand-patch the Swift output — fix the schema instead.
 `pnpm contracts:check` fails when a generated file is stale.
 
+Running it by hand is rarely needed: `pnpm dev` regenerates on every save of a schema and
+recompiles the client, and a commit that touches `packages/contracts/src` regenerates and
+stages the outputs before it lands.
+
 ## Conventions
 
 Biome formats and lints the TypeScript side: two spaces, single quotes, semicolons, 100

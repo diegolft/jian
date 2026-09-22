@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "dev": "node --watch-path=src --watch-preserve-output ../../scripts/contracts-sync.mjs",
     "typecheck": "tsc --noEmit"
   },
   "exports": {
