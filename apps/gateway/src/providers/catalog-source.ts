@@ -34,9 +34,13 @@ const entry = z.looseObject({
     .optional()
     .catch(undefined),
   modalities: z
-    .looseObject({ input: z.array(z.string()).optional().catch(undefined) })
+    .looseObject({
+      input: z.array(z.string()).optional().catch(undefined),
+      output: z.array(z.string()).optional().catch(undefined),
+    })
     .optional()
     .catch(undefined),
+  release_date: z.string().optional().catch(undefined),
   reasoning_options: z
     .array(
       z.looseObject({
@@ -59,7 +63,18 @@ export type CatalogEntry = {
   maxOutputTokens?: number;
   reasoningEfforts: ModelCapabilities['reasoningEfforts'];
   inputModalities: ModelCapabilities['inputModalities'];
+  /** What the model returns. Empty means the catalog did not say, not that it returns nothing. */
+  outputModalities: ModelCapabilities['inputModalities'];
+  /** ISO date, when the catalog carries one. It is how a newer model wins over an older one. */
+  releaseDate?: string;
 };
+
+const modalities = (values: string[] | undefined): ModelCapabilities['inputModalities'] =>
+  (values ?? []).flatMap((value) => {
+    const parsed = modality.safeParse(value);
+
+    return parsed.success ? [parsed.data] : [];
+  });
 
 function toEntry(model: z.infer<typeof entry>): CatalogEntry {
   const levels = model.reasoning_options?.find((option) => option.type === 'effort')?.values ?? [];
@@ -75,11 +90,9 @@ function toEntry(model: z.infer<typeof entry>): CatalogEntry {
 
       return parsed.success ? [parsed.data] : [];
     }),
-    inputModalities: (model.modalities?.input ?? []).flatMap((value) => {
-      const parsed = modality.safeParse(value);
-
-      return parsed.success ? [parsed.data] : [];
-    }),
+    inputModalities: modalities(model.modalities?.input),
+    outputModalities: modalities(model.modalities?.output),
+    ...(model.release_date ? { releaseDate: model.release_date } : {}),
   };
 }
 

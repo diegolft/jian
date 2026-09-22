@@ -10,8 +10,9 @@ import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound, GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
 import type { ProfileReader } from '../profiles/port.js';
+import type { ModelFallback } from '../providers/fallback.js';
 import type { ProviderSelection } from '../providers/port.js';
-import { readModelDefaults } from '../providers/repository.js';
+import { readModelDefaults, writeModelDefaults } from '../providers/repository.js';
 import type { SessionReader } from '../sessions/port.js';
 import { insertMessage } from '../sessions/repository.js';
 import type { Queryable, Store } from '../storage/database.js';
@@ -41,6 +42,27 @@ export class Runs {
   ) {}
 
   /**
+   * Set after construction because choosing a model needs the model discovery, which needs the
+   * providers, which are built alongside this service. Absent in a gateway without discovery;
+   * a run there needs a model the owner chose.
+   */
+  private fallback?: Pick<ModelFallback, 'pick'>;
+
+  useFallback(fallback: Pick<ModelFallback, 'pick'>): void {
+    this.fallback = fallback;
+  }
+
+  /** Whether this profile already has a model for this activity, or one to fall back on. */
+  private async configured(
+    profileId: string,
+    activity: 'conversation' | 'channel',
+  ): Promise<boolean> {
+    const defaults = await readModelDefaults(this.store.db, profileId, nowIso(this.clock));
+
+    return Boolean(defaults[activity] ?? defaults.conversation);
+  }
+
+  /**
    * A request key promises the same request. Different content under a key that is already
    * taken is a mistake on the caller's side, not a second run.
    */
@@ -58,6 +80,14 @@ export class Runs {
   async submit(profileId: string, sessionId: string, input: unknown, options: SubmitOptions = {}) {
     const { continuationOf, activity = 'conversation', call, group } = options;
     const data = submitSchema.parse(input);
+
+    // Choosing a model for an owner who has not can reach the provider, and the profile lock
+    // must not be held across a network call — so it is resolved before the transaction and
+    // used only if nothing is configured by the time the transaction reads it.
+    const automatic =
+      data.model || (await this.configured(profileId, activity))
+        ? null
+        : await this.fallback?.pick();
 
     return this.store.transaction(profileId, async (tx) => {
       const profile = await this.profiles.profile(profileId, tx);
@@ -86,7 +116,8 @@ export class Runs {
       }
 
       const defaults = await readModelDefaults(tx, profileId, nowIso(this.clock));
-      let selection = data.model ?? defaults[activity] ?? defaults.conversation;
+      let selection =
+        data.model ?? defaults[activity] ?? defaults.conversation ?? automatic ?? null;
       let chosen: Awaited<ReturnType<typeof this.providers.selectedModel>> | null = null;
       if (selection) {
         try {
@@ -97,9 +128,23 @@ export class Runs {
         }
       }
       // No list is invented here: which models a key can call is the provider's answer, so a
-      // run needs a model the owner actually chose for this activity.
+      // run needs either a model the owner chose or one picked from what a provider reports.
       if (!chosen && !profile.model.apiKeyEnv && !profile.model.providerId) {
-        throw new GatewayError(409, 'Choose a default model before starting a run');
+        throw new GatewayError(
+          409,
+          'No model is available. Configure a provider, or choose a model in Modelos padrão.',
+        );
+      }
+
+      // A model picked here becomes the profile's default, so the panel agrees with what just
+      // ran and the next run does not have to choose again.
+      if (chosen && selection && selection === automatic) {
+        await writeModelDefaults(
+          tx,
+          profileId,
+          { ...defaults, conversation: automatic },
+          new Date(this.clock()),
+        );
       }
 
       if ((await countActiveRuns(tx, profileId)) >= ACTIVE_RUN_LIMIT) {

@@ -13,6 +13,7 @@ import { Coordination } from './coordination/service.js';
 import { ModelCatalog } from './providers/catalog-source.js';
 import { CodexLogin } from './providers/codex/login.js';
 import { ProviderModels } from './providers/discovery.js';
+import { ModelFallback } from './providers/fallback.js';
 import { RunQueue } from './runs/queue.js';
 import { SecretBox } from './security/crypto.js';
 import { GatewayVault } from './security/gateway-vault.js';
@@ -87,6 +88,10 @@ const providerModels = new ProviderModels(
   outbound.fetch,
   { catalog },
 );
+
+// A profile answers as soon as a provider exists: with no model chosen, one is taken from what
+// the provider reports and written as the profile's default.
+services.runs.useFallback(new ModelFallback(services.providers, providerModels, catalog));
 
 // Skill import reaches GitHub through the same guarded client, and only for the owner.
 const skills = new Skills(services.profiles, outbound.fetch);
