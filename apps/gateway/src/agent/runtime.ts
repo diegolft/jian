@@ -4,6 +4,7 @@ import type { Run } from '@jian/contracts';
 import { generateText, type LanguageModel, stepCountIs, ToolLoopAgent, type ToolSet } from 'ai';
 import { fitPrompt, tokenCounter } from '../context/budget.js';
 import type { ContextSource } from '../context/port.js';
+import { isSubscriptionToken, withClaudeCodeIdentity } from '../providers/claude-subscription.js';
 import { reasoningProviderOptions } from '../providers/effort.js';
 import { resolveModel } from '../providers/models.js';
 import { providerSecret } from '../providers/service.js';
@@ -127,6 +128,12 @@ export class AgentRuntime {
         }
       }
 
+      // Anthropic checks that a subscription request comes from Claude Code, and the system
+      // prompt is part of that check. The profile's own instructions follow it untouched.
+      const subscription = isSubscriptionToken(
+        providerKey ?? (config.apiKeyEnv ? process.env[config.apiKeyEnv] : undefined),
+      );
+
       const model = await this.model(config, process.env, outbound.fetch, providerKey);
       const tools = profileTools(this.services, run);
       const { mcpToolNames, selectedMcpTools } = await connectMcpTools(run, tools, {
@@ -223,7 +230,7 @@ export class AgentRuntime {
 
       const agent = new ToolLoopAgent({
         model,
-        instructions: context.system,
+        instructions: subscription ? withClaudeCodeIdentity(context.system) : context.system,
         tools: guarded,
         stopWhen: stepCountIs(policy.maxSteps),
         maxRetries: 0,
@@ -255,7 +262,9 @@ export class AgentRuntime {
             provider: config.provider,
             modelId: config.modelId,
             policy,
-            instructions: refreshed.system,
+            instructions: subscription
+              ? withClaudeCodeIdentity(refreshed.system)
+              : refreshed.system,
             messages,
             tools: activeTools,
           });

@@ -6,16 +6,21 @@ import type { ModelConfig } from '@jian/contracts';
 import type { LanguageModel } from 'ai';
 import { createSafeFetch } from '../security/outbound.js';
 import { providerEnvironment } from './catalog.js';
+import {
+  isSubscriptionToken,
+  subscriptionFetch,
+  subscriptionHeaders,
+} from './claude-subscription.js';
 import { createCodexModel } from './codex/model.js';
 
 const defaultOutbound = createSafeFetch();
 
-export function resolveModel(
+export async function resolveModel(
   config: ModelConfig,
   env: NodeJS.ProcessEnv = process.env,
   fetcher: typeof globalThis.fetch = defaultOutbound.fetch,
   explicitKey?: string,
-): LanguageModel {
+): Promise<LanguageModel> {
   const apiKey =
     explicitKey ??
     (config.apiKeyEnv ? env[config.apiKeyEnv] : undefined) ??
@@ -44,13 +49,14 @@ export function resolveModel(
         fetch: fetcher,
       }).chatModel(config.modelId);
     case 'anthropic':
+      // A subscription token is not a key: it goes as a bearer, with Claude Code's own betas
+      // and client identity, or Anthropic refuses it however valid it is.
       return createAnthropic({
-        ...(config.providerId ||
-        (config.apiKeyEnv ?? providerEnvironment('anthropic', env)) !== 'ANTHROPIC_API_TOKEN'
-          ? { apiKey }
-          : { authToken: apiKey }),
+        ...(isSubscriptionToken(apiKey)
+          ? { authToken: apiKey, headers: subscriptionHeaders() }
+          : { apiKey }),
         baseURL: config.baseURL,
-        fetch: fetcher,
+        fetch: isSubscriptionToken(apiKey) ? await subscriptionFetch(fetcher) : fetcher,
       })(config.modelId);
     case 'google':
       return createGoogleGenerativeAI({ apiKey, baseURL: config.baseURL, fetch: fetcher })(

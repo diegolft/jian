@@ -6,7 +6,7 @@ import { resolveModel } from '../src/providers/models.js';
 describe('providers', () => {
   it.each(['openai', 'anthropic', 'google', 'openai-compatible'] as const)(
     'resolves %s without using another profile’s default',
-    (provider) => {
+    async (provider) => {
       const config = modelSchema.parse({
         provider,
         modelId: 'chosen-model',
@@ -14,7 +14,7 @@ describe('providers', () => {
         ...(provider === 'openai-compatible' ? { baseURL: 'http://localhost:11434/v1' } : {}),
       });
 
-      const model = resolveModel(config, { JIAN_PROVIDER_A: 'test-only' });
+      const model = await resolveModel(config, { JIAN_PROVIDER_A: 'test-only' });
 
       expect(typeof model).toBe('object');
 
@@ -24,27 +24,27 @@ describe('providers', () => {
     },
   );
 
-  it('does not fall back to a global key if the selected credential is absent', () => {
-    expect(() =>
+  it('does not fall back to a global key if the selected credential is absent', async () => {
+    await expect(
       resolveModel(
         { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_MISSING' },
         { OPENAI_API_KEY: 'other-profile-secret' },
       ),
-    ).toThrow('Provider key is not configured');
+    ).rejects.toThrow('Provider key is not configured');
   });
 });
 
-it('rejects a compatible provider without an endpoint before making a request', () => {
-  expect(() =>
+it('rejects a compatible provider without an endpoint before making a request', async () => {
+  await expect(
     resolveModel(
       { provider: 'openai-compatible', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_LOCAL' },
       { JIAN_PROVIDER_LOCAL: 'local' },
     ),
-  ).toThrow('baseURL is required for compatible providers');
+  ).rejects.toThrow('baseURL is required for compatible providers');
 });
 
-it('accepts an explicitly resolved vault key without consulting host environment', () => {
-  const model = resolveModel(
+it('accepts an explicitly resolved vault key without consulting host environment', async () => {
+  const model = await resolveModel(
     {
       provider: 'openai',
       modelId: 'chosen-model',
@@ -60,7 +60,7 @@ it('accepts an explicitly resolved vault key without consulting host environment
   }
 });
 
-it('sends ANTHROPIC_API_TOKEN as a bearer token', async () => {
+it('presents a Claude subscription token as Claude Code, and a key as a key', async () => {
   let headers = new Headers();
   const fetcher: typeof fetch = async (_input, init) => {
     headers = new Headers(init?.headers);
@@ -69,13 +69,34 @@ it('sends ANTHROPIC_API_TOKEN as a bearer token', async () => {
       { status: 400 },
     );
   };
-  const model = resolveModel(
+
+  // `claude setup-token` issues this shape. Sent as a key it 401s; sent as a bare bearer it
+  // 429s; Anthropic accepts it only from something presenting itself as Claude Code.
+  const subscription = await resolveModel(
     { provider: 'anthropic', modelId: 'test', apiKeyEnv: 'ANTHROPIC_API_TOKEN' },
-    { ANTHROPIC_API_TOKEN: 'synthetic-token' },
+    { ANTHROPIC_API_TOKEN: 'sk-ant-oat01-synthetic' },
     fetcher,
   );
 
-  await expect(generateText({ model, prompt: 'Hi', maxRetries: 0 })).rejects.toThrow();
-  expect(headers.get('authorization')).toBe('Bearer synthetic-token');
+  await expect(
+    generateText({ model: subscription, prompt: 'Hi', maxRetries: 0 }),
+  ).rejects.toThrow();
+
+  expect(headers.get('authorization')).toBe('Bearer sk-ant-oat01-synthetic');
   expect(headers.has('x-api-key')).toBe(false);
+  expect(headers.get('anthropic-beta')).toContain('oauth-2025-04-20');
+  expect(headers.get('anthropic-beta')).toContain('claude-code-20250219');
+  expect(headers.get('user-agent')).toMatch(/^claude-cli\/\d/);
+
+  // The same variable holding a real key is still a key: the shape decides, not the name.
+  const key = await resolveModel(
+    { provider: 'anthropic', modelId: 'test', apiKeyEnv: 'ANTHROPIC_API_TOKEN' },
+    { ANTHROPIC_API_TOKEN: 'sk-ant-api03-synthetic' },
+    fetcher,
+  );
+
+  await expect(generateText({ model: key, prompt: 'Hi', maxRetries: 0 })).rejects.toThrow();
+
+  expect(headers.get('x-api-key')).toBe('sk-ant-api03-synthetic');
+  expect(headers.has('authorization')).toBe(false);
 });
