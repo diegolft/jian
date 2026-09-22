@@ -1,0 +1,484 @@
+import type {
+  AgentCallOrigin,
+  ContextPolicy,
+  GroupTurn,
+  Identity,
+  McpServer,
+  ModelConfig,
+  ModelSelection,
+  Profile,
+  ReasoningEffort,
+  Skill,
+  Usage,
+} from '@jian/contracts';
+import { sql } from 'drizzle-orm';
+import {
+  bigint,
+  bigserial,
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
+
+/**
+ * A column holds what the gateway filters, sorts or constrains on. JSONB holds what it only
+ * ever reads back whole — a frozen model choice, a protocol payload, a ciphertext envelope.
+ * Everything here is scoped by profile, and every child cascades from its profile.
+ */
+
+const createdAt = timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
+
+export const profiles = pgTable('profiles', {
+  id: uuid('id').primaryKey(),
+  name: text('name').notNull(),
+  instructions: text('instructions').notNull(),
+  // What other agents of the installation see; never the instructions.
+  summary: text('summary').notNull().default(''),
+  avatar: text('avatar'),
+  model: jsonb('model').$type<ModelConfig>().notNull(),
+  identity: jsonb('identity').$type<Identity>().notNull(),
+  contextPolicy: jsonb('context_policy').$type<ContextPolicy>().notNull(),
+  skills: jsonb('skills').$type<Skill[]>().notNull().default([]),
+  mcpServers: jsonb('mcp_servers').$type<McpServer[]>().notNull().default([]),
+  allowSelfManagement: boolean('allow_self_management').notNull().default(false),
+  version: integer('version').notNull(),
+  createdAt,
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** One row per version. A run points at the version it froze instead of copying the profile. */
+export const profileRevisions = pgTable(
+  'profile_revisions',
+  {
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    document: jsonb('document').$type<Profile>().notNull(),
+    createdAt,
+  },
+  (table) => [
+    primaryKey({ columns: [table.profileId, table.version] }),
+    index('profile_revisions_recent').on(table.profileId, table.version.desc()),
+  ],
+);
+
+export const providerKind = pgEnum('provider_kind', ['openai', 'anthropic', 'google']);
+
+export const providers = pgTable(
+  'providers',
+  {
+    id: uuid('id').primaryKey(),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    kind: providerKind('kind').notNull(),
+    authMode: text('auth_mode').$type<'api' | 'codex'>(),
+    apiKeyEnv: text('api_key_env'),
+    createdAt,
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (table) => [
+    // One live provider per vendor: the rule the service enforced by scanning.
+    uniqueIndex('providers_live_per_kind')
+      .on(table.profileId, table.kind)
+      .where(sql`${table.revokedAt} is null`),
+  ],
+);
+
+/** A role per row, so a role added later needs no column. */
+export const modelDefaults = pgTable(
+  'model_defaults',
+  {
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    role: text('role').notNull(),
+    providerId: uuid('provider_id').notNull(),
+    modelId: text('model_id').notNull(),
+    reasoningEffort: text('reasoning_effort').$type<ReasoningEffort>(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.profileId, table.role] })],
+);
+
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid('id').primaryKey(),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    channel: text('channel').notNull(),
+    // Set on the session a pair of agents shares; the peer never reads it.
+    peerProfileId: uuid('peer_profile_id').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt,
+  },
+  (table) => [
+    index('sessions_recent').on(table.profileId, table.createdAt.desc()),
+    index('sessions_peer').on(table.profileId, table.peerProfileId),
+  ],
+);
+
+export const runStatus = pgEnum('run_status', [
+  'queued',
+  'running',
+  'completed',
+  'failed',
+  'interrupted',
+  'cancelled',
+]);
+
+export const runs = pgTable(
+  'runs',
+  {
+    id: uuid('id').primaryKey(),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    // The profile this run froze. The snapshot is read from the revision, never copied here.
+    profileVersion: integer('profile_version').notNull(),
+    requestKey: text('request_key').notNull(),
+    input: text('input').notNull(),
+    status: runStatus('status').notNull(),
+    output: text('output'),
+    error: text('error'),
+    usage: jsonb('usage').$type<Usage>(),
+    continuationOf: uuid('continuation_of'),
+    model: jsonb('model').$type<ModelConfig>(),
+    modelSelection: jsonb('model_selection').$type<ModelSelection>(),
+    contextPolicy: jsonb('context_policy').$type<ContextPolicy>(),
+    call: jsonb('call').$type<AgentCallOrigin>(),
+    group: jsonb('group_turn').$type<GroupTurn>(),
+    leaseOwner: text('lease_owner'),
+    leaseUntil: bigint('lease_until', { mode: 'number' }),
+    createdAt,
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Submitting the same request twice returns the first run instead of starting another.
+    uniqueIndex('runs_request_key').on(table.profileId, table.sessionId, table.requestKey),
+    index('runs_activity').on(table.profileId, table.status, table.createdAt.desc()),
+    // Recovery sweeps every profile's running rows, so this one is not scoped by profile.
+    index('runs_running').on(table.status).where(sql`${table.status} = 'running'`),
+  ],
+);
+
+export const messageRole = pgEnum('message_role', ['user', 'assistant']);
+
+export const messages = pgTable(
+  'messages',
+  {
+    id: uuid('id').primaryKey(),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    runId: uuid('run_id')
+      .notNull()
+      .references(() => runs.id, { onDelete: 'cascade' }),
+    role: messageRole('role').notNull(),
+    content: text('content').notNull(),
+    createdAt,
+  },
+  (table) => [
+    index('messages_session').on(table.sessionId, table.createdAt.desc()),
+    index('messages_profile').on(table.profileId, table.createdAt.desc()),
+    index('messages_search').using('gin', sql`to_tsvector('simple', ${table.content})`),
+  ],
+);
+
+export const memories = pgTable(
+  'memories',
+  {
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    // One memory per key: the uniqueness the service used to enforce by reading first.
+    key: text('key').notNull(),
+    content: text('content').notNull(),
+    version: integer('version').notNull(),
+    sourceSessionId: uuid('source_session_id').references(() => sessions.id, {
+      onDelete: 'set null',
+    }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.profileId, table.key] }),
+    index('memories_recent').on(table.profileId, table.updatedAt.desc()),
+    index('memories_search').using(
+      'gin',
+      sql`to_tsvector('simple', ${table.key} || ' ' || ${table.content})`,
+    ),
+  ],
+);
+
+export const checkpoints = pgTable(
+  'checkpoints',
+  {
+    id: uuid('id').primaryKey(),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    runId: uuid('run_id')
+      .notNull()
+      .references(() => runs.id, { onDelete: 'cascade' }),
+    data: jsonb('data').notNull(),
+    createdAt,
+  },
+  (table) => [index('checkpoints_run').on(table.runId, table.createdAt.desc())],
+);
+
+export const artifacts = pgTable(
+  'artifacts',
+  {
+    id: uuid('id').primaryKey(),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    runId: uuid('run_id')
+      .notNull()
+      .references(() => runs.id, { onDelete: 'cascade' }),
+    toolName: text('tool_name').notNull(),
+    content: text('content').notNull(),
+    bytes: integer('bytes').notNull(),
+    createdAt,
+  },
+  (table) => [index('artifacts_run').on(table.runId, table.createdAt.desc())],
+);
+
+/** A fenced lock a run holds on a named resource; the fence rises on every acquisition. */
+export const leases = pgTable(
+  'leases',
+  {
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    resource: text('resource').notNull(),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    fence: bigserial('fence', { mode: 'number' }).notNull(),
+    expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.profileId, table.resource] })],
+);
+
+export const mail = pgTable(
+  'mail',
+  {
+    id: uuid('id').primaryKey(),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    fromSessionId: uuid('from_session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    toSessionId: uuid('to_session_id')
+      .notNull()
+      .references(() => sessions.id, { onDelete: 'cascade' }),
+    text: text('text').notNull(),
+    requestKey: text('request_key').notNull(),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex('mail_request_key').on(table.profileId, table.requestKey),
+    index('mail_inbox').on(table.toSessionId, table.createdAt.desc()),
+  ],
+);
+
+/**
+ * Every secret the installation holds, addressed by what owns it — `provider:<id>`,
+ * `channel:<id>`, `mcp:<name>`. The address is also the associated data of the envelope, so a
+ * ciphertext moved to another owner fails to decrypt.
+ */
+export const secrets = pgTable(
+  'secrets',
+  {
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    envelope: jsonb('envelope').notNull(),
+    createdAt,
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.profileId, table.name] })],
+);
+
+export const channelType = pgEnum('channel_type', ['api', 'telegram', 'whatsapp']);
+
+export const channels = pgTable(
+  'channels',
+  {
+    id: uuid('id').primaryKey(),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    type: channelType('type').notNull(),
+    // How this connection is addressed on its protocol; how an agent recognises a colleague.
+    address: text('address'),
+    webhookTokenHash: text('webhook_token_hash'),
+    createdAt,
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (table) => [
+    // One live channel per type: the rule the screen now shows as connected or not.
+    uniqueIndex('channels_live_per_type')
+      .on(table.profileId, table.type)
+      .where(sql`${table.revokedAt} is null`),
+    uniqueIndex('channels_webhook_token').on(table.webhookTokenHash),
+  ],
+);
+
+export const contactScope = pgEnum('contact_scope', ['direct', 'group']);
+export const contactStatus = pgEnum('contact_status', ['pending', 'approved', 'blocked']);
+
+export const contacts = pgTable(
+  'contacts',
+  {
+    id: uuid('id').primaryKey(),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    channelId: uuid('channel_id')
+      .notNull()
+      .references(() => channels.id, { onDelete: 'cascade' }),
+    scope: contactScope('scope').notNull(),
+    // The chat this contact speaks in; for a group, the room itself.
+    chatId: text('chat_id').notNull(),
+    actorId: text('actor_id'),
+    title: text('title'),
+    status: contactStatus('status').notNull(),
+    sessionId: uuid('session_id').references(() => sessions.id, { onDelete: 'set null' }),
+    // The first message, kept until approval releases it exactly once.
+    heldMessage: jsonb('held_message'),
+    heldMessageId: text('held_message_id'),
+    agentTurns: integer('agent_turns').notNull().default(0),
+    seen: jsonb('seen').$type<string[]>().notNull().default([]),
+    createdAt,
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('contacts_identity').on(table.channelId, table.chatId, table.actorId),
+    index('contacts_pending').on(table.profileId, table.status),
+  ],
+);
+
+export const deliveryStatus = pgEnum('delivery_status', ['pending', 'sent', 'failed']);
+
+export const deliveries = pgTable(
+  'deliveries',
+  {
+    id: uuid('id').primaryKey(),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    channelId: uuid('channel_id')
+      .notNull()
+      .references(() => channels.id, { onDelete: 'cascade' }),
+    // A notice to a stranger has no run behind it.
+    runId: uuid('run_id').references(() => runs.id, { onDelete: 'cascade' }),
+    chatId: text('chat_id').notNull(),
+    text: text('text'),
+    status: deliveryStatus('status').notNull(),
+    error: text('error'),
+    createdAt,
+  },
+  (table) => [index('deliveries_recent').on(table.profileId, table.createdAt.desc())],
+);
+
+export const connectionStatus = pgEnum('connection_status', [
+  'disconnected',
+  'connecting',
+  'awaiting_scan',
+  'connected',
+  'failed',
+]);
+
+/** The desired and observed state of one linked device, plus the lease its worker holds. */
+export const channelConnections = pgTable('channel_connections', {
+  channelId: uuid('channel_id')
+    .primaryKey()
+    .references(() => channels.id, { onDelete: 'cascade' }),
+  profileId: uuid('profile_id')
+    .notNull()
+    .references(() => profiles.id, { onDelete: 'cascade' }),
+  desired: boolean('desired').notNull(),
+  generation: integer('generation').notNull(),
+  fence: integer('fence'),
+  status: connectionStatus('status').notNull(),
+  owner: text('owner'),
+  leaseUntil: bigint('lease_until', { mode: 'number' }),
+  retryAt: bigint('retry_at', { mode: 'number' }),
+  accountId: text('account_id'),
+  sessionSavedAt: timestamp('session_saved_at', { withTimezone: true }),
+  error: text('error'),
+  qr: jsonb('qr'),
+  qrExpiresAt: bigint('qr_expires_at', { mode: 'number' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** The linked device's own credentials, encrypted in chunks the gateway never reads. */
+export const channelAuth = pgTable('channel_auth', {
+  channelId: uuid('channel_id')
+    .primaryKey()
+    .references(() => channels.id, { onDelete: 'cascade' }),
+  profileId: uuid('profile_id')
+    .notNull()
+    .references(() => profiles.id, { onDelete: 'cascade' }),
+  chunks: jsonb('chunks').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const inboxStatus = pgEnum('inbox_status', ['pending', 'submitted', 'discarded']);
+
+/** What a device received before the gateway could turn it into a run. */
+export const channelInbox = pgTable(
+  'channel_inbox',
+  {
+    id: text('id').primaryKey(),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    channelId: uuid('channel_id')
+      .notNull()
+      .references(() => channels.id, { onDelete: 'cascade' }),
+    generation: integer('generation').notNull(),
+    message: jsonb('message').notNull(),
+    status: inboxStatus('status').notNull(),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('channel_inbox_pending').on(table.channelId, table.status, table.receivedAt)],
+);
+
+/** The durable feed the panel and the Apple client follow, ordered by a single sequence. */
+export const events = pgTable(
+  'events',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    runId: uuid('run_id'),
+    type: text('type').notNull(),
+    data: jsonb('data'),
+    createdAt,
+  },
+  (table) => [index('events_cursor').on(table.profileId, table.id)],
+);

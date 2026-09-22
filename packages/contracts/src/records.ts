@@ -87,6 +87,8 @@ export const eventSchema = z.strictObject({
   createdAt: timestamp,
 });
 
+export type Usage = z.infer<typeof usageSchema>;
+
 export type ModelConfig = z.infer<typeof profileSchema>['model'];
 
 export type Profile = z.infer<typeof profileRecordSchema>;

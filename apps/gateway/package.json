@@ -19,6 +19,7 @@
     "@jian/contracts": "workspace:*",
     "ai": "^7.0.108",
     "baileys": "7.0.0-rc14",
+    "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.5",
     "ipaddr.js": "^2.5.0",
     "js-tiktoken": "^1.0.21",
@@ -38,8 +39,10 @@
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^13.1.0",
+    "@electric-sql/pglite": "^0.5.8",
     "@types/node": "^26.6.2",
     "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"

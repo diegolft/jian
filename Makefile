@@ -59,6 +59,9 @@ db-up: ## Start the development PostgreSQL on 127.0.0.1:5432
 db-stop: ## Stop the development PostgreSQL, keeping its data
 	$(COMPOSE_DEV) stop postgres
 
+db-migration: ## Write a migration for what changed in the schema file
+	cd apps/gateway && pnpm exec drizzle-kit generate
+
 db-reset: ## Delete the development database volume and start an empty one
 	$(COMPOSE_DEV) down -v
 	$(COMPOSE_DEV) up -d --wait postgres

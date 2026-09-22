@@ -158,3 +158,8 @@ export const memorySchema = z.strictObject({
   content: z.string().trim().min(1).max(4_000),
   expectedVersion: z.number().int().nonnegative(),
 });
+
+export type Skill = z.infer<typeof skillSchema>;
+export type McpServer = z.infer<typeof mcpSchema>;
+export type Identity = z.infer<typeof identitySchema>;
+export type ContextPolicy = z.infer<typeof contextPolicySchema>;
