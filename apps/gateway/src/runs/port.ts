@@ -29,6 +29,7 @@ export interface RunExecution {
   heartbeat(profileId: string, runId: string, owner: string): Promise<void>;
   checkpoint(profileId: string, runId: string, owner: string, data: unknown): Promise<void>;
   progress(runId: string, owner: string, progress: RunProgress | null): Promise<void>;
+  steer(runId: string, owner: string): Promise<string | null>;
   checkpoints(profileId: string, runId: string): Promise<Checkpoint[]>;
   recordUsage(
     profileId: string,

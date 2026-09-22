@@ -67,6 +67,14 @@ export class ProgressReporter {
     this.mark(false);
   }
 
+  /** A new message landed mid-run: the answer being written is not the one that will stand. */
+  redirected(): void {
+    this.phase = 'thinking';
+    this.tool = undefined;
+    this.text = '';
+    this.mark(true);
+  }
+
   stepEnded(): void {
     this.steps += 1;
     this.mark(false);

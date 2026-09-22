@@ -11401,6 +11401,10 @@
                       "default": false,
                       "type": "boolean"
                     },
+                    "allowShell": {
+                      "default": false,
+                      "type": "boolean"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid",
@@ -11434,6 +11438,7 @@
                     "disabledSkills",
                     "mcpServers",
                     "allowSelfManagement",
+                    "allowShell",
                     "id",
                     "version",
                     "createdAt",
@@ -11935,6 +11940,10 @@
                         "default": false,
                         "type": "boolean"
                       },
+                      "allowShell": {
+                        "default": false,
+                        "type": "boolean"
+                      },
                       "id": {
                         "type": "string",
                         "format": "uuid",
@@ -11968,6 +11977,7 @@
                       "disabledSkills",
                       "mcpServers",
                       "allowSelfManagement",
+                      "allowShell",
                       "id",
                       "version",
                       "createdAt",
@@ -12449,6 +12459,10 @@
                   "allowSelfManagement": {
                     "default": false,
                     "type": "boolean"
+                  },
+                  "allowShell": {
+                    "default": false,
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -12765,6 +12779,10 @@
                       "default": false,
                       "type": "boolean"
                     },
+                    "allowShell": {
+                      "default": false,
+                      "type": "boolean"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid",
@@ -12798,6 +12816,7 @@
                     "disabledSkills",
                     "mcpServers",
                     "allowSelfManagement",
+                    "allowShell",
                     "id",
                     "version",
                     "createdAt",
@@ -13308,6 +13327,10 @@
                       "default": false,
                       "type": "boolean"
                     },
+                    "allowShell": {
+                      "default": false,
+                      "type": "boolean"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid",
@@ -13341,6 +13364,7 @@
                     "disabledSkills",
                     "mcpServers",
                     "allowSelfManagement",
+                    "allowShell",
                     "id",
                     "version",
                     "createdAt",
@@ -13809,6 +13833,9 @@
                   "allowSelfManagement": {
                     "type": "boolean"
                   },
+                  "allowShell": {
+                    "type": "boolean"
+                  },
                   "expectedVersion": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -14128,6 +14155,10 @@
                       "default": false,
                       "type": "boolean"
                     },
+                    "allowShell": {
+                      "default": false,
+                      "type": "boolean"
+                    },
                     "id": {
                       "type": "string",
                       "format": "uuid",
@@ -14161,6 +14192,7 @@
                     "disabledSkills",
                     "mcpServers",
                     "allowSelfManagement",
+                    "allowShell",
                     "id",
                     "version",
                     "createdAt",
@@ -14684,6 +14716,10 @@
                             "default": false,
                             "type": "boolean"
                           },
+                          "allowShell": {
+                            "default": false,
+                            "type": "boolean"
+                          },
                           "id": {
                             "type": "string",
                             "format": "uuid",
@@ -14717,6 +14753,7 @@
                           "disabledSkills",
                           "mcpServers",
                           "allowSelfManagement",
+                          "allowShell",
                           "id",
                           "version",
                           "createdAt",

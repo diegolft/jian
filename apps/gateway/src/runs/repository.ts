@@ -1,6 +1,6 @@
 import type { Checkpoint, Profile, Run, RunProgress } from '@jian/contracts';
 import { profileRecordSchema } from '@jian/contracts';
-import { and, asc, count, desc, eq, inArray, isNull, lte, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Queryable } from '../storage/database.js';
 import { checkpoints, profileRevisions, runs } from '../storage/schema.js';
 
@@ -135,6 +135,58 @@ export async function insertRun(db: Queryable, run: Run): Promise<Run | null> {
 
 export async function updateRun(db: Queryable, run: Run): Promise<void> {
   await db.update(runs).set(toRow(run)).where(eq(runs.id, run.id));
+}
+
+/**
+ * Appends what the person said while the run was already going. Read and write both happen
+ * under the profile lock the caller holds, so two messages arriving together keep both.
+ */
+export async function appendSteer(
+  db: Queryable,
+  runId: string,
+  text: string,
+): Promise<string | null> {
+  const [current] = await db
+    .select({ steer: runs.steer })
+    .from(runs)
+    .where(and(eq(runs.id, runId), inArray(runs.status, activeStatuses)))
+    .limit(1);
+
+  if (!current) {
+    return null;
+  }
+
+  const steer = current.steer ? `${current.steer}\n\n${text}` : text;
+
+  await db.update(runs).set({ steer }).where(eq(runs.id, runId));
+
+  return steer;
+}
+
+/** Takes what is waiting and leaves the slot empty, so a step reads each message once. */
+export async function takeSteer(
+  db: Queryable,
+  runId: string,
+  owner: string,
+): Promise<string | null> {
+  const [current] = await db
+    .select({ steer: runs.steer })
+    .from(runs)
+    .where(and(eq(runs.id, runId), eq(runs.leaseOwner, owner), isNotNull(runs.steer)))
+    .limit(1);
+
+  if (!current?.steer) {
+    return null;
+  }
+
+  // Cleared only if it still holds exactly what was read. A message that landed in between
+  // fails this and stays for the next step, which is the side to err on.
+  await db
+    .update(runs)
+    .set({ steer: null })
+    .where(and(eq(runs.id, runId), eq(runs.steer, current.steer)));
+
+  return current.steer;
 }
 
 /**

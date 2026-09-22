@@ -51,6 +51,7 @@ export const profiles = pgTable('profiles', {
   disabledSkills: jsonb('disabled_skills').$type<string[]>().notNull().default([]),
   mcpServers: jsonb('mcp_servers').$type<McpServer[]>().notNull().default([]),
   allowSelfManagement: boolean('allow_self_management').notNull().default(false),
+  allowShell: boolean('allow_shell').notNull().default(false),
   version: integer('version').notNull(),
   createdAt,
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -184,6 +185,8 @@ export const runs = pgTable(
     group: jsonb('group_turn').$type<GroupTurn>(),
     // Overwritten many times while a run is live and cleared when it ends; never history.
     progress: jsonb('progress').$type<RunProgress>(),
+    // What the person said while this run was already going. Read and cleared between steps.
+    steer: text('steer'),
     leaseOwner: text('lease_owner'),
     leaseUntil: bigint('lease_until', { mode: 'number' }),
     createdAt,

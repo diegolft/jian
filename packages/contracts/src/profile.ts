@@ -155,6 +155,12 @@ export const profileSchema = z.strictObject({
   disabledSkills: z.array(skillNameSchema).max(20).default([]),
   mcpServers: z.array(mcpSchema).max(10).default([]),
   allowSelfManagement: z.boolean().default(false),
+  /**
+   * Reading files, writing files and running commands on the machine the gateway runs on,
+   * with the privileges of whoever started it. Off by default and never implied by anything
+   * else: it is the one setting that turns a conversation into access to a computer.
+   */
+  allowShell: z.boolean().default(false),
 });
 
 export const profilePatchSchema = profileSchema.partial().extend({
@@ -169,6 +175,7 @@ export const profilePatchSchema = profileSchema.partial().extend({
   disabledSkills: z.array(skillNameSchema).max(20).optional(),
   mcpServers: z.array(mcpSchema).max(10).optional(),
   allowSelfManagement: z.boolean().optional(),
+  allowShell: z.boolean().optional(),
 });
 
 export const sessionSchema = z.strictObject({

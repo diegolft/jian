@@ -10,6 +10,7 @@ import {
   insertCheckpoint,
   listCheckpoints,
   listExpiredRuns,
+  takeSteer,
   updateRun,
   writeProgress,
 } from './repository.js';
@@ -79,6 +80,11 @@ export class RunLifecycle {
    */
   async progress(runId: string, owner: string, progress: RunProgress | null) {
     await writeProgress(this.store.db, runId, owner, progress);
+  }
+
+  /** What the person said while this run was already going, taken once and left empty. */
+  async steer(runId: string, owner: string): Promise<string | null> {
+    return takeSteer(this.store.db, runId, owner);
   }
 
   async checkpoint(profileId: string, runId: string, owner: string, data: unknown) {

@@ -255,6 +255,16 @@ export class AgentRuntime {
 
           const refreshed = await this.services.contexts.context(run);
 
+          // What the person said after this run began. It arrives as their own turn, at the
+          // point the loop reached, so the agent answers what they are asking now rather than
+          // finishing an errand they have already moved on from.
+          const steer = await this.services.lifecycle.steer(runId, owner);
+
+          if (steer) {
+            messages.push({ role: 'user', content: steer });
+            progress.redirected();
+          }
+
           const activeNames = Object.keys(guarded).filter(
             (name) => !mcpToolNames.includes(name) || selectedMcpTools.has(name),
           );

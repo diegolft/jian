@@ -145,8 +145,12 @@ it('freezes the chosen model and its context budget per run', async () => {
   ).resolves.toMatchObject({ profileId: other.id });
 
   await services.providers.revokeProvider(provider.id);
+
+  // A session with nothing in flight: one that is busy takes the message as a correction.
+  const third = await services.sessions.createSession(profile.id, { title: 'Third' });
+
   await expect(
-    services.runs.submit(profile.id, otherSession.id, {
+    services.runs.submit(profile.id, third.id, {
       text: 'Third',
       requestKey: 'three',
       model: large,
@@ -168,10 +172,48 @@ it('commits one run and message for concurrent duplicate submissions', async () 
   await expect(
     services.runs.submit(profile.id, session.id, { text: 'Different', requestKey: 'same' }),
   ).rejects.toMatchObject({ statusCode: 409 });
+});
 
-  await expect(
-    services.runs.submit(profile.id, session.id, { text: 'Again', requestKey: 'new' }),
-  ).rejects.toMatchObject({ statusCode: 409 });
+it('takes a message sent mid-run as a correction to that run', async () => {
+  const { services, profile, session } = await setup();
+
+  const first = await services.runs.submit(profile.id, session.id, {
+    text: 'Pergunta ao Moabe se o deploy pode sair',
+    requestKey: 'one',
+  });
+
+  await services.lifecycle.claim(first.id, profile.id, 'worker');
+
+  const again = await services.runs.submit(profile.id, session.id, {
+    text: 'Na verdade, esquece o Moabe',
+    requestKey: 'two',
+  });
+
+  // The same run, not a second one waiting behind it.
+  expect(again.id).toBe(first.id);
+  expect(await services.runs.activities(profile.id)).toHaveLength(1);
+
+  // It is in the history as the person's own turn, and reaches the run exactly once.
+  const history = await services.sessions.messages(profile.id, session.id);
+
+  expect(history.map((message) => message.content)).toContain('Na verdade, esquece o Moabe');
+  expect(await services.lifecycle.steer(first.id, 'worker')).toBe('Na verdade, esquece o Moabe');
+  expect(await services.lifecycle.steer(first.id, 'worker')).toBeNull();
+});
+
+it('keeps every correction when two arrive before the run reads them', async () => {
+  const { services, profile, session } = await setup();
+
+  const run = await services.runs.submit(profile.id, session.id, {
+    text: 'Começa',
+    requestKey: 'one',
+  });
+
+  await services.lifecycle.claim(run.id, profile.id, 'worker');
+  await services.runs.submit(profile.id, session.id, { text: 'Primeira', requestKey: 'a' });
+  await services.runs.submit(profile.id, session.id, { text: 'Segunda', requestKey: 'b' });
+
+  expect(await services.lifecycle.steer(run.id, 'worker')).toBe('Primeira\n\nSegunda');
 });
 
 it('pins model configuration for queued runs', async () => {

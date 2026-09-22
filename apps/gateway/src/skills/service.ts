@@ -59,6 +59,14 @@ export class Skills {
     return Array.isArray(parsed) ? (parsed as Entry[]) : [];
   }
 
+  private async skillDirectory(source: Source): Promise<{ path: string; entries: Entry[] }> {
+    const root = await this.listDirectory(source, source.path);
+    const path = root.some((entry) => entry.type === 'dir' && entry.name === 'skills')
+      ? `${source.path ? `${source.path}/` : ''}skills`
+      : source.path;
+    return { path, entries: path === source.path ? root : await this.listDirectory(source, path) };
+  }
+
   /** What a URL offers: a marketplace of plugins, a folder of skills, or one skill. */
   async catalog(input: unknown): Promise<{ marketplace?: string; entries: CatalogEntry[] }> {
     const { url } = catalogQuerySchema.parse(input);
@@ -87,12 +95,13 @@ export class Skills {
 
     const entries: CatalogEntry[] = [];
 
-    for (const child of await this.listDirectory(source, this.skillsPath(source.path))) {
-      if (child.type === 'dir') {
+    const directory = await this.skillDirectory(source);
+    for (const child of directory.entries) {
+      if (child.type === 'dir' && !child.name.startsWith('.')) {
         entries.push({
           name: child.name,
           description: 'Skill in this repository',
-          url: pageUrl(source, `${this.skillsPath(source.path)}/${child.name}`),
+          url: pageUrl(source, `${directory.path ? `${directory.path}/` : ''}${child.name}`),
         });
       }
     }
@@ -118,10 +127,6 @@ export class Skills {
     return /SKILL\.md$/i.test(path) ? path : `${path ? `${path}/` : ''}SKILL.md`;
   }
 
-  private skillsPath(path: string): string {
-    return path ? `${path}/skills` : 'skills';
-  }
-
   private folderName(path: string): string | undefined {
     return path
       .replace(/\/SKILL\.md$/i, '')
@@ -144,12 +149,13 @@ export class Skills {
     if (document) {
       found.push({ ...parseSkillDocument(document, this.folderName(source.path)), url });
     } else {
-      for (const child of await this.listDirectory(source, this.skillsPath(source.path))) {
-        if (child.type !== 'dir' || found.length >= MAX_SKILLS) {
+      const directory = await this.skillDirectory(source);
+      for (const child of directory.entries) {
+        if (child.type !== 'dir' || child.name.startsWith('.') || found.length >= MAX_SKILLS) {
           continue;
         }
 
-        const childPath = `${this.skillsPath(source.path)}/${child.name}/SKILL.md`;
+        const childPath = `${directory.path ? `${directory.path}/` : ''}${child.name}/SKILL.md`;
         const body = await this.read(rawUrl(source, childPath));
 
         if (body) {

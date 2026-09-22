@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Plus, Save } from 'lucide-react';
+import { Plus, Save } from 'lucide-react';
 import { useState } from 'react';
 import type { GatewayApi, Mutation, Profile } from '../../lib/api';
 import { Button, Field, Modal, SectionHeading } from '../ui';
@@ -112,6 +112,7 @@ export function ProfileEditor({
         description="Instruções compartilhadas entre todas as sessões."
       />
       <form
+        className="profile-form"
         method="post"
         action="/ui/"
         onSubmit={(event) => {
@@ -133,16 +134,13 @@ export function ProfileEditor({
                   boundaries: lines(String(form.get('boundaries'))),
                 },
                 allowSelfManagement: form.get('selfManagement') === 'on',
+                allowShell: form.get('shell') === 'on',
               }),
             'Perfil atualizado.',
           );
         }}
       >
-        <div className="settings-section">
-          <div className="settings-caption">
-            <h2>Identidade</h2>
-            <p>Um propósito claro, em qualquer canal.</p>
-          </div>
+        <div className="identity-form">
           <div className="settings-fields">
             <AvatarField name="avatar" profileName={profile.name} current={profile.avatar} />
             <Field label="Nome">
@@ -189,13 +187,21 @@ export function ProfileEditor({
                 </small>
               </span>
             </label>
+            <label className="check-row">
+              <input name="shell" type="checkbox" defaultChecked={profile.allowShell} />
+              <span>
+                <strong>Permitir terminal e arquivos</strong>
+                <small>
+                  O agente pode ler e escrever arquivos e rodar comandos nesta máquina, com as
+                  permissões de quem subiu o gateway. Vale também pelo WhatsApp e pelo Telegram:
+                  qualquer contato aprovado passa a ter esse caminho.
+                </small>
+              </span>
+            </label>
           </div>
         </div>
         <div className="save-bar">
-          <span>
-            <Check size={15} />
-            Alterações valem para novas execuções
-          </span>
+          <span>Alterações valem para novas execuções</span>
           <Button type="submit" busy={busy}>
             <Save size={16} />
             Salvar perfil

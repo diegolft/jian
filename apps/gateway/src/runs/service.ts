@@ -18,6 +18,7 @@ import { insertMessage } from '../sessions/repository.js';
 import type { Queryable, Store } from '../storage/database.js';
 import type { SubmitOptions } from './port.js';
 import {
+  appendSteer,
   countActiveRuns,
   findActiveSessionRun,
   findRun,
@@ -112,8 +113,25 @@ export class Runs {
         return this.sameRequest(duplicate, data.text, data.model);
       }
 
-      if (await findActiveSessionRun(tx, profileId, sessionId)) {
-        throw new GatewayError(409, 'Session already has an active run');
+      const inFlight = await findActiveSessionRun(tx, profileId, sessionId);
+
+      // A person who writes again while the agent is working is not starting a second turn —
+      // they are changing what this one should be about. The message joins the run in flight
+      // and is read between its steps, so nothing waits for a turn that already began.
+      if (inFlight) {
+        await insertMessage(tx, {
+          id: randomUUID(),
+          profileId,
+          sessionId,
+          runId: inFlight.id,
+          role: 'user',
+          content: data.text,
+          createdAt: nowIso(this.clock),
+        });
+
+        await appendSteer(tx, inFlight.id, data.text);
+
+        return inFlight;
       }
 
       const defaults = await readModelDefaults(tx, profileId, nowIso(this.clock));

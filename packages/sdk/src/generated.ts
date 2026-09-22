@@ -6357,6 +6357,8 @@ export interface operations {
                         }[];
                         /** @default false */
                         allowSelfManagement: boolean;
+                        /** @default false */
+                        allowShell: boolean;
                         /** Format: uuid */
                         id: string;
                         version: number;
@@ -6580,6 +6582,8 @@ export interface operations {
                         }[];
                         /** @default false */
                         allowSelfManagement: boolean;
+                        /** @default false */
+                        allowShell: boolean;
                         /** Format: uuid */
                         id: string;
                         version: number;
@@ -6797,6 +6801,8 @@ export interface operations {
                     }[];
                     /** @default false */
                     allowSelfManagement?: boolean;
+                    /** @default false */
+                    allowShell?: boolean;
                 };
             };
         };
@@ -6904,6 +6910,8 @@ export interface operations {
                         }[];
                         /** @default false */
                         allowSelfManagement: boolean;
+                        /** @default false */
+                        allowShell: boolean;
                         /** Format: uuid */
                         id: string;
                         version: number;
@@ -7129,6 +7137,8 @@ export interface operations {
                         }[];
                         /** @default false */
                         allowSelfManagement: boolean;
+                        /** @default false */
+                        allowShell: boolean;
                         /** Format: uuid */
                         id: string;
                         version: number;
@@ -7318,6 +7328,7 @@ export interface operations {
                         bearerTokenEnv?: string;
                     }[];
                     allowSelfManagement?: boolean;
+                    allowShell?: boolean;
                     expectedVersion: number;
                 };
             };
@@ -7426,6 +7437,8 @@ export interface operations {
                         }[];
                         /** @default false */
                         allowSelfManagement: boolean;
+                        /** @default false */
+                        allowShell: boolean;
                         /** Format: uuid */
                         id: string;
                         version: number;
@@ -7655,6 +7668,8 @@ export interface operations {
                             }[];
                             /** @default false */
                             allowSelfManagement: boolean;
+                            /** @default false */
+                            allowShell: boolean;
                             /** Format: uuid */
                             id: string;
                             version: number;

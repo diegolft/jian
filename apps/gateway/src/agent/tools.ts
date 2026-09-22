@@ -13,6 +13,7 @@ import type { SessionNamer, SessionReader } from '../sessions/port.js';
 import { builtinSkillNames, findSkill } from '../skills/builtin/index.js';
 import type { Store } from '../storage/database.js';
 import { artifacts, checkpoints } from '../storage/schema.js';
+import { shellTools } from './shell.js';
 
 /** What the tool set reaches for on the profile's behalf during a run. */
 export type ToolServices = {
@@ -253,6 +254,10 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
         coordination.release(run.profileId, { ...input, sessionId: run.sessionId }),
     }),
   };
+
+  if (run.profile.allowShell) {
+    Object.assign(tools, shellTools());
+  }
 
   if (run.profile.allowSelfManagement) {
     tools.update_skills = tool({
