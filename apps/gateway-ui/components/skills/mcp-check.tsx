@@ -1,86 +1,119 @@
 'use client';
 
-import { CheckCircle2, Plug, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Plug, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import type { GatewayApi, McpStatus, Profile } from '../../lib/api';
-import { Button } from '../ui';
 
-/**
- * Runs the connection now and shows what the server answered. The tools are not a setting —
- * they come from the server — so this is also how the owner sees what it actually offers.
- */
-export function McpCheck({
-  profile,
-  name,
-  api,
-}: {
-  profile: Profile;
-  name: string;
-  api: GatewayApi;
-}) {
+/** Collapsed, the list says what the server offers without burying the row under it. */
+const PREVIEW = 12;
+
+export function useMcpCheck(profile: Profile, name: string, api: GatewayApi) {
   const [status, setStatus] = useState<McpStatus>();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [expanded, setExpanded] = useState(false);
 
-  const visible = expanded ? (status?.tools ?? []) : (status?.tools ?? []).slice(0, 12);
+  return {
+    status,
+    error,
+    busy,
+    check: async () => {
+      setBusy(true);
+      setError('');
+
+      try {
+        setStatus(await api.checkMcpServer(profile.id, name));
+      } catch (failure) {
+        setError(failure instanceof Error ? failure.message : 'Não foi possível testar.');
+      } finally {
+        setBusy(false);
+      }
+    },
+  };
+}
+
+/** What the last check answered. Absent until the owner asks, so the row stays a row. */
+export function McpResult({ status, error }: { status?: McpStatus; error: string }) {
+  const [open, setOpen] = useState(false);
+
+  if (error) {
+    return (
+      <p className="form-error mt-2" role="alert">
+        {error}
+      </p>
+    );
+  }
+
+  if (!status) {
+    return null;
+  }
+
+  if (!status.reachable) {
+    return (
+      <p className="mcp-state bad" role="alert">
+        <TriangleAlert size={14} />
+        <span>Não conectou — {status.error}</span>
+      </p>
+    );
+  }
+
+  const shown = open ? status.tools : status.tools.slice(0, PREVIEW);
+  const rest = status.tools.length - shown.length;
 
   return (
-    <div className="mcp-check">
-      <Button
-        variant="secondary"
-        busy={busy}
-        onClick={async () => {
-          setBusy(true);
-          setError('');
-
-          try {
-            setStatus(await api.checkMcpServer(profile.id, name));
-          } catch (failure) {
-            setError(failure instanceof Error ? failure.message : 'Não foi possível testar.');
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <Plug size={15} />
-        Testar conexão
-      </Button>
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
+    <div className="mt-2" role="status">
+      <p className="mcp-state good">
+        <CheckCircle2 size={14} />
+        <span>
+          Conectado — {status.tools.length}{' '}
+          {status.tools.length === 1 ? 'ferramenta' : 'ferramentas'}
+        </span>
+      </p>
+      {status.tools.length > 0 && (
+        <>
+          <div className={`mcp-tools ${open ? 'open' : ''}`}>
+            {shown.map((tool) => (
+              <code key={tool.name} title={tool.description}>
+                {tool.name}
+              </code>
+            ))}
+          </div>
+          {(rest > 0 || open) && (
+            <button
+              type="button"
+              className="text-button mt-2"
+              aria-expanded={open}
+              onClick={() => setOpen(!open)}
+            >
+              <ChevronDown size={14} className={open ? 'rotate-180' : ''} />
+              {open ? 'Ver menos' : `Ver as ${rest} restantes`}
+            </button>
+          )}
+        </>
       )}
-      {status &&
-        (status.reachable ? (
-          <div className="mcp-result good" role="status">
-            <p>
-              <CheckCircle2 size={15} />
-              Conectado — {status.tools.length}{' '}
-              {status.tools.length === 1 ? 'ferramenta' : 'ferramentas'}
-            </p>
-            <div className="tag-list">
-              {visible.map((tool) => (
-                <code key={tool.name} title={tool.description}>
-                  {tool.name}
-                </code>
-              ))}
-            </div>
-            {status.tools.length > visible.length && (
-              <button type="button" className="text-button" onClick={() => setExpanded(true)}>
-                Ver as {status.tools.length - visible.length} restantes
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="mcp-result bad" role="alert">
-            <p>
-              <TriangleAlert size={15} />
-              Não conectou
-            </p>
-            <small>{status.error}</small>
-          </div>
-        ))}
     </div>
+  );
+}
+
+/** The action itself, so it sits with edit and remove instead of inside the description. */
+export function McpCheckButton({
+  name,
+  busy,
+  onCheck,
+}: {
+  name: string;
+  busy: boolean;
+  onCheck: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="icon-button"
+      aria-label={`Testar conexão com ${name}`}
+      title="Testar conexão"
+      disabled={busy}
+      onClick={onCheck}
+    >
+      <Plug size={16} className={busy ? 'spin' : ''} />
+    </button>
   );
 }

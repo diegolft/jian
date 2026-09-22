@@ -30,21 +30,22 @@ export function SkillImport({
         }
       }}
     >
-      <Field
-        label="Importar de um repositório"
-        hint="Endereço no GitHub de uma skill ou de uma pasta de skills. As instruções são copiadas uma vez."
-      >
+      <Field label="Importar de um repositório">
         <input
           value={url}
           onChange={(event) => setUrl(event.target.value)}
           placeholder="https://github.com/dono/repositorio/tree/main/skills/deploy"
           inputMode="url"
+          aria-describedby="skill-import-hint"
         />
       </Field>
       <Button type="submit" busy={busy} disabled={!url.trim()}>
         <Download size={16} />
         Importar
       </Button>
+      <p id="skill-import-hint" className="skill-import-hint">
+        Endereço no GitHub de uma skill ou pasta de skills. As instruções são copiadas uma vez.
+      </p>
     </form>
   );
 }

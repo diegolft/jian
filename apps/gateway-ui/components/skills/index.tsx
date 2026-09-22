@@ -1,13 +1,14 @@
 'use client';
 
-import { BookOpen, Pencil, Plug, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import type { McpServer } from '../../lib/api';
 import type { SectionProps } from '../props';
 import { Button, Confirm, Empty, Field, Modal, SectionHeading } from '../ui';
 import { BuiltinSkills } from './built-in';
 import { SkillCatalog } from './catalog';
 import { SkillImport } from './import';
-import { McpCheck } from './mcp-check';
+import { McpRow } from './mcp-row';
 
 export function Capabilities({
   kind,
@@ -51,42 +52,59 @@ export function Capabilities({
       {isSkill && <h2 className="mb-4 text-2xl">Importadas</h2>}
       {items.length ? (
         <div className="resource-list">
-          {items.map((item, index) => (
-            <article className="resource-row" key={item.name}>
-              <div className="resource-icon">
-                {isSkill ? <BookOpen size={20} /> : <Plug size={20} />}
-              </div>
-              <div className="grow">
-                <h3>{item.name}</h3>
-                <p>{'description' in item ? item.description : item.url}</p>
-                {isSkill && profile.skills[index]?.origin && (
-                  <div className="tag-list">
-                    <a href={profile.skills[index].origin.url} target="_blank" rel="noreferrer">
-                      Importada de {new URL(profile.skills[index].origin.url).pathname.slice(1)}
-                    </a>
-                  </div>
-                )}
-                {!isSkill && <McpCheck profile={profile} name={item.name} api={api} />}
-              </div>
-              <Button
-                variant="quiet"
-                aria-label={`Editar ${item.name}`}
-                onClick={() => {
+          {items.map((item, index) =>
+            isSkill ? (
+              <article className="resource-row items-start" key={item.name}>
+                <div className="resource-icon">
+                  <BookOpen size={20} />
+                </div>
+                <div className="grow">
+                  <h3>{item.name}</h3>
+                  <p>{'description' in item ? item.description : item.url}</p>
+                  {profile.skills[index]?.origin && (
+                    <div className="tag-list">
+                      <a href={profile.skills[index].origin.url} target="_blank" rel="noreferrer">
+                        Importada de {new URL(profile.skills[index].origin.url).pathname.slice(1)}
+                      </a>
+                    </div>
+                  )}
+                </div>
+                <div className="row-actions">
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={`Editar ${item.name}`}
+                    onClick={() => {
+                      setFailed(false);
+                      setEditing(index);
+                    }}
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={`Remover ${item.name}`}
+                    onClick={() => setRemoving(index)}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </article>
+            ) : (
+              <McpRow
+                key={item.name}
+                server={profile.mcpServers[index] as McpServer}
+                profile={profile}
+                api={api}
+                onEdit={() => {
                   setFailed(false);
                   setEditing(index);
                 }}
-              >
-                <Pencil size={16} />
-              </Button>
-              <Button
-                variant="quiet"
-                aria-label={`Remover ${item.name}`}
-                onClick={() => setRemoving(index)}
-              >
-                <Trash2 size={16} />
-              </Button>
-            </article>
-          ))}
+                onRemove={() => setRemoving(index)}
+              />
+            ),
+          )}
         </div>
       ) : isSkill ? (
         <p className="rounded-md bg-surface px-5 py-4 text-sm">

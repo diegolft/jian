@@ -1,18 +1,178 @@
-/* The panel's stylesheet, in cascade order. Each import owns one surface. */
-
-@import "./styles/base.css";
-@import "./styles/brand.css";
+@import "tailwindcss";
+@import "./styles/themes.css";
+@import "./styles/surfaces.css";
+@import "./styles/flight.css";
 @import "./styles/controls.css";
-@import "./styles/shell.css";
-@import "./styles/overview.css";
-@import "./styles/resources.css";
-@import "./styles/channels.css";
-@import "./styles/memories.css";
-@import "./styles/settings.css";
-@import "./styles/forms.css";
-@import "./styles/feedback.css";
-@import "./styles/modal.css";
-@import "./styles/conversations.css";
-@import "./styles/login.css";
-@import "./styles/motion.css";
-@import "./styles/responsive.css";
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  body {
+    @apply m-0 bg-canvas font-sans text-sm leading-relaxed text-ink antialiased;
+  }
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+  button,
+  select,
+  summary {
+    @apply cursor-pointer;
+  }
+  button:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+  a,
+  button,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1 {
+    @apply font-display text-4xl font-semibold leading-tight tracking-tight sm:text-5xl;
+  }
+  h2 {
+    @apply font-display text-2xl font-semibold leading-tight;
+  }
+  h3 {
+    @apply text-sm font-semibold;
+  }
+  p {
+    @apply text-muted;
+  }
+  small {
+    @apply text-xs;
+  }
+  code {
+    @apply break-all font-mono text-xs;
+  }
+  svg {
+    @apply shrink-0;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 0;
+  }
+  ::selection {
+    @apply bg-accent text-white;
+  }
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    @apply w-full border border-control bg-surface/40 px-3.5 py-3 text-sm text-ink transition-colors;
+    border-radius: 3px 10px 3px 3px;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    @apply text-muted;
+  }
+  input:focus,
+  textarea:focus,
+  select:focus {
+    @apply border-accent bg-canvas;
+    outline: none;
+    box-shadow:
+      inset 3px 0 0 var(--accent),
+      0 0 0 1px var(--accent);
+  }
+  textarea {
+    @apply min-h-20 resize-y leading-relaxed;
+  }
+  input[type="checkbox"] {
+    @apply mt-1 h-4 w-4 shrink-0 accent-accent;
+  }
+  fieldset {
+    @apply mb-5 rounded-sm border border-line px-4 py-3;
+  }
+  legend {
+    @apply px-1.5 text-xs text-muted;
+  }
+}
+
+@layer components {
+  .grow {
+    @apply min-w-0 flex-1;
+  }
+  .muted {
+    @apply text-muted;
+  }
+  .small {
+    @apply text-xs;
+  }
+  .button {
+    @apply relative inline-flex min-h-11 shrink-0 items-center justify-center gap-2.5 border border-transparent px-4 py-2.5 text-xs font-medium transition-all;
+    border-radius: 3px 12px 3px 3px;
+  }
+  .button:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  .button.primary {
+    @apply border-accent bg-accent text-white hover:border-accent-hover hover:bg-accent-hover;
+    box-shadow: inset 0 -2px 0 #0000001a;
+  }
+  .button.secondary {
+    @apply border-line bg-surface text-ink hover:border-accent hover:bg-accent-soft;
+  }
+  .button.quiet {
+    @apply bg-transparent px-2.5 text-muted hover:bg-accent-soft hover:text-accent;
+    border-radius: 4px;
+  }
+  .button.danger {
+    @apply bg-bad text-white hover:brightness-90;
+  }
+  .icon-button {
+    @apply inline-flex min-h-10 min-w-10 items-center justify-center rounded-sm text-muted hover:bg-accent-soft hover:text-accent;
+  }
+  .icon-button:disabled {
+    @apply cursor-default opacity-50 hover:bg-transparent hover:text-muted;
+  }
+  .text-button {
+    @apply inline-flex items-center gap-2 py-1 text-xs font-medium text-accent hover:underline;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm bg-surface px-2 py-1 text-[11px] font-medium text-muted;
+  }
+  .badge-dot {
+    @apply h-1.5 w-1.5 rounded-full bg-current;
+  }
+  .badge.good {
+    @apply bg-good-soft text-good;
+  }
+  .badge.warn {
+    @apply bg-warn-soft text-warn;
+  }
+  .badge.bad {
+    @apply bg-bad-soft text-bad;
+  }
+  .section-heading {
+    @apply mb-8 flex flex-wrap items-start justify-between gap-5;
+  }
+  .section-heading p {
+    @apply mt-2 max-w-2xl text-sm;
+  }
+  .section-row {
+    @apply mb-4 flex flex-wrap items-center justify-between gap-3;
+  }
+  .subsection {
+    @apply mt-8;
+  }
+  .subsection > h2 {
+    @apply mb-4;
+  }
+  .tag-list {
+    @apply mt-3 flex flex-wrap gap-1.5;
+  }
+  .tag-list > * {
+    @apply rounded-sm border border-line bg-surface px-2 py-0.5 text-xs text-muted;
+  }
+  .boot {
+    @apply grid min-h-dvh place-items-center text-accent;
+  }
+  .skip-link {
+    @apply fixed -top-24 left-4 z-50 bg-accent px-5 py-3 text-white focus:top-4;
+  }
+}
