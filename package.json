@@ -34,7 +34,7 @@
   },
   "lint-staged": {
     "*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,json,jsonc}": "biome check --write --no-errors-on-unmatched --error-on-warnings",
-    "packages/contracts/src/**/*.ts": "sh -c 'pnpm contracts:generate && git add packages/contracts/openapi.json packages/sdk/src/generated.ts'",
+    "packages/contracts/src/**/*.ts": "sh -c 'pnpm contracts:generate'",
     "apps/apple/**/*.swift": "sh -c 'make apple-lint'"
   },
   "packageManager": "pnpm@11.9.0",
