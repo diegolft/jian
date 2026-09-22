@@ -1,6 +1,10 @@
 import { modelSchema } from '@jian/contracts';
 import { generateText } from 'ai';
 import { describe, expect, it } from 'vitest';
+import {
+  CLAUDE_CODE_IDENTITY,
+  withClaudeCodeIdentity,
+} from '../src/providers/claude-subscription.js';
 import { resolveModel } from '../src/providers/models.js';
 
 describe('providers', () => {
@@ -99,4 +103,38 @@ it('presents a Claude subscription token as Claude Code, and a key as a key', as
 
   expect(headers.get('x-api-key')).toBe('sk-ant-api03-synthetic');
   expect(headers.has('authorization')).toBe(false);
+});
+
+it('sends the Claude Code identity as a system block of its own', async () => {
+  let sent: { system?: unknown } = {};
+  const fetcher: typeof fetch = async (_input, init) => {
+    sent = JSON.parse(String(init?.body)) as { system?: unknown };
+
+    return Response.json(
+      { type: 'error', error: { type: 'invalid_request_error', message: 'synthetic' } },
+      { status: 400 },
+    );
+  };
+
+  const model = await resolveModel(
+    { provider: 'anthropic', modelId: 'test', apiKeyEnv: 'ANTHROPIC_API_TOKEN' },
+    { ANTHROPIC_API_TOKEN: 'sk-ant-oat01-synthetic' },
+    fetcher,
+  );
+
+  await expect(
+    generateText({
+      model,
+      system: withClaudeCodeIdentity('Você é Zero Two.'),
+      prompt: 'Oi',
+      maxRetries: 0,
+    }),
+  ).rejects.toThrow();
+
+  // Measured against the real account: the identity appended to the profile's own block is
+  // refused, and the same text split in two is accepted.
+  expect(sent.system).toEqual([
+    { type: 'text', text: CLAUDE_CODE_IDENTITY },
+    { type: 'text', text: 'Você é Zero Two.' },
+  ]);
 });

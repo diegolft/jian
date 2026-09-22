@@ -40,9 +40,16 @@ async function claudeCodeVersion(): Promise<string> {
 export const subscriptionHeaders = (): Record<string, string> => ({ 'anthropic-beta': BETAS });
 
 /**
- * The client identity has to be set on the request itself: the model SDK writes its own
- * user-agent over anything the provider was configured with, and Anthropic reads that header
- * to decide whether a subscription request came from Claude Code.
+ * Two things Anthropic checks that neither the provider options nor the prompt can express,
+ * so they are applied to the request itself:
+ *
+ * The model SDK writes its own user-agent over whatever the provider was configured with, and
+ * Anthropic reads that header to decide the caller is Claude Code.
+ *
+ * And the first system block has to be the identity line *alone*. Measured: identity by itself
+ * answers 200, the same text with the profile's instructions appended to that one block
+ * answers 429, and identity plus instructions as two blocks answers 200. The SDK sends one
+ * block, so the split happens here.
  */
 export async function subscriptionFetch(
   fetcher: typeof globalThis.fetch,
@@ -54,8 +61,41 @@ export async function subscriptionFetch(
 
     headers.set('user-agent', agent);
 
-    return fetcher(input, { ...init, headers });
+    return fetcher(input, { ...init, headers, body: splitSystem(init?.body) });
   };
+}
+
+function splitSystem(body: BodyInit | null | undefined): BodyInit | null | undefined {
+  if (typeof body !== 'string') {
+    return body;
+  }
+
+  try {
+    const payload = JSON.parse(body) as { system?: unknown };
+    const system = payload.system;
+    const text =
+      typeof system === 'string'
+        ? system
+        : Array.isArray(system) && system.length === 1
+          ? ((system[0] as { text?: unknown }).text as string | undefined)
+          : undefined;
+
+    if (typeof text !== 'string' || !text.startsWith(CLAUDE_CODE_IDENTITY)) {
+      return body;
+    }
+
+    const rest = text.slice(CLAUDE_CODE_IDENTITY.length).trim();
+
+    return JSON.stringify({
+      ...payload,
+      system: [
+        { type: 'text', text: CLAUDE_CODE_IDENTITY },
+        ...(rest ? [{ type: 'text', text: rest }] : []),
+      ],
+    });
+  } catch {
+    return body;
+  }
 }
 
 /**
