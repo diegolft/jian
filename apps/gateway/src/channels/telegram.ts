@@ -1,8 +1,6 @@
 import { telegramUpdateSchema } from '@jian/contracts';
-import { GatewayError } from '../core/errors.js';
 import type {
   Channel,
-  ChannelConfiguration,
   DeliveryContext,
   DeliveryOutcome,
   IncomingMessage,
@@ -16,12 +14,6 @@ export class TelegramChannel implements Channel {
   readonly type = 'telegram';
   readonly webhookHeader = 'x-telegram-bot-api-secret-token';
 
-  validateConfiguration(configuration: ChannelConfiguration): void {
-    if (!configuration.token) {
-      throw new GatewayError(400, 'Telegram requires the bot token');
-    }
-  }
-
   receive(payload: unknown): IncomingMessage | null {
     const update = telegramUpdateSchema.parse(payload);
 
@@ -29,11 +21,14 @@ export class TelegramChannel implements Channel {
       return null;
     }
 
+    const name = update.message.from.first_name ?? update.message.from.username;
+
     return {
       actorId: String(update.message.from.id),
       chatId: String(update.message.chat.id),
       text: update.message.text,
       requestKey: String(update.update_id),
+      ...(name ? { displayName: name } : {}),
     };
   }
 

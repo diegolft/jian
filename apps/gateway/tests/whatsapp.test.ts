@@ -50,17 +50,7 @@ async function setup(send?: (chatId: string, text: string) => Promise<string>) {
     instructions: 'Help.',
     model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
   });
-  const session = await services.sessions.createSession(profile.id, {
-    title: 'WhatsApp',
-    channel: 'whatsapp',
-  });
-  const binding = await channels.create(profile.id, {
-    name: 'Phone',
-    type: 'whatsapp',
-    sessionId: session.id,
-    actorIds: [actorId],
-    chatIds: [actorId],
-  });
+  const binding = await channels.connect(profile.id, { type: 'whatsapp' });
   const app = createApp({ ...services, channels, whatsapp, token, logger: false });
   const base = `/v1/profiles/${profile.id}/channels/${binding.id}`;
 
@@ -77,6 +67,13 @@ async function setup(send?: (chatId: string, text: string) => Promise<string>) {
     app,
     base,
     connection,
+    approve: async (sender = actorId) => {
+      const contact = (await channels.contacts(profile.id)).find((item) => item.actorId === sender);
+
+      if (!contact) throw new Error('Contact request missing');
+
+      return channels.approveContact(profile.id, contact.id);
+    },
     advance: (ms: number) => {
       now += ms;
     },
@@ -172,8 +169,9 @@ describe('WhatsApp linked device', () => {
     }
   });
 
-  it('queues authorized messages during a busy run, deduplicates input and sends each result once', async () => {
+  it('turns an approved contact into its own session and sends each result once', async () => {
     const f = await setup();
+    const stranger = '5511000000000@c.us';
 
     try {
       await f.whatsapp.connect(f.profile.id, f.binding.id);
@@ -181,16 +179,29 @@ describe('WhatsApp linked device', () => {
       const callbacks = f.devices[0]?.callbacks;
       if (!callbacks) throw new Error('Device missing');
       await callbacks.ready('5511888888888@c.us');
-      await callbacks.message({ ...message, actorId: 'stranger@c.us' });
+      await callbacks.message({
+        ...message,
+        actorId: stranger,
+        chatId: stranger,
+        requestKey: 'wa-stranger',
+      });
       await callbacks.message(message);
       await callbacks.message(message);
       await callbacks.message({ ...message, text: 'Next', requestKey: 'wa-message-two' });
       await f.whatsapp.tick(f.receive);
 
+      // Nobody is known yet: two senders, two requests, and no session or run in the profile.
+      expect(await f.channels.contacts(f.profile.id)).toHaveLength(2);
+      expect(await f.services.sessions.sessions(f.profile.id)).toEqual([]);
+      expect(await f.services.runs.activities(f.profile.id)).toEqual([]);
+
+      const contact = await f.approve();
       const [first] = await f.services.runs.activities(f.profile.id);
       if (!first) throw new Error('Run missing');
-      expect(first.input).toBe('Hello');
-      expect(await f.store.list('channelInbox', { where: { status: 'pending' } })).toHaveLength(1);
+      expect(first.sessionId).toBe(contact.sessionId);
+      expect(first.input).toBe('Hello\n\nNext');
+      expect((await f.services.sessions.sessions(f.profile.id))[0]?.title).toContain(actorId);
+
       await f.services.lifecycle.claim(first.id, f.profile.id, 'worker');
       await f.services.lifecycle.finish(
         f.profile.id,
@@ -200,16 +211,23 @@ describe('WhatsApp linked device', () => {
         'First answer',
       );
       await Promise.all([f.channels.dispatch(), f.channels.dispatch()]);
-      expect(f.sent).toEqual([{ chatId: actorId, text: 'First answer' }]);
-      expect((await f.channels.deliveries(f.profile.id))[0]?.remoteMessageIds).toEqual([
-        'wa-sent-1',
-      ]);
 
+      expect(f.sent.filter((item) => item.text === 'First answer')).toEqual([
+        { chatId: actorId, text: 'First answer' },
+      ]);
+      expect(f.sent.filter((item) => item.chatId === stranger)).toHaveLength(1);
+      expect(
+        (await f.channels.deliveries(f.profile.id)).find((item) => item.runId === first.id)
+          ?.remoteMessageIds,
+      ).toHaveLength(1);
+
+      await callbacks.message({ ...message, text: 'Later', requestKey: 'wa-message-three' });
       await f.whatsapp.tick(f.receive);
-      expect((await f.services.runs.activities(f.profile.id))[0]?.input).toBe('Next');
       expect(await f.store.list('channelInbox', { where: { status: 'pending' } })).toHaveLength(0);
       const [second] = await f.services.runs.activities(f.profile.id);
       if (!second) throw new Error('Second run missing');
+      expect(second.input).toBe('Later');
+
       await f.whatsapp.disconnect(f.profile.id, f.binding.id);
       await f.whatsapp.connect(f.profile.id, f.binding.id);
       await f.whatsapp.tick(f.receive);
@@ -223,7 +241,7 @@ describe('WhatsApp linked device', () => {
         'Old account reply',
       );
       await f.channels.dispatch();
-      expect(f.sent).toHaveLength(1);
+      expect(f.sent.some((item) => item.text === 'Old account reply')).toBe(false);
       expect(
         (await f.channels.deliveries(f.profile.id)).find((item) => item.runId === second.id)
           ?.status,
@@ -281,6 +299,7 @@ describe('WhatsApp linked device', () => {
       await f.devices[0]?.callbacks.ready('account');
       await f.devices[0]?.callbacks.message(message);
       await f.whatsapp.tick(f.receive);
+      await f.approve();
       const [run] = await f.services.runs.activities(f.profile.id);
       if (!run) throw new Error('Run missing');
       await f.services.lifecycle.claim(run.id, f.profile.id, 'worker');
@@ -288,8 +307,10 @@ describe('WhatsApp linked device', () => {
       await f.channels.dispatch();
       await f.channels.dispatch();
 
-      expect(f.sent).toHaveLength(1);
-      expect((await f.channels.deliveries(f.profile.id))[0]?.status).toBe('unknown');
+      expect(f.sent.filter((item) => item.text === 'Answer')).toHaveLength(1);
+      expect(
+        (await f.channels.deliveries(f.profile.id)).find((item) => item.runId === run.id)?.status,
+      ).toBe('unknown');
     } finally {
       await f.whatsapp.stop();
       await f.app.close();

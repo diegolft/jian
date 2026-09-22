@@ -19,13 +19,13 @@ A aplicação usa uma página estática, com navegação por fragmentos (`/ui/#c
 
    Os papéis são: conversas, canais, compactação de contexto, geração de imagem, geração de áudio, fala a partir de texto e texto a partir de fala. Só conversas e canais têm runtime hoje — os outros cinco são salvos, validados e **não executados**, e o painel diz isso em cada um. Quando o provider não responde, o painel mostra a última lista lida com aviso; a configuração salva não muda. O login ChatGPT não publica lista de modelos: use **Informar ID…** para digitar o ID.
 5. Adicione Skills e servidores MCP, com ferramentas explicitamente permitidas. Crie uma conversa, escolha um modelo e um esforço no Composer se quiser substituir o padrão, e teste uma mensagem. O worker precisa estar em execução para processar a fila.
-6. Em **Canais**, vincule uma sessão e informe as listas de remetentes e conversas autorizados.
+6. Em **Canais**, conecte WhatsApp, Telegram ou API Server. Cada tipo existe uma vez e aparece como conectado ou não, como em Providers.
 
 O login ChatGPT usa o backend Codex com o mesmo ciclo de contexto, ferramentas e registro de uso do Jian. Tokens OAuth ficam criptografados no cofre e são renovados pelo gateway. Não cole tokens de login no campo de chave de API. Perfis antigos com `model` e `contextPolicy` continuam legíveis e funcionais.
 
-Para WhatsApp, abra **Conexão**, gere o QR Code e leia-o no celular em **Dispositivos conectados**. O painel acompanha a conexão e a primeira cópia criptografada da sessão. O QR expira e não é gravado no navegador.
+Conectar o WhatsApp é ler o QR Code: o painel abre o pareamento na hora e acompanha a conexão e a primeira cópia criptografada da sessão. O QR expira sem ser gravado no navegador. Conectar o Telegram é informar o token do BotFather, que o Gateway guarda criptografado; o painel mostra a URL e o segredo do webhook uma única vez, e o `setWebhook` continua sendo uma etapa externa. Conectar o API Server gera essa mesma URL e token. Nada além disso é pedido — nem nome, nem sessão, nem lista de remetentes.
 
-Para Telegram, informe o token do BotFather junto do canal. Depois da criação, o painel mostra a URL e o segredo do webhook uma única vez. O registro de `setWebhook` no Telegram continua sendo uma etapa externa; consulte [canais](channels.md). O webhook HTTP genérico recebe mensagens, mas não envia respostas a um serviço externo.
+Quem escreve pela primeira vez aparece em **Solicitações de contato**, com o nome, o identificador e a mensagem que ficou esperando. Aprovar cria a conversa e libera essa mensagem; recusar bloqueia o remetente em silêncio. A solicitação chega sozinha: o painel acompanha o fluxo de eventos do perfil e se atualiza quando um contato ou um canal muda, sem recarregar a página. Consulte [canais](channels.md) para as garantias do lado do Gateway.
 
 Segredo não tem tela própria: a chave do provider é digitada em **Providers**, o token de um servidor MCP junto do servidor e o token do bot junto do canal. O cofre continua cifrando por perfil, sem aparecer no painel, e nenhum valor é exibido de novo — para trocar, envie outro; para remover, remova a coisa que o usa.
 
@@ -41,7 +41,8 @@ Segredo não tem tela própria: a chave do provider é digitada em **Providers**
 - A política CSP aceita scripts do próprio Gateway e hashes exatos dos scripts de hidratação do export. Enquadramento em iframe, plugins e alteração da URL-base são bloqueados.
 - Inputs são renderizados como texto; o histórico e as instruções não executam HTML.
 - Mudanças de perfil usam `expectedVersion`; submissões de mensagem conservam a chave de idempotência quando a resposta HTTP é incerta.
-- Listagens seguem os limites atuais da API: até 100 sessões, mensagens recentes, memórias e entregas. O painel não substitui a API de histórico paginado.
+- Listagens seguem os limites atuais da API: até 100 sessões, mensagens recentes, memórias e entregas, e até 200 contatos. O painel não substitui a API de histórico paginado.
+- O fluxo de eventos usa o mesmo cookie de sessão e o mesmo cabeçalho das demais chamadas, lido por `fetch` porque `EventSource` não envia cabeçalhos. O Gateway reconfere a sessão a cada ciclo e encerra o fluxo quando ela expira; o painel reabre a partir do último evento recebido.
 
 Infraestrutura permanece na configuração do servidor: PostgreSQL, keyring de criptografia, token administrativo, papel API/worker, HTTPS e regras de rede. A UI não transforma esta instalação de dono único em um SaaS multiusuário.
 

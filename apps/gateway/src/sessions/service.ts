@@ -3,7 +3,7 @@ import { type Session, sessionSchema } from '@jian/contracts';
 import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
-import type { Reader, Store } from '../core/store.js';
+import type { Reader, Store, Transaction } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
 
 export class Sessions {
@@ -13,10 +13,11 @@ export class Sessions {
     private readonly clock: Clock = Date.now,
   ) {}
 
-  async createSession(profileId: string, input: unknown) {
+  /** A caller already inside a profile transaction passes it in: this store never nests locks. */
+  async createSession(profileId: string, input: unknown, transaction?: Transaction) {
     const data = sessionSchema.parse(input);
 
-    return this.store.transaction(profileId, async (tx) => {
+    const write = async (tx: Transaction) => {
       await this.profiles.profile(profileId, tx);
 
       const session: Session = {
@@ -30,7 +31,9 @@ export class Sessions {
       await recordEvent(tx, this.clock, profileId, 'session.created', session);
 
       return session;
-    });
+    };
+
+    return transaction ? write(transaction) : this.store.transaction(profileId, write);
   }
 
   async session(profileId: string, sessionId: string, reader: Reader = this.store) {

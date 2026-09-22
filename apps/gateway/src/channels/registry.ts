@@ -1,12 +1,12 @@
 import { GatewayError } from '../core/errors.js';
+import { ApiChannel } from './api.js';
 import type { Channel, ChannelType } from './channel.js';
-import { GenericChannel } from './generic.js';
 import { TelegramChannel } from './telegram.js';
 
 export class ChannelRegistry {
   private readonly adapters = new Map<ChannelType, Channel>();
 
-  constructor(channels: readonly Channel[] = [new GenericChannel(), new TelegramChannel()]) {
+  constructor(channels: readonly Channel[] = [new ApiChannel(), new TelegramChannel()]) {
     for (const channel of channels) {
       if (this.adapters.has(channel.type)) {
         throw new Error(`Duplicate channel adapter: ${channel.type}`);

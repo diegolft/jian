@@ -2,13 +2,14 @@ import { createHash, randomUUID } from 'node:crypto';
 import { channelInputSchema, type channelSchema, type deliverySchema } from '@jian/contracts';
 import type { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
-import type { Store } from '../core/store.js';
+import type { Reader, Store, Transaction } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
 import type { RunWriter } from '../runs/port.js';
 import { issueToken, verifyToken } from '../security/tokens.js';
 import type { Vault } from '../security/vault.js';
 import type { SessionWriter } from '../sessions/port.js';
-import type { ChannelRequest, DeliveryOutcome, IncomingMessage } from './channel.js';
+import type { ChannelRequest, ChannelType, DeliveryOutcome, IncomingMessage } from './channel.js';
+import { type ContactRecord, Contacts } from './contacts.js';
 import { ChannelRegistry } from './registry.js';
 
 export type ChannelRecord = z.infer<typeof channelSchema> & { tokenHash: string };
@@ -20,6 +21,10 @@ export type DeliveryRecord = z.infer<typeof deliverySchema> & { connectionGenera
 
 const DISPATCH_INTERVAL_MS = 2000;
 const UNCERTAIN_DELIVERY_AFTER_MS = 10 * 60_000;
+
+/** Sent once to a sender the owner has not decided on yet. It must never depend on a run. */
+const APPROVAL_NOTICE =
+  'This gateway does not know you yet. Its owner was asked to approve this conversation, and your message is waiting for that decision.';
 
 /** Owns access checks and durable delivery state, independently of each protocol adapter. */
 type ChannelServices = {
@@ -40,6 +45,7 @@ export class Channels {
     private readonly services: ChannelServices,
     private readonly fetcher: typeof fetch,
     private readonly registry = new ChannelRegistry(),
+    private readonly people = new Contacts(services),
   ) {}
 
   start() {
@@ -67,61 +73,83 @@ export class Channels {
     await this.pending;
   }
 
-  async create(profileId: string, input: unknown) {
-    const { token, ...data } = channelInputSchema.parse(input);
+  private metadata({ tokenHash: _hash, ...channel }: ChannelRecord) {
+    return channel;
+  }
 
-    await this.services.sessions.session(profileId, data.sessionId);
+  private async active(profileId: string, type: ChannelType, reader: Reader = this.services.store) {
+    const channels = await reader.list('channel', { profileId, where: { type }, limit: 100 });
 
-    const adapter = this.registry.get(data.type);
+    return channels.find((channel) => !channel.revokedAt);
+  }
 
-    adapter.validateConfiguration?.({ ...data, token });
+  /** One channel of each type per profile: connecting is the whole configuration. */
+  async connect(profileId: string, input: unknown) {
+    const { botToken, ...data } = channelInputSchema.parse(input);
+
+    await this.services.profiles.profile(profileId);
+    this.registry.get(data.type);
+
+    if (await this.active(profileId, data.type)) {
+      throw new GatewayError(409, 'This channel type is already connected');
+    }
 
     const issued = issueToken();
 
     const record: ChannelRecord = {
-      ...data,
       id: randomUUID(),
       profileId,
+      type: data.type,
       tokenHash: issued.hash,
       createdAt: new Date().toISOString(),
     };
 
     await this.services.store.transaction(profileId, async (tx) => {
-      if (token) {
-        await this.services.vault.put(profileId, channelSecret(record.id), token, tx);
+      if (await this.active(profileId, data.type, tx)) {
+        throw new GatewayError(409, 'This channel type is already connected');
+      }
+
+      // The vault owns the bot token, addressed by this channel; revoking it takes the token.
+      if (botToken) {
+        await this.services.vault.put(profileId, channelSecret(record.id), botToken, tx);
       }
 
       await tx.put('channel', record.id, profileId, record);
 
       await tx.event({
         profileId,
-        type: 'channel.created',
+        type: 'channel.connected',
         data: { id: record.id, type: record.type },
         createdAt: record.createdAt,
       });
     });
 
-    const { tokenHash: _hash, ...metadata } = record;
-
-    return { ...metadata, webhookToken: issued.token };
+    return { ...this.metadata(record), webhookToken: issued.token };
   }
 
   async list(profileId: string) {
     await this.services.profiles.profile(profileId);
 
-    return (await this.services.store.list('channel', { profileId })).map(
-      ({ tokenHash: _hash, ...metadata }) => metadata,
+    return (await this.services.store.list('channel', { profileId })).map((channel) =>
+      this.metadata(channel),
     );
   }
 
   async revoke(profileId: string, id: string) {
-    return this.services.store.transaction(profileId, async (tx) => {
+    const record = await this.services.store.transaction(profileId, async (tx) => {
       const value = await tx.get('channel', id);
       const channel = assertFound(value?.profileId === profileId ? value : null, 'Channel');
       const record = { ...channel, revokedAt: new Date().toISOString() };
 
       await tx.put('channel', id, profileId, record);
       await this.services.vault.discard(profileId, channelSecret(id), tx);
+
+      await tx.event({
+        profileId,
+        type: 'channel.disconnected',
+        data: { id: record.id, type: record.type },
+        createdAt: record.revokedAt,
+      });
 
       const connection = await tx.get('channelConnection', id);
 
@@ -138,10 +166,40 @@ export class Channels {
         await tx.put('channelAuth', id, profileId, { id, profileId, chunks: [] });
       }
 
-      const { tokenHash: _hash, ...metadata } = record;
-
-      return metadata;
+      return record;
     });
+
+    return this.metadata(record);
+  }
+
+  contacts(profileId: string) {
+    return this.people.list(profileId);
+  }
+
+  /**
+   * Approval is what creates the conversation: the session appears here, and the message that
+   * was waiting reaches the agent exactly once, because its text is dropped after it is used.
+   */
+  async approveContact(profileId: string, contactId: string) {
+    const contact = await this.people.approve(profileId, contactId);
+
+    if (!contact.message || !contact.sessionId) {
+      return this.people.view(contact);
+    }
+
+    const channel = await this.services.store.get('channel', contact.channelId);
+
+    if (!channel || channel.revokedAt) {
+      throw new GatewayError(409, 'The channel of this contact is disconnected');
+    }
+
+    await this.submit(channel, contact, contact.message, contact.requestKey ?? contact.id);
+
+    return this.people.release(profileId, contactId);
+  }
+
+  blockContact(profileId: string, contactId: string) {
+    return this.people.block(profileId, contactId);
   }
 
   async receive(id: string, request: ChannelRequest) {
@@ -170,7 +228,7 @@ export class Channels {
     const data = adapter.receive(request.payload);
 
     if (!data) {
-      return { accepted: false, runId: undefined };
+      return { accepted: false };
     }
 
     return this.accept(channel, data);
@@ -195,7 +253,7 @@ export class Channels {
     const data = adapter.receive(input);
 
     if (!data) {
-      return { accepted: false, runId: undefined };
+      return { accepted: false };
     }
 
     return this.accept(channel, data, generation);
@@ -206,28 +264,55 @@ export class Channels {
     data: IncomingMessage,
     connectionGeneration?: number,
   ) {
-    const id = channel.id;
-    const adapter = this.registry.get(channel.type);
+    const intake = await this.services.store.transaction(channel.profileId, async (tx) => {
+      const outcome = await this.people.intake(tx, channel, data);
 
-    if (!channel.actorIds.includes(data.actorId) || !channel.chatIds.includes(data.chatId)) {
-      throw new GatewayError(403, 'Channel actor or chat is not permitted');
+      if (outcome.status === 'pending' && outcome.announce) {
+        await this.notify(tx, channel, data.chatId, connectionGeneration);
+      }
+
+      return outcome;
+    });
+
+    if (intake.status !== 'approved') {
+      return { accepted: false, contact: intake.status };
     }
 
-    // The binding, not the inbound payload, chooses the profile and session.
+    const run = await this.submit(
+      channel,
+      intake.contact,
+      data.text,
+      data.requestKey,
+      connectionGeneration,
+    );
+
+    return { accepted: true, runId: run.id, contact: 'approved' as const };
+  }
+
+  /** The binding, not the inbound payload, chooses the profile and session. */
+  private async submit(
+    channel: ChannelRecord,
+    contact: ContactRecord,
+    text: string,
+    requestKey: string,
+    connectionGeneration?: number,
+  ) {
+    const sessionId = assertFound(contact.sessionId ?? null, 'Session');
+
     const run = await this.services.runs.submit(
       channel.profileId,
-      channel.sessionId,
+      sessionId,
       {
-        text: data.text,
+        text,
         requestKey: createHash('sha256')
-          .update(JSON.stringify([id, data.chatId, data.actorId, data.requestKey]))
+          .update(JSON.stringify([channel.id, contact.chatId, contact.actorId, requestKey]))
           .digest('hex'),
       },
       undefined,
       'channel',
     );
 
-    if (adapter.send) {
+    if (this.registry.get(channel.type).send) {
       await this.services.store.transaction(channel.profileId, async (tx) => {
         if (await tx.get('delivery', run.id)) {
           return;
@@ -239,8 +324,8 @@ export class Channels {
           id: run.id,
           runId: run.id,
           profileId: channel.profileId,
-          channelId: id,
-          chatId: data.chatId,
+          channelId: channel.id,
+          chatId: contact.chatId,
           status: 'pending',
           createdAt: now,
           updatedAt: now,
@@ -250,7 +335,34 @@ export class Channels {
       });
     }
 
-    return { accepted: true, runId: run.id };
+    return run;
+  }
+
+  private async notify(
+    tx: Transaction,
+    channel: ChannelRecord,
+    chatId: string,
+    connectionGeneration?: number,
+  ) {
+    if (!this.registry.get(channel.type).send) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const id = randomUUID();
+
+    await tx.put('delivery', id, channel.profileId, {
+      id,
+      profileId: channel.profileId,
+      channelId: channel.id,
+      chatId,
+      notice: APPROVAL_NOTICE,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now,
+      remoteMessageIds: [],
+      connectionGeneration,
+    });
   }
 
   async deliveries(profileId: string) {
@@ -272,10 +384,17 @@ export class Channels {
         return;
       }
 
-      const run = await this.services.runs.run(delivery.profileId, delivery.runId);
+      let text = delivery.notice ?? '';
 
-      if (run.status === 'queued' || run.status === 'running') {
-        continue;
+      if (delivery.runId) {
+        const run = await this.services.runs.run(delivery.profileId, delivery.runId);
+
+        if (run.status === 'queued' || run.status === 'running') {
+          continue;
+        }
+
+        text =
+          run.output ?? 'The agent could not complete this request. Check the gateway for details.';
       }
 
       const channel = await this.services.store.get('channel', delivery.channelId);
@@ -301,8 +420,6 @@ export class Channels {
         continue;
       }
 
-      const text =
-        run.output ?? 'The agent could not complete this request. Check the gateway for details.';
       const outcome = await this.deliver(delivery, text);
 
       await this.services.store.transaction(delivery.profileId, async (tx) => {
@@ -361,7 +478,7 @@ export class Channels {
         channelSecret(channel.id),
       );
 
-      if (!adapter.send) {
+      if (!adapter.send || !text) {
         throw new Error('Channel does not support delivery');
       }
 

@@ -140,23 +140,15 @@ describe('public API contracts', () => {
     }
   });
 
-  it('validates ingress using only its binding token and rejects unapproved actors', async () => {
+  it('validates ingress with its binding token and holds an unknown sender for approval', async () => {
     const { app, services, profile } = await setup();
 
     try {
-      const session = await services.sessions.createSession(profile.id, { title: 'External' });
-
       const created = await app.inject({
         method: 'POST',
         url: `/v1/profiles/${profile.id}/channels`,
         headers: admin,
-        payload: {
-          name: 'API',
-          type: 'generic',
-          sessionId: session.id,
-          actorIds: ['owner'],
-          chatIds: ['chat'],
-        },
+        payload: { type: 'api' },
       });
 
       expect(created.statusCode).toBe(201);
@@ -170,25 +162,40 @@ describe('public API contracts', () => {
       );
 
       const headers = { 'x-jian-channel-token': binding.webhookToken };
+      const held = await app.inject({ method: 'POST', url, headers, payload });
 
-      expect(
-        (
-          await app.inject({
-            method: 'POST',
-            url,
-            headers,
-            payload: { ...payload, actorId: 'stranger' },
-          })
-        ).statusCode,
-      ).toBe(403);
+      expect(held.statusCode).toBe(202);
+      expect(held.json()).toEqual({ accepted: false, contact: 'pending' });
+      expect(await services.sessions.sessions(profile.id)).toEqual([]);
 
-      const first = await app.inject({ method: 'POST', url, headers, payload });
+      const contacts = await app.inject({
+        url: `/v1/profiles/${profile.id}/contacts`,
+        headers: admin,
+      });
 
-      expect(first.statusCode).toBe(202);
+      expect(contacts.statusCode).toBe(200);
+      expect(contacts.json()).toHaveLength(1);
 
-      expect((await app.inject({ method: 'POST', url, headers, payload })).json()).toEqual(
-        first.json(),
-      );
+      const approved = await app.inject({
+        method: 'POST',
+        url: `/v1/profiles/${profile.id}/contacts/${contacts.json()[0].id}/approve`,
+        headers: admin,
+      });
+
+      expect(approved.statusCode).toBe(200);
+      expect(approved.json().status).toBe('approved');
+
+      const runs = await services.runs.activities(profile.id);
+
+      expect(runs).toHaveLength(1);
+      expect(runs[0]?.input).toBe('hi');
+
+      // The caller may redeliver what the owner already approved; it reaches the same run.
+      const again = await app.inject({ method: 'POST', url, headers, payload });
+
+      expect(again.statusCode).toBe(202);
+      expect(again.json()).toEqual({ accepted: true, runId: runs[0]?.id, contact: 'approved' });
+      expect(await services.runs.activities(profile.id)).toHaveLength(1);
 
       const deliveries = await app.inject({
         method: 'GET',
@@ -196,6 +203,7 @@ describe('public API contracts', () => {
         headers: admin,
       });
 
+      // An ingress-only channel cannot answer, so it never records a delivery it did not make.
       expect(deliveries.statusCode).toBe(200);
       expect(deliveries.json()).toEqual([]);
 

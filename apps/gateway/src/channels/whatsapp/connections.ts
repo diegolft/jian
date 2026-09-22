@@ -220,14 +220,8 @@ export class WhatsAppConnections {
   private async enqueue(record: ConnectionRecord, message: IncomingMessage) {
     await this.store.transaction(record.profileId, async (tx) => {
       await this.owned(tx, record);
-      const channel = assertFound(await tx.get('channel', record.id), 'Channel');
-
-      if (
-        !channel.actorIds.includes(message.actorId) ||
-        !channel.chatIds.includes(message.chatId)
-      ) {
-        return;
-      }
+      // Who may be answered is decided by contact approval, after the message is durable.
+      assertFound(await tx.get('channel', record.id), 'Channel');
 
       const id = createHash('sha256')
         .update(JSON.stringify([record.id, message.requestKey]))

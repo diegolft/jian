@@ -1,8 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import type { ChannelRequest } from '../src/channels/channel.js';
 import { Channels } from '../src/channels/service.js';
 import { testServices } from './helpers/services.js';
+
+const token = 'synthetic-telegram-admin-token-32-chars';
+const admin = { authorization: `Bearer ${token}` };
 
 async function setup(fetcher: typeof fetch) {
   const services = testServices();
@@ -13,72 +17,247 @@ async function setup(fetcher: typeof fetch) {
     model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
   });
 
-  const session = await services.sessions.createSession(profile.id, { title: 'Telegram' });
-
   const channels = new Channels(services, fetcher);
 
-  const binding = await channels.create(profile.id, {
-    name: 'Telegram',
+  const channel = await channels.connect(profile.id, {
     type: 'telegram',
-    sessionId: session.id,
-    token: '123:synthetic-test-token',
-    actorIds: ['42'],
-    chatIds: ['99'],
+    botToken: '123:synthetic-test-token',
   });
 
-  return { services, channels, binding, profile };
+  const app = createApp({ ...services, channels, token, logger: false });
+
+  return {
+    services,
+    channels,
+    channel,
+    profile,
+    app,
+    url: `/v1/telegram/${channel.id}`,
+    headers: { 'x-telegram-bot-api-secret-token': channel.webhookToken },
+  };
 }
 
-const update = { update_id: 123, message: { from: { id: 42 }, chat: { id: 99 }, text: 'Hello' } };
+const update = {
+  update_id: 123,
+  message: { from: { id: 42, first_name: 'Ada' }, chat: { id: 99 }, text: 'Hello' },
+};
 
-function webhook(token: string): ChannelRequest {
+const later = {
+  update_id: 124,
+  message: { from: { id: 42, first_name: 'Ada' }, chat: { id: 99 }, text: 'Still there?' },
+};
+
+function webhook(secret: string): ChannelRequest {
   return {
     type: 'telegram',
-    headers: { 'x-telegram-bot-api-secret-token': token },
+    headers: { 'x-telegram-bot-api-secret-token': secret },
     payload: update,
   };
 }
 
 describe('Telegram transport', () => {
-  it('validates the webhook and deduplicates both ingestion and delivery', async () => {
+  it('connects one channel per type and frees the type again after disconnecting', async () => {
+    const f = await setup(async () => Response.json({ ok: true }));
+
+    try {
+      await expect(
+        f.channels.connect(f.profile.id, { type: 'telegram', botToken: '123:other' }),
+      ).rejects.toThrow('already connected');
+
+      await expect(f.channels.connect(f.profile.id, { type: 'telegram' })).rejects.toThrow();
+
+      await f.channels.revoke(f.profile.id, f.channel.id);
+
+      const replacement = await f.channels.connect(f.profile.id, {
+        type: 'telegram',
+        botToken: '123:synthetic-replacement',
+      });
+
+      expect(replacement.id).not.toBe(f.channel.id);
+      expect(replacement.webhookToken).not.toBe(f.channel.webhookToken);
+      expect((await f.channels.list(f.profile.id)).filter((item) => !item.revokedAt)).toHaveLength(
+        1,
+      );
+    } finally {
+      await f.app.close();
+    }
+  });
+
+  it('holds an unknown sender out of the profile and warns them only once', async () => {
     const sent: string[] = [];
 
-    const { services, channels, binding, profile } = await setup(async (_url, options) => {
+    const f = await setup(async (_url, options) => {
       sent.push(String(options?.body));
 
       return Response.json({ ok: true, result: { message_id: 5 } });
     });
 
-    const app = createApp({
-      ...services,
-      channels,
-      token: 'test-admin-token'.repeat(3),
-      logger: false,
-    });
-    const url = `/v1/telegram/${binding.id}`;
-    const headers = { 'x-telegram-bot-api-secret-token': binding.webhookToken };
-
     try {
-      const denied = await app.inject({ method: 'POST', url, payload: update });
+      const denied = await f.app.inject({ method: 'POST', url: f.url, payload: update });
       expect(denied.statusCode).toBe(401);
 
-      const accepted = await app.inject({ method: 'POST', url, headers, payload: update });
-      expect(accepted.statusCode).toBe(200);
-      const first = accepted.json<{ accepted: boolean; runId: string }>();
-      expect(first.accepted).toBe(true);
+      const first = await f.app.inject({
+        method: 'POST',
+        url: f.url,
+        headers: f.headers,
+        payload: update,
+      });
 
-      const duplicate = await app.inject({ method: 'POST', url, headers, payload: update });
-      expect(duplicate.json()).toEqual(first);
+      expect(first.json()).toEqual({ accepted: false, contact: 'pending' });
 
-      await services.lifecycle.claim(first.runId, profile.id, 'worker');
-      await services.lifecycle.finish(profile.id, first.runId, 'worker', 'completed', 'Hi');
-      await Promise.all([channels.dispatch(), channels.dispatch()]);
+      await f.app.inject({ method: 'POST', url: f.url, headers: f.headers, payload: later });
+
+      const contacts = await f.channels.contacts(f.profile.id);
+
+      expect(contacts).toHaveLength(1);
+      expect(contacts[0]).toMatchObject({
+        status: 'pending',
+        actorId: '42',
+        displayName: 'Ada',
+        message: 'Hello\n\nStill there?',
+      });
+
+      expect(await f.services.sessions.sessions(f.profile.id)).toEqual([]);
+      expect(await f.services.runs.activities(f.profile.id)).toEqual([]);
+
+      await f.channels.dispatch();
+      await f.channels.dispatch();
 
       expect(sent).toHaveLength(1);
-      expect(JSON.parse(sent[0] as string)).toEqual({ chat_id: '99', text: 'Hi' });
-      expect((await channels.deliveries(profile.id))[0]?.status).toBe('sent');
+      expect(JSON.parse(sent[0] as string).chat_id).toBe('99');
+      expect(JSON.parse(sent[0] as string).text).toContain('approve');
     } finally {
-      await app.close();
+      await f.app.close();
+    }
+  });
+
+  it('releases the waiting message once when the owner approves, and blocks silently', async () => {
+    const sent: string[] = [];
+
+    const f = await setup(async (_url, options) => {
+      sent.push(String(options?.body));
+
+      return Response.json({ ok: true, result: { message_id: 5 } });
+    });
+
+    try {
+      await f.channels.receive(f.channel.id, webhook(f.channel.webhookToken));
+
+      const [pending] = await f.channels.contacts(f.profile.id);
+      if (!pending) throw new Error('Contact request missing');
+
+      const approved = await f.channels.approveContact(f.profile.id, pending.id);
+
+      expect(approved.status).toBe('approved');
+      expect(approved.message).toBeUndefined();
+      expect(approved.sessionId).toBeDefined();
+
+      const runs = await f.services.runs.activities(f.profile.id);
+
+      expect(runs).toHaveLength(1);
+      expect(runs[0]?.input).toBe('Hello');
+      expect(runs[0]?.sessionId).toBe(approved.sessionId);
+
+      await f.channels.approveContact(f.profile.id, pending.id);
+      expect(await f.services.runs.activities(f.profile.id)).toHaveLength(1);
+
+      const replay = await f.app.inject({
+        method: 'POST',
+        url: f.url,
+        headers: f.headers,
+        payload: update,
+      });
+
+      expect(replay.json()).toEqual({ accepted: true, runId: runs[0]?.id, contact: 'approved' });
+
+      const runId = runs[0]?.id as string;
+      await f.services.lifecycle.claim(runId, f.profile.id, 'worker');
+      await f.services.lifecycle.finish(f.profile.id, runId, 'worker', 'completed', 'Hi');
+      await Promise.all([f.channels.dispatch(), f.channels.dispatch()]);
+
+      expect(sent.map((body) => JSON.parse(body).text)).toEqual([
+        expect.stringContaining('approve'),
+        'Hi',
+      ]);
+
+      await f.channels.blockContact(f.profile.id, pending.id);
+
+      const afterBlock = await f.app.inject({
+        method: 'POST',
+        url: f.url,
+        headers: f.headers,
+        payload: { ...later, update_id: 200 },
+      });
+
+      expect(afterBlock.json()).toEqual({ accepted: false, contact: 'blocked' });
+      await f.channels.dispatch();
+      expect(sent).toHaveLength(2);
+    } finally {
+      await f.app.close();
+    }
+  });
+
+  it('keeps contact decisions administrative and inside their own profile', async () => {
+    const f = await setup(async () => Response.json({ ok: true }));
+
+    try {
+      await f.channels.receive(f.channel.id, webhook(f.channel.webhookToken));
+      const [pending] = await f.channels.contacts(f.profile.id);
+      if (!pending) throw new Error('Contact request missing');
+
+      // Approving is granting access to the agent, so only the host token may do it.
+      const stranger = { authorization: `Bearer ${token}-wrong` };
+      const base = `/v1/profiles/${f.profile.id}/contacts`;
+
+      expect((await f.app.inject({ url: base, headers: stranger })).statusCode).toBe(401);
+
+      expect(
+        (
+          await f.app.inject({
+            method: 'POST',
+            url: `${base}/${pending.id}/approve`,
+            headers: stranger,
+          })
+        ).statusCode,
+      ).toBe(401);
+
+      const other = await f.services.profiles.createProfile({
+        name: 'Other',
+        instructions: 'Help',
+        model: f.profile.model,
+      });
+
+      expect(
+        (
+          await f.app.inject({
+            method: 'POST',
+            url: `/v1/profiles/${other.id}/contacts/${pending.id}/approve`,
+            headers: admin,
+          })
+        ).statusCode,
+      ).toBe(404);
+
+      expect(
+        (
+          await f.app.inject({
+            method: 'POST',
+            url: `${base}/${randomUUID()}/block`,
+            headers: admin,
+          })
+        ).statusCode,
+      ).toBe(404);
+
+      expect(
+        (
+          await f.app.inject({
+            method: 'POST',
+            url: `${base}/${pending.id}/approve`,
+            headers: admin,
+          })
+        ).statusCode,
+      ).toBe(200);
+    } finally {
+      await f.app.close();
     }
   });
 
@@ -87,33 +266,49 @@ describe('Telegram transport', () => {
     async (confirmedChunks) => {
       let attempts = 0;
 
-      const { services, channels, binding, profile } = await setup(async () => {
+      const f = await setup(async () => {
         attempts += 1;
 
-        if (attempts <= confirmedChunks) {
+        if (attempts <= confirmedChunks + 1) {
           return Response.json({ ok: true, result: { message_id: 5 } });
         }
 
         throw new Error('Connection closed after remote write');
       });
 
-      const { runId } = await channels.receive(binding.id, webhook(binding.webhookToken));
+      try {
+        await f.channels.receive(f.channel.id, webhook(f.channel.webhookToken));
+        const [pending] = await f.channels.contacts(f.profile.id);
+        if (!pending) throw new Error('Contact request missing');
 
-      await services.lifecycle.claim(runId as string, profile.id, 'worker');
-      await services.lifecycle.finish(
-        profile.id,
-        runId as string,
-        'worker',
-        'completed',
-        'x'.repeat(4001),
-      );
-      await channels.dispatch();
-      await channels.dispatch();
-      expect(attempts).toBe(confirmedChunks + 1);
-      expect((await channels.deliveries(profile.id))[0]).toMatchObject({
-        status: 'unknown',
-        remoteMessageIds: confirmedChunks ? [5] : [],
-      });
+        await f.channels.approveContact(f.profile.id, pending.id);
+        // The approval notice is the first confirmed send; the reply follows it.
+        await f.channels.dispatch();
+
+        const [run] = await f.services.runs.activities(f.profile.id);
+        if (!run) throw new Error('Run missing');
+
+        await f.services.lifecycle.claim(run.id, f.profile.id, 'worker');
+        await f.services.lifecycle.finish(
+          f.profile.id,
+          run.id,
+          'worker',
+          'completed',
+          'x'.repeat(4001),
+        );
+        await f.channels.dispatch();
+        await f.channels.dispatch();
+
+        expect(attempts).toBe(confirmedChunks + 2);
+        expect(
+          (await f.channels.deliveries(f.profile.id)).find((item) => item.runId === run.id),
+        ).toMatchObject({
+          status: 'unknown',
+          remoteMessageIds: confirmedChunks ? [5] : [],
+        });
+      } finally {
+        await f.app.close();
+      }
     },
   );
 });

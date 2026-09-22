@@ -2,7 +2,7 @@ import { PgBoss } from 'pg-boss';
 import { z } from 'zod';
 import { AgentRuntime } from './agent/runtime.js';
 import { createApp } from './app.js';
-import { GenericChannel } from './channels/generic.js';
+import { ApiChannel } from './channels/api.js';
 import { ChannelRegistry } from './channels/registry.js';
 import { Channels } from './channels/service.js';
 import { TelegramChannel } from './channels/telegram.js';
@@ -78,7 +78,7 @@ const providerModels = new ProviderModels(services, outbound.fetch);
 const coordination = new Coordination(services);
 const whatsapp = new WhatsAppConnections(store, box, createWhatsAppDeviceFactory());
 const channelRegistry = new ChannelRegistry([
-  new GenericChannel(),
+  new ApiChannel(),
   new TelegramChannel(),
   new WhatsAppChannel(whatsapp),
 ]);

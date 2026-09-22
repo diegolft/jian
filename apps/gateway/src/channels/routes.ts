@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { GatewayError } from '../core/errors.js';
-import type { ChannelParams, ProfileParams } from '../http/params.js';
+import type { ChannelParams, ContactParams, ProfileParams } from '../http/params.js';
 import type { Channels } from './service.js';
 import type { WhatsAppConnections } from './whatsapp/connections.js';
 
@@ -27,7 +27,7 @@ export function registerChannelRoutes(app: FastifyInstance, deps: ChannelRouteSe
   }
 
   app.post<{ Params: ProfileParams }>('/v1/profiles/:profileId/channels', async (request, reply) =>
-    reply.code(201).send(await channels().create(request.params.profileId, request.body)),
+    reply.code(201).send(await channels().connect(request.params.profileId, request.body)),
   );
 
   app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/channels', async (request) =>
@@ -41,6 +41,21 @@ export function registerChannelRoutes(app: FastifyInstance, deps: ChannelRouteSe
 
   app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/deliveries', async (request) =>
     channels().deliveries(request.params.profileId),
+  );
+
+  app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/contacts', async (request) =>
+    channels().contacts(request.params.profileId),
+  );
+
+  app.post<{ Params: ContactParams }>(
+    '/v1/profiles/:profileId/contacts/:contactId/approve',
+    async (request) =>
+      channels().approveContact(request.params.profileId, request.params.contactId),
+  );
+
+  app.post<{ Params: ContactParams }>(
+    '/v1/profiles/:profileId/contacts/:contactId/block',
+    async (request) => channels().blockContact(request.params.profileId, request.params.contactId),
   );
 
   app.post<{ Params: ChannelParams }>(
@@ -78,7 +93,7 @@ export function registerChannelRoutes(app: FastifyInstance, deps: ChannelRouteSe
   app.post<{ Params: { channelId: string } }>('/v1/ingress/:channelId', async (request, reply) =>
     reply.code(202).send(
       await channels().receive(request.params.channelId, {
-        type: 'generic',
+        type: 'api',
         headers: request.headers,
         payload: request.body,
       }),

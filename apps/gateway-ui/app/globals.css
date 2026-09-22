@@ -840,6 +840,56 @@ svg {
   display: grid;
   place-items: center;
 }
+.resource-icon.api {
+  color: #7b73c6;
+  background: #f2f1fb;
+  border-color: #e8e6f6;
+}
+.request-panel {
+  border: 1px solid #f0dfc0;
+  background: #fffbf3;
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  margin-bottom: 25px;
+}
+.request-panel > header {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  color: #a9813a;
+}
+.request-panel h2 {
+  font-size: 15px;
+  color: var(--ink);
+}
+.request-panel header p {
+  font-size: 12px;
+  margin-top: 4px;
+}
+.request-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0 0;
+  margin-top: 16px;
+  border-top: 1px solid #f2e6d2;
+}
+.request-row h3 {
+  font-size: 14px;
+}
+.request-row small {
+  display: block;
+  color: #6d7b8d;
+  font-size: 10px;
+  margin-top: 3px;
+}
+.request-message {
+  margin-top: 9px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #526177;
+  overflow-wrap: anywhere;
+}
 .memory-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1733,6 +1783,12 @@ legend {
   }
   .channel-row .row-actions {
     flex-wrap: wrap;
+  }
+  .request-row {
+    flex-wrap: wrap;
+  }
+  .request-row .row-actions {
+    margin-left: auto;
   }
   .save-bar {
     padding: 12px;

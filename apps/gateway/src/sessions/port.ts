@@ -1,5 +1,5 @@
 import type { Message, Session } from '@jian/contracts';
-import type { Reader } from '../core/store.js';
+import type { Reader, Transaction } from '../core/store.js';
 
 export interface SessionReader {
   session(profileId: string, sessionId: string, reader?: Reader): Promise<Session>;
@@ -8,5 +8,5 @@ export interface SessionReader {
 }
 
 export interface SessionWriter extends SessionReader {
-  createSession(profileId: string, input: unknown): Promise<Session>;
+  createSession(profileId: string, input: unknown, transaction?: Transaction): Promise<Session>;
 }

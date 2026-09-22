@@ -20,8 +20,9 @@ connected.
   messages passed between parallel sessions.
 - **A context budget you control.** Per-step and per-run limits, relevant memories only,
   tool schemas loaded on demand instead of flooding the prompt.
-- **Channels.** WhatsApp, Telegram and HTTP webhooks, each with explicit allowlists, so no
-  channel inherits the owner's privileges.
+- **Channels.** WhatsApp, Telegram and an API server, one of each. A stranger's first
+  message becomes a contact request the owner approves; each approved conversation gets
+  its own session, so no channel inherits the owner's privileges.
 - **A vault, not a config file.** Provider, MCP and channel secrets are typed where the
   thing is configured and stored encrypted with AES-256-GCM, never read back.
 - **A typed contract.** OpenAPI 3.1 generated from the schemas the server validates

@@ -1,9 +1,7 @@
-import type { channelInputSchema, ingressSchema } from '@jian/contracts';
+import type { channelTypeSchema, ingressSchema } from '@jian/contracts';
 import type { z } from 'zod';
 
-export type ChannelConfiguration = z.infer<typeof channelInputSchema>;
-
-export type ChannelType = ChannelConfiguration['type'];
+export type ChannelType = z.infer<typeof channelTypeSchema>;
 
 export type IncomingMessage = z.infer<typeof ingressSchema>;
 
@@ -37,7 +35,6 @@ export interface Channel {
   readonly webhookHeader?: string;
 
   receive(payload: unknown): IncomingMessage | null;
-  validateConfiguration?(configuration: ChannelConfiguration): void;
 
   canSend?(channelId: string): Promise<boolean>;
   // An absent sender describes an ingress-only channel; it is not a fake successful delivery.

@@ -11,6 +11,10 @@ export type Session = JsonResponse<'listSessions', 200>[number];
 
 export type Channel = JsonResponse<'listChannels', 200>[number];
 
+export type ChannelType = Channel['type'];
+
+export type Contact = JsonResponse<'listContacts', 200>[number];
+
 export type Provider = JsonResponse<'listProviders', 200>[number];
 export type ModelDefaults = JsonResponse<'getModelDefaults', 200>;
 export type ModelDefaultsInput =
@@ -224,6 +228,74 @@ export function gatewayApi() {
       ),
     deliveries: (profileId: string) =>
       result(client.GET('/v1/profiles/{profileId}/deliveries', { params: profile(profileId) })),
+    contacts: (profileId: string) =>
+      result(client.GET('/v1/profiles/{profileId}/contacts', { params: profile(profileId) })),
+    approveContact: (profileId: string, contactId: string) =>
+      result(
+        client.POST('/v1/profiles/{profileId}/contacts/{contactId}/approve', {
+          params: { path: { profileId, contactId } },
+        }),
+      ),
+    blockContact: (profileId: string, contactId: string) =>
+      result(
+        client.POST('/v1/profiles/{profileId}/contacts/{contactId}/block', {
+          params: { path: { profileId, contactId } },
+        }),
+      ),
+    /**
+     * The panel authenticates with a cookie plus a custom header, which EventSource cannot send,
+     * so the stream is read from a plain response body. It resolves when the stream ends.
+     */
+    events: async (
+      profileId: string,
+      after: number,
+      onEvent: (event: { id: number; type: string }) => void,
+      signal: AbortSignal,
+    ) => {
+      const response = await fetch(
+        `${window.location.origin}/v1/profiles/${profileId}/events/stream?after=${after}`,
+        {
+          headers: { 'x-jian-panel': '1' },
+          credentials: 'same-origin',
+          cache: 'no-store',
+          signal,
+        },
+      );
+
+      if (!response.ok || !response.body) {
+        throw new Error('O canal de eventos não está disponível.');
+      }
+
+      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buffer = '';
+      let id = after;
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          return;
+        }
+
+        const lines = (buffer + value).split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (line.startsWith('id: ')) {
+            id = Number(line.slice(4).trim());
+          }
+
+          if (line.startsWith('event: ') && id > after) {
+            onEvent({ id, type: line.slice(7).trim() });
+          }
+        }
+
+        // A line this long is not one this panel understands; do not grow the buffer for it.
+        if (buffer.length > 64_000) {
+          buffer = '';
+        }
+      }
+    },
     connect: (profileId: string, channelId: string) =>
       result(
         client.POST('/v1/profiles/{profileId}/channels/{channelId}/connect', {
@@ -263,6 +335,7 @@ export type ProfileData = {
   memories: Memory[];
   activities: Run[];
   deliveries: Delivery[];
+  contacts: Contact[];
 };
 
 export type Mutation = (action: () => Promise<unknown>, message?: string) => Promise<boolean>;

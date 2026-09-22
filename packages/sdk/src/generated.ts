@@ -174,6 +174,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/profiles/{profileId}/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Required permission: admin. */
+        get: operations["listContacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/profiles/{profileId}/contacts/{contactId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Required permission: admin. */
+        post: operations["approveContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/profiles/{profileId}/contacts/{contactId}/block": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Required permission: admin. */
+        post: operations["blockContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/profiles/{profileId}/deliveries": {
         parameters: {
             query?: never;
@@ -2369,17 +2420,12 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        name: string;
-                        /** @enum {string} */
-                        type: "generic" | "telegram" | "whatsapp";
-                        /** Format: uuid */
-                        sessionId: string;
-                        actorIds: string[];
-                        chatIds: string[];
                         /** Format: uuid */
                         id: string;
                         /** Format: uuid */
                         profileId: string;
+                        /** @enum {string} */
+                        type: "whatsapp" | "telegram" | "api";
                         /** Format: date-time */
                         createdAt: string;
                         /** Format: date-time */
@@ -2500,14 +2546,9 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    name: string;
                     /** @enum {string} */
-                    type: "generic" | "telegram" | "whatsapp";
-                    /** Format: uuid */
-                    sessionId: string;
-                    actorIds: string[];
-                    chatIds: string[];
-                    token?: string;
+                    type: "whatsapp" | "telegram" | "api";
+                    botToken?: string;
                 };
             };
         };
@@ -2519,17 +2560,12 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        name: string;
-                        /** @enum {string} */
-                        type: "generic" | "telegram" | "whatsapp";
-                        /** Format: uuid */
-                        sessionId: string;
-                        actorIds: string[];
-                        chatIds: string[];
                         /** Format: uuid */
                         id: string;
                         /** Format: uuid */
                         profileId: string;
+                        /** @enum {string} */
+                        type: "whatsapp" | "telegram" | "api";
                         /** Format: date-time */
                         createdAt: string;
                         /** Format: date-time */
@@ -2658,21 +2694,447 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        name: string;
-                        /** @enum {string} */
-                        type: "generic" | "telegram" | "whatsapp";
-                        /** Format: uuid */
-                        sessionId: string;
-                        actorIds: string[];
-                        chatIds: string[];
                         /** Format: uuid */
                         id: string;
                         /** Format: uuid */
                         profileId: string;
+                        /** @enum {string} */
+                        type: "whatsapp" | "telegram" | "api";
                         /** Format: date-time */
                         createdAt: string;
                         /** Format: date-time */
                         revokedAt?: string;
+                    };
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+        };
+    };
+    listContacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        profileId: string;
+                        /** Format: uuid */
+                        channelId: string;
+                        /** @enum {string} */
+                        type: "whatsapp" | "telegram" | "api";
+                        actorId: string;
+                        chatId: string;
+                        displayName?: string;
+                        /** @enum {string} */
+                        status: "pending" | "approved" | "blocked";
+                        /** Format: uuid */
+                        sessionId?: string;
+                        /** @description The message held until the owner decides. */
+                        message?: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                    }[];
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+        };
+    };
+    approveContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileId: string;
+                contactId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        profileId: string;
+                        /** Format: uuid */
+                        channelId: string;
+                        /** @enum {string} */
+                        type: "whatsapp" | "telegram" | "api";
+                        actorId: string;
+                        chatId: string;
+                        displayName?: string;
+                        /** @enum {string} */
+                        status: "pending" | "approved" | "blocked";
+                        /** Format: uuid */
+                        sessionId?: string;
+                        /** @description The message held until the owner decides. */
+                        message?: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+            /** @description Error */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                    };
+                };
+            };
+        };
+    };
+    blockContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileId: string;
+                contactId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        profileId: string;
+                        /** Format: uuid */
+                        channelId: string;
+                        /** @enum {string} */
+                        type: "whatsapp" | "telegram" | "api";
+                        actorId: string;
+                        chatId: string;
+                        displayName?: string;
+                        /** @enum {string} */
+                        status: "pending" | "approved" | "blocked";
+                        /** Format: uuid */
+                        sessionId?: string;
+                        /** @description The message held until the owner decides. */
+                        message?: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
                     };
                 };
             };
@@ -2802,7 +3264,7 @@ export interface operations {
                         /** Format: uuid */
                         channelId: string;
                         /** Format: uuid */
-                        runId: string;
+                        runId?: string;
                         chatId: string;
                         /** @enum {string} */
                         status: "pending" | "sending" | "sent" | "failed" | "unknown";
@@ -2812,6 +3274,8 @@ export interface operations {
                         updatedAt: string;
                         /** @default [] */
                         remoteMessageIds: (number | string)[];
+                        /** @description Gateway-authored text sent without a run, such as the approval notice. */
+                        notice?: string;
                     }[];
                 };
             };
@@ -3458,6 +3922,7 @@ export interface operations {
                     chatId: string;
                     text: string;
                     requestKey: string;
+                    displayName?: string;
                 };
             };
         };
@@ -3472,6 +3937,11 @@ export interface operations {
                         accepted: boolean;
                         /** Format: uuid */
                         runId?: string;
+                        /**
+                         * @description Absent when the payload carried no message to route.
+                         * @enum {string}
+                         */
+                        contact?: "approved" | "pending" | "blocked";
                     };
                 };
             };
@@ -3592,6 +4062,8 @@ export interface operations {
                     message?: {
                         from: {
                             id: number;
+                            first_name?: string;
+                            username?: string;
                         };
                         chat: {
                             id: number;
@@ -3612,6 +4084,11 @@ export interface operations {
                         accepted: boolean;
                         /** Format: uuid */
                         runId?: string;
+                        /**
+                         * @description Absent when the payload carried no message to route.
+                         * @enum {string}
+                         */
+                        contact?: "approved" | "pending" | "blocked";
                     };
                 };
             };

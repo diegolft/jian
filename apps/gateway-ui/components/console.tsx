@@ -197,13 +197,13 @@ function Overview({
     },
     {
       label: 'Criar uma conversa',
-      description: 'Uma sessão para testar ou vincular a um canal.',
+      description: 'Uma sessão para testar. As dos canais nascem sozinhas.',
       done: data.sessions.length > 0,
       section: 'sessions' as const,
     },
     {
       label: 'Abrir um canal',
-      description: 'WhatsApp, Telegram ou seu próprio webhook.',
+      description: 'WhatsApp, Telegram ou o API Server.',
       done: connected.length > 0,
       section: 'channels' as const,
     },
@@ -370,10 +370,11 @@ function Overview({
 }
 
 async function profileData(api: GatewayApi, id: string): Promise<ProfileData> {
-  const [sessions, channels, memories, activities, deliveries, providers, modelDefaults] =
+  const [sessions, channels, contacts, memories, activities, deliveries, providers, modelDefaults] =
     await Promise.all([
       api.sessions(id),
       api.channels(id),
+      api.contacts(id),
       api.memories(id),
       api.activities(id),
       api.deliveries(id),
@@ -402,6 +403,7 @@ async function profileData(api: GatewayApi, id: string): Promise<ProfileData> {
   return {
     sessions,
     channels,
+    contacts,
     memories,
     activities,
     deliveries,
@@ -472,6 +474,48 @@ function Workspace({
       generation.current++;
     };
   }, [refresh]);
+
+  // A contact request must reach the owner without a reload: the gateway already streams
+  // every profile event, and a dropped stream is reopened from the last event seen.
+  useEffect(() => {
+    if (!selected) {
+      return;
+    }
+
+    const controller = new AbortController();
+    let cursor = 0;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const listen = async () => {
+      try {
+        await api.events(
+          selected,
+          cursor,
+          (event) => {
+            cursor = event.id;
+
+            if (event.type.startsWith('contact.') || event.type.startsWith('channel.')) {
+              void refresh();
+            }
+          },
+          controller.signal,
+        );
+      } catch {
+        // A stream ends on shutdown, on a lost network or when the session expires.
+      }
+
+      if (!controller.signal.aborted) {
+        timer = setTimeout(() => void listen(), 5000);
+      }
+    };
+
+    void listen();
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [api, selected, refresh]);
 
   useEffect(() => {
     const update = () => {
