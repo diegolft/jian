@@ -148,6 +148,26 @@ export interface SafeFetchOptions {
   lookup?: (hostname: string) => Promise<readonly string[]>;
 }
 
+/** The failure code of an error or of whatever it was raised from, and nothing else of it. */
+function reason(error: unknown): string {
+  const codes: string[] = [];
+  let cursor = error;
+
+  while (cursor instanceof Error && codes.length < 4) {
+    const code = (cursor as { code?: unknown }).code;
+
+    if (typeof code === 'string') {
+      codes.push(code);
+    } else if (cursor.message && codes.length === 0) {
+      codes.push(cursor.message.slice(0, 80));
+    }
+
+    cursor = cursor.cause;
+  }
+
+  return codes.length ? ` (${[...new Set(codes)].join(' · ')})` : '';
+}
+
 export function createSafeFetch(options: SafeFetchOptions = {}): {
   fetch: typeof globalThis.fetch;
   close(): Promise<void>;
@@ -227,8 +247,10 @@ export function createSafeFetch(options: SafeFetchOptions = {}): {
         redirect: 'error',
         dispatcher: agent,
       } as RequestInit);
-    } catch {
-      throw new Error('Outbound request failed');
+    } catch (error) {
+      // The cause carries the address and can carry a credential, so only its code travels —
+      // which is the part that says whether the host refused, resolved or timed out.
+      throw new Error(`Outbound request failed${reason(error)}`);
     }
   };
 
