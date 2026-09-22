@@ -1,10 +1,11 @@
-import { memorySchema, type Run, skillSchema } from '@jian/contracts';
+import { agentCallSchema, memorySchema, type Run, skillSchema } from '@jian/contracts';
 import { type ToolSet, tool } from 'ai';
 import { z } from 'zod';
 import { Coordination } from '../coordination/service.js';
 import { GatewayError } from '../core/errors.js';
 import type { Store } from '../core/store.js';
 import type { MemoryWriter } from '../memories/port.js';
+import type { PeerAgents } from '../peers/port.js';
 import type { ProfileAdmin } from '../profiles/port.js';
 import type { RunExecution, RunReader } from '../runs/port.js';
 import type { SessionReader } from '../sessions/port.js';
@@ -15,6 +16,7 @@ export type ToolServices = {
   memories: MemoryWriter;
   sessions: SessionReader;
   runs: RunReader;
+  peers: PeerAgents;
   lifecycle: RunExecution;
   store: Store;
 };
@@ -159,6 +161,20 @@ export function profileTools(services: ToolServices, run: Run): ToolSet {
       }),
       execute: async (input) =>
         coordination.send(run.profileId, { ...input, fromSessionId: run.sessionId }),
+    }),
+
+    list_agents: tool({
+      description:
+        'List the other agents of this installation: their id, name and what each one does. Their instructions, memories and conversations are not readable — here or anywhere else.',
+      inputSchema: z.object({}),
+      execute: async () => services.peers.agents(run.profileId),
+    }),
+
+    ask_agent: tool({
+      description:
+        'Ask another agent of this installation and wait for its written answer. Only text crosses: they never read your memories, sessions or history, and you never read theirs. The two of you keep one shared thread. A chain of calls is bounded — you cannot ask yourself, nor an agent that already spoke in this conversation, and the depth budget is shared by everyone in the chain.',
+      inputSchema: agentCallSchema,
+      execute: async (input, { abortSignal }) => services.peers.ask(run, input, abortSignal),
     }),
 
     read_inbox: tool({

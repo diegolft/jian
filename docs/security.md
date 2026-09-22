@@ -8,6 +8,8 @@ Cada operação do contrato é `admin`, `public` ou `webhook`. Só `/health` e a
 
 Chaves de provider, tokens de MCP e de canal são digitados onde a coisa é configurada, cifrados por perfil e nunca devolvidos em leitura alguma.
 
+Perfis conversam entre si trocando texto, e só texto: a descoberta mostra nome e o resumo escrito pelo dono, a resposta é a saída do run de quem foi chamado, e nenhuma ferramenta lê memória, credencial, sessão ou histórico de outro perfil. O texto que chega de outro agente é dado não confiável como qualquer entrada — o nome de quem chama é endereçamento, não autoridade. A cadeia de chamadas é limitada por um orçamento de profundidade que viaja com ela e por não chamar duas vezes o mesmo perfil na mesma conversa; sem isso, agentes se respondem em laço e cada volta gasta chave de provider.
+
 ## Criptografia e rotação
 
 `JIAN_MASTER_KEYS` é um objeto JSON de identificadores para chaves de 32 bytes em Base64. `JIAN_ACTIVE_KEY_ID` escolhe a chave usada para novas gravações. O setup cria um keyring em `.env` com permissão `0600`; na hospedagem, injete-o por um gerenciador de segredos. Não coloque esse keyring no banco, no Git ou no mesmo backup do banco.

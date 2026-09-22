@@ -99,9 +99,17 @@ export const avatarSchema = z
   )
   .max(100_000, 'The picture must stay under 100 kB encoded');
 
+/**
+ * The one line the other agents of this installation read about this one. Discovery shows the
+ * name and this text, and nothing else ever crosses: instructions, identity, memories and
+ * history stay inside the profile. Empty until the owner writes it.
+ */
+export const summarySchema = z.string().trim().max(280).default('');
+
 export const profileSchema = z.strictObject({
   name: z.string().trim().min(1).max(100),
   instructions: z.string().trim().min(1).max(8_000),
+  summary: summarySchema,
   avatar: avatarSchema.nullable().default(null),
   // Retained for existing installations and old runs; new profiles choose models per run.
   model: modelSchema.default({ provider: 'openai', modelId: 'unconfigured' }),
@@ -114,6 +122,7 @@ export const profileSchema = z.strictObject({
 
 export const profilePatchSchema = profileSchema.partial().extend({
   expectedVersion: z.number().int().positive(),
+  summary: summarySchema.optional(),
   // Absent keeps the current picture; an explicit null removes it.
   avatar: avatarSchema.nullable().optional(),
   model: modelSchema.optional(),

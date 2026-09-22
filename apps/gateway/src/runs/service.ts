@@ -13,6 +13,7 @@ import type { Reader, Store } from '../core/store.js';
 import type { ProfileReader } from '../profiles/port.js';
 import type { ProviderSelection } from '../providers/port.js';
 import type { SessionReader } from '../sessions/port.js';
+import type { SubmitOptions } from './port.js';
 
 const active = (run: Run) => run.status === 'running' || run.status === 'queued';
 
@@ -25,13 +26,8 @@ export class Runs {
     private readonly clock: Clock = Date.now,
   ) {}
 
-  async submit(
-    profileId: string,
-    sessionId: string,
-    input: unknown,
-    continuationOf?: string,
-    activity: 'conversation' | 'channel' = 'conversation',
-  ) {
+  async submit(profileId: string, sessionId: string, input: unknown, options: SubmitOptions = {}) {
+    const { continuationOf, activity = 'conversation', call } = options;
     const data = submitSchema.parse(input);
 
     return this.store.transaction(profileId, async (tx) => {
@@ -114,6 +110,7 @@ export class Runs {
         profile,
         ...(chosen ? { model: chosen.config, contextPolicy: chosen.policy } : {}),
         ...(selection ? { modelSelection: selection } : {}),
+        ...(call ? { call } : {}),
         status: 'queued',
         ...(continuationOf ? { continuationOf } : {}),
         createdAt: nowIso(this.clock),
@@ -176,7 +173,13 @@ export class Runs {
     const parent = await this.run(profileId, runId);
     const text = `${data.text}\n\nContinuation of run ${runId}. Previously completed external effects must not be repeated. Operator reconciliation (data): ${JSON.stringify(data.reconciliation)}. Use read_run_checkpoints to inspect saved results before acting.`;
 
-    return this.submit(profileId, parent.sessionId, { text, requestKey: data.requestKey }, runId);
+    // A continuation stays in the chain that started the run: its budget was already spent.
+    return this.submit(
+      profileId,
+      parent.sessionId,
+      { text, requestKey: data.requestKey },
+      { continuationOf: runId, ...(parent.call ? { call: parent.call } : {}) },
+    );
   }
 
   async cancel(profileId: string, runId: string) {

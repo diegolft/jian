@@ -10,3 +10,13 @@ export interface SessionReader {
 export interface SessionWriter extends SessionReader {
   createSession(profileId: string, input: unknown, transaction?: Transaction): Promise<Session>;
 }
+
+/** The session two agents share. Held apart from `SessionWriter`: only peer calls open one. */
+export interface PeerSessions {
+  peerSession(
+    profileId: string,
+    peerProfileId: string,
+    title: string,
+    transaction?: Transaction,
+  ): Promise<Session>;
+}

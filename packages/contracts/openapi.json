@@ -3530,6 +3530,48 @@
                         "maxRunTokens"
                       ],
                       "additionalProperties": false
+                    },
+                    "call": {
+                      "type": "object",
+                      "properties": {
+                        "fromProfileId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "fromName": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "fromRunId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "depth": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 3
+                        },
+                        "chain": {
+                          "minItems": 2,
+                          "maxItems": 4,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "fromProfileId",
+                        "fromName",
+                        "fromRunId",
+                        "depth",
+                        "chain"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -9892,6 +9934,11 @@
                         "minLength": 1,
                         "maxLength": 8000
                       },
+                      "summary": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 280
+                      },
                       "avatar": {
                         "default": null,
                         "type": [
@@ -10166,6 +10213,7 @@
                     "required": [
                       "name",
                       "instructions",
+                      "summary",
                       "avatar",
                       "model",
                       "identity",
@@ -10382,6 +10430,11 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 8000
+                  },
+                  "summary": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 280
                   },
                   "avatar": {
                     "default": null,
@@ -10646,6 +10699,11 @@
                       "minLength": 1,
                       "maxLength": 8000
                     },
+                    "summary": {
+                      "default": "",
+                      "type": "string",
+                      "maxLength": 280
+                    },
                     "avatar": {
                       "default": null,
                       "type": [
@@ -10920,6 +10978,7 @@
                   "required": [
                     "name",
                     "instructions",
+                    "summary",
                     "avatar",
                     "model",
                     "identity",
@@ -11150,6 +11209,11 @@
                       "minLength": 1,
                       "maxLength": 8000
                     },
+                    "summary": {
+                      "default": "",
+                      "type": "string",
+                      "maxLength": 280
+                    },
                     "avatar": {
                       "default": null,
                       "type": [
@@ -11424,6 +11488,7 @@
                   "required": [
                     "name",
                     "instructions",
+                    "summary",
                     "avatar",
                     "model",
                     "identity",
@@ -11650,6 +11715,11 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 8000
+                  },
+                  "summary": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 280
                   },
                   "avatar": {
                     "type": [
@@ -11895,6 +11965,11 @@
                       "minLength": 1,
                       "maxLength": 8000
                     },
+                    "summary": {
+                      "default": "",
+                      "type": "string",
+                      "maxLength": 280
+                    },
                     "avatar": {
                       "default": null,
                       "type": [
@@ -12169,6 +12244,7 @@
                   "required": [
                     "name",
                     "instructions",
+                    "summary",
                     "avatar",
                     "model",
                     "identity",
@@ -12411,6 +12487,11 @@
                             "type": "string",
                             "minLength": 1,
                             "maxLength": 8000
+                          },
+                          "summary": {
+                            "default": "",
+                            "type": "string",
+                            "maxLength": 280
                           },
                           "avatar": {
                             "default": null,
@@ -12686,6 +12767,7 @@
                         "required": [
                           "name",
                           "instructions",
+                          "summary",
                           "avatar",
                           "model",
                           "identity",
@@ -12939,6 +13021,11 @@
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                       },
                       "profileId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "peerProfileId": {
                         "type": "string",
                         "format": "uuid",
                         "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
@@ -13205,6 +13292,11 @@
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                     },
                     "profileId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "peerProfileId": {
                       "type": "string",
                       "format": "uuid",
                       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
@@ -13970,6 +14062,48 @@
                         "toolResultTokens",
                         "maxSteps",
                         "maxRunTokens"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "call": {
+                      "type": "object",
+                      "properties": {
+                        "fromProfileId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "fromName": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "fromRunId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "depth": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 3
+                        },
+                        "chain": {
+                          "minItems": 2,
+                          "maxItems": 4,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "fromProfileId",
+                        "fromName",
+                        "fromRunId",
+                        "depth",
+                        "chain"
                       ],
                       "additionalProperties": false
                     }
@@ -14909,6 +15043,48 @@
                           "maxRunTokens"
                         ],
                         "additionalProperties": false
+                      },
+                      "call": {
+                        "type": "object",
+                        "properties": {
+                          "fromProfileId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "fromName": {
+                            "type": "string",
+                            "maxLength": 100
+                          },
+                          "fromRunId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          "depth": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 3
+                          },
+                          "chain": {
+                            "minItems": 2,
+                            "maxItems": 4,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            }
+                          }
+                        },
+                        "required": [
+                          "fromProfileId",
+                          "fromName",
+                          "fromRunId",
+                          "depth",
+                          "chain"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": [
@@ -15351,6 +15527,48 @@
                         "maxRunTokens"
                       ],
                       "additionalProperties": false
+                    },
+                    "call": {
+                      "type": "object",
+                      "properties": {
+                        "fromProfileId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "fromName": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "fromRunId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "depth": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 3
+                        },
+                        "chain": {
+                          "minItems": 2,
+                          "maxItems": 4,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "fromProfileId",
+                        "fromName",
+                        "fromRunId",
+                        "depth",
+                        "chain"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -15790,6 +16008,48 @@
                         "toolResultTokens",
                         "maxSteps",
                         "maxRunTokens"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "call": {
+                      "type": "object",
+                      "properties": {
+                        "fromProfileId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "fromName": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "fromRunId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "depth": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 3
+                        },
+                        "chain": {
+                          "minItems": 2,
+                          "maxItems": 4,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "fromProfileId",
+                        "fromName",
+                        "fromRunId",
+                        "depth",
+                        "chain"
                       ],
                       "additionalProperties": false
                     }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { agentCallOriginSchema } from './peers.js';
 import { contextPolicySchema, modelSchema, profileSchema, sessionSchema } from './profile.js';
 import { modelSelectionSchema } from './providers.js';
 
@@ -15,6 +16,9 @@ export const profileRecordSchema = profileSchema.extend({
 export const sessionRecordSchema = sessionSchema.extend({
   id: uuid,
   profileId: uuid,
+  // Only on the session a pair of agents shares: the profile on the other side of it. The
+  // session belongs to this profile alone; the peer never reads it.
+  peerProfileId: uuid.optional(),
   createdAt: timestamp,
 });
 
@@ -60,6 +64,8 @@ export const runRecordSchema = z.strictObject({
   model: modelSchema.optional(),
   modelSelection: modelSelectionSchema.optional(),
   contextPolicy: contextPolicySchema.optional(),
+  // Present when another profile asked for this run; it carries the chain's spent budget.
+  call: agentCallOriginSchema.optional(),
 });
 
 export const revisionRecordSchema = z.strictObject({

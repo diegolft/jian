@@ -308,8 +308,7 @@ export class Channels {
           .update(JSON.stringify([channel.id, contact.chatId, contact.actorId, requestKey]))
           .digest('hex'),
       },
-      undefined,
-      'channel',
+      { activity: 'channel' },
     );
 
     if (this.registry.get(channel.type).send) {

@@ -2298,6 +2298,15 @@ export interface operations {
                             /** @default 100000 */
                             maxRunTokens: number;
                         };
+                        call?: {
+                            /** Format: uuid */
+                            fromProfileId: string;
+                            fromName: string;
+                            /** Format: uuid */
+                            fromRunId: string;
+                            depth: number;
+                            chain: string[];
+                        };
                     };
                 };
             };
@@ -5565,6 +5574,8 @@ export interface operations {
                     "application/json": {
                         name: string;
                         instructions: string;
+                        /** @default  */
+                        summary: string;
                         /** @default null */
                         avatar: string | null;
                         /**
@@ -5770,6 +5781,8 @@ export interface operations {
                 "application/json": {
                     name: string;
                     instructions: string;
+                    /** @default  */
+                    summary?: string;
                     /** @default null */
                     avatar?: string | null;
                     /**
@@ -5865,6 +5878,8 @@ export interface operations {
                     "application/json": {
                         name: string;
                         instructions: string;
+                        /** @default  */
+                        summary: string;
                         /** @default null */
                         avatar: string | null;
                         /**
@@ -6078,6 +6093,8 @@ export interface operations {
                     "application/json": {
                         name: string;
                         instructions: string;
+                        /** @default  */
+                        summary: string;
                         /** @default null */
                         avatar: string | null;
                         /**
@@ -6285,6 +6302,8 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     instructions?: string;
+                    /** @default  */
+                    summary?: string;
                     avatar?: string | null;
                     model?: {
                         /** @enum {string} */
@@ -6352,6 +6371,8 @@ export interface operations {
                     "application/json": {
                         name: string;
                         instructions: string;
+                        /** @default  */
+                        summary: string;
                         /** @default null */
                         avatar: string | null;
                         /**
@@ -6569,6 +6590,8 @@ export interface operations {
                         profile: {
                             name: string;
                             instructions: string;
+                            /** @default  */
+                            summary: string;
                             /** @default null */
                             avatar: string | null;
                             /**
@@ -6790,6 +6813,8 @@ export interface operations {
                         id: string;
                         /** Format: uuid */
                         profileId: string;
+                        /** Format: uuid */
+                        peerProfileId?: string;
                         /** Format: date-time */
                         createdAt: string;
                     }[];
@@ -6929,6 +6954,8 @@ export interface operations {
                         id: string;
                         /** Format: uuid */
                         profileId: string;
+                        /** Format: uuid */
+                        peerProfileId?: string;
                         /** Format: date-time */
                         createdAt: string;
                     };
@@ -7261,6 +7288,15 @@ export interface operations {
                             maxSteps: number;
                             /** @default 100000 */
                             maxRunTokens: number;
+                        };
+                        call?: {
+                            /** Format: uuid */
+                            fromProfileId: string;
+                            fromName: string;
+                            /** Format: uuid */
+                            fromRunId: string;
+                            depth: number;
+                            chain: string[];
                         };
                     };
                 };
@@ -7707,6 +7743,15 @@ export interface operations {
                             /** @default 100000 */
                             maxRunTokens: number;
                         };
+                        call?: {
+                            /** Format: uuid */
+                            fromProfileId: string;
+                            fromName: string;
+                            /** Format: uuid */
+                            fromRunId: string;
+                            depth: number;
+                            chain: string[];
+                        };
                     }[];
                 };
             };
@@ -7888,6 +7933,15 @@ export interface operations {
                             /** @default 100000 */
                             maxRunTokens: number;
                         };
+                        call?: {
+                            /** Format: uuid */
+                            fromProfileId: string;
+                            fromName: string;
+                            /** Format: uuid */
+                            fromRunId: string;
+                            depth: number;
+                            chain: string[];
+                        };
                     };
                 };
             };
@@ -8068,6 +8122,15 @@ export interface operations {
                             maxSteps: number;
                             /** @default 100000 */
                             maxRunTokens: number;
+                        };
+                        call?: {
+                            /** Format: uuid */
+                            fromProfileId: string;
+                            fromName: string;
+                            /** Format: uuid */
+                            fromRunId: string;
+                            depth: number;
+                            chain: string[];
                         };
                     };
                 };

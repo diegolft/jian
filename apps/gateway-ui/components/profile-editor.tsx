@@ -124,6 +124,7 @@ export function ProfileEditor({
                 expectedVersion: profile.version,
                 name: String(form.get('name')),
                 instructions: String(form.get('instructions')),
+                summary: String(form.get('summary')),
                 avatar: String(form.get('avatar')) || null,
                 identity: {
                   role: '',
@@ -154,6 +155,17 @@ export function ProfileEditor({
                 rows={8}
                 required
                 maxLength={8000}
+              />
+            </Field>
+            <Field
+              label="Resumo para a equipe"
+              hint="Uma linha sobre o que este agente faz. É tudo o que os outros perfis veem dele."
+            >
+              <input
+                name="summary"
+                defaultValue={profile.summary}
+                maxLength={280}
+                placeholder="Ex.: Cuida das entregas e sabe o estado de cada uma."
               />
             </Field>
             <Field label="Limites" hint="Regras que o perfil deve respeitar, uma por linha.">

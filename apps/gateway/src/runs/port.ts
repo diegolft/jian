@@ -1,5 +1,12 @@
-import type { Checkpoint, Run } from '@jian/contracts';
+import type { AgentCallOrigin, Checkpoint, Run } from '@jian/contracts';
 import type { Reader } from '../core/store.js';
+
+/** What decides a run beyond its text: where it continues from, who asked, what it may cost. */
+export type SubmitOptions = {
+  continuationOf?: string;
+  activity?: 'conversation' | 'channel';
+  call?: AgentCallOrigin;
+};
 
 export interface RunReader {
   run(profileId: string, runId: string, reader?: Reader): Promise<Run>;
@@ -11,8 +18,7 @@ export interface RunWriter extends RunReader {
     profileId: string,
     sessionId: string,
     input: unknown,
-    continuationOf?: string,
-    activity?: 'conversation' | 'channel',
+    options?: SubmitOptions,
   ): Promise<Run>;
 }
 

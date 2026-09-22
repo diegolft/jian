@@ -3,6 +3,7 @@ import { MockLanguageModelV4 } from 'ai/test';
 import { PgBoss } from 'pg-boss';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AgentRuntime } from '../src/agent/runtime.js';
+import { Peers } from '../src/peers/service.js';
 import { RunQueue } from '../src/runs/queue.js';
 import { SecretBox } from '../src/security/crypto.js';
 import { Vault } from '../src/security/vault.js';
@@ -127,6 +128,62 @@ describe('PostgreSQL durability', () => {
       await queue.stop();
     }
   }, 30_000);
+
+  it('answers concurrent agent calls with one run of the called profile', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => ({
+        content: [{ type: 'text', text: 'Feito.' }],
+        finishReason: { unified: 'stop', raw: 'stop' },
+        warnings: [],
+        usage: {
+          inputTokens: { total: 1, noCache: 1, cacheRead: 0, cacheWrite: 0 },
+          outputTokens: { total: 1, text: 1, reasoning: 0 },
+        },
+      }),
+    });
+
+    const runtime = new AgentRuntime(services, () => model);
+    const queue = new RunQueue(new PgBoss(connectionString), services, runtime, () => {});
+    const caller = await services.profiles.createProfile({ ...input, name: 'Caller' });
+    const callee = await services.profiles.createProfile({ ...input, name: 'Callee' });
+    const session = await services.sessions.createSession(caller.id, { title: 'Owner' });
+    const peers = new Peers(services, Date.now, { answerWithin: 25_000, pollEvery: 100 });
+
+    const asking = await services.runs.submit(caller.id, session.id, {
+      text: 'Delegate it',
+      requestKey: 'peer-root',
+    });
+
+    try {
+      await queue.start();
+
+      const call = () =>
+        peers.ask(asking, { toProfileId: callee.id, text: 'Faça', requestKey: 'peer-same' });
+
+      expect((await Promise.all([call(), call()])).map((answer) => answer.text)).toEqual([
+        'Feito.',
+        'Feito.',
+      ]);
+
+      const answered = await store.list('run', { profileId: callee.id });
+
+      expect(answered).toHaveLength(1);
+      expect(answered[0]?.call?.chain).toEqual([caller.id, callee.id]);
+
+      expect(
+        (await services.sessions.sessions(callee.id)).filter(
+          (shared) => shared.peerProfileId === caller.id,
+        ),
+      ).toHaveLength(1);
+
+      // The wall holds against the real store: the caller reaches nothing of the callee.
+      await expect(
+        services.sessions.messages(caller.id, answered[0]?.sessionId ?? ''),
+      ).rejects.toThrow();
+    } finally {
+      await queue.stop();
+    }
+  }, 40_000);
 });
 
 it('applies migrations repeatedly and searches old records through stable cursors', async () => {
