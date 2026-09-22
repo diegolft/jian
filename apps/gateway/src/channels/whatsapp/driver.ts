@@ -12,6 +12,7 @@ import {
   type WASocket,
 } from 'baileys';
 import { MAX_DEVICE_SESSION_BYTES } from './connections.js';
+import { quietLibsignal } from './quiet.js';
 import type { DeviceFactory } from './types.js';
 import { DEVICE_SEND_TIMEOUT_MS } from './types.js';
 
@@ -325,6 +326,8 @@ export function createWhatsAppDeviceFactory(): DeviceFactory {
     return {
       start: async () => {
         if (socket || closed) return;
+
+        quietLibsignal();
 
         socket = makeWASocket({
           auth,
