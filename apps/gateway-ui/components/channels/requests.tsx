@@ -2,7 +2,7 @@
 
 import { ShieldQuestion, UserCheck, UserX } from 'lucide-react';
 import type { Contact } from '../../lib/api';
-import { date } from '../../lib/api';
+import { date } from '../../lib/format';
 import type { SectionProps } from '../props';
 import { Badge, Button } from '../ui';
 import { kinds } from './kinds';

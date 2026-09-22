@@ -2,7 +2,8 @@
 
 import { BookOpen, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { date, type Memory } from '../../lib/api';
+import type { Memory } from '../../lib/api';
+import { date } from '../../lib/format';
 import type { SectionProps } from '../props';
 import { Button, Confirm, Empty, Field, SectionHeading } from '../ui';
 

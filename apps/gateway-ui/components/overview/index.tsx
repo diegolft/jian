@@ -2,7 +2,8 @@
 
 import { Activity, ArrowRight, BookOpen, Check, MessageSquare, Smartphone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { date, type Profile, type ProfileData } from '../../lib/api';
+import type { Profile, ProfileData } from '../../lib/api';
+import { date } from '../../lib/format';
 import { Avatar } from '../profile/avatar-field';
 import { Badge, Button, SectionHeading } from '../ui';
 

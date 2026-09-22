@@ -2,7 +2,7 @@
 
 import { MessageSquare, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { date } from '../../lib/api';
+import { date } from '../../lib/format';
 import type { SectionProps } from '../props';
 import { Button, Empty, Field, Modal, SectionHeading } from '../ui';
 import { Conversation } from './conversation';

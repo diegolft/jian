@@ -2,7 +2,7 @@
 
 import { BookOpen, Pencil, Plug, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { lines } from '../../lib/api';
+import { lines } from '../../lib/format';
 import type { SectionProps } from '../props';
 import { Button, Confirm, Empty, Field, Modal, SectionHeading } from '../ui';
 import { SkillImport } from './import';

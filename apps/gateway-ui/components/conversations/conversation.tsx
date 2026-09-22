@@ -2,14 +2,8 @@
 
 import { ArrowUp, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import {
-  date,
-  type GatewayApi,
-  type ModelSelection,
-  type ProfileData,
-  type ReasoningEffort,
-  type Run,
-} from '../../lib/api';
+import type { GatewayApi, ModelSelection, ProfileData, ReasoningEffort, Run } from '../../lib/api';
+import { date } from '../../lib/format';
 import { availableModels } from '../providers/catalog';
 import { Badge, Button, Empty } from '../ui';
 import { running, statusLabels } from './status';

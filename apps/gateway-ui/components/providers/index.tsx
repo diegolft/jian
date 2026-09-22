@@ -2,7 +2,8 @@
 
 import { Save, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { date, type GatewayApi } from '../../lib/api';
+import type { GatewayApi } from '../../lib/api';
+import { date } from '../../lib/format';
 import type { SectionProps } from '../props';
 import { Badge, Button, Field, SectionHeading } from '../ui';
 import { providers } from './catalog';

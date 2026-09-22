@@ -3,7 +3,7 @@
 import { QrCode, Unplug } from 'lucide-react';
 import { useState } from 'react';
 import type { Channel, ChannelType } from '../../lib/api';
-import { date } from '../../lib/api';
+import { date } from '../../lib/format';
 import type { SectionProps } from '../props';
 import { Badge, Button, Confirm, Field, Secret, SectionHeading } from '../ui';
 import { kinds } from './kinds';
