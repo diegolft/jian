@@ -7,6 +7,7 @@ export default function configuration(phase) {
     trailingSlash: true,
     poweredByHeader: false,
     images: { unoptimized: true },
+    devIndicators: false,
     ...(phase === PHASE_DEVELOPMENT_SERVER
       ? {
           // basePath makes the dev server answer only under /ui; in production the Gateway

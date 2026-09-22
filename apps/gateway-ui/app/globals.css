@@ -345,7 +345,7 @@ svg {
   padding: 0 11px;
   margin-bottom: 8px;
 }
-.nav-group button {
+.nav-group a {
   display: flex;
   align-items: center;
   gap: 11px;
@@ -359,15 +359,15 @@ svg {
   font-size: 12px;
   text-align: left;
 }
-.nav-group button:hover {
+.nav-group a:hover {
   background: #ecf0f7;
 }
-.nav-group button.active {
+.nav-group a.active {
   background: #e7edfb;
   color: #315cce;
   font-weight: 500;
 }
-.nav-group button small {
+.nav-group a small {
   margin-left: auto;
   font-size: 10px;
   background: #e5eaf2;
