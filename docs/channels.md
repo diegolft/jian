@@ -36,9 +36,9 @@ O vínculo fixo foi escolhido para tornar o acesso explícito e evitar que o rem
 
 ## WhatsApp por dispositivo vinculado
 
-`WhatsAppChannel` usa [`whatsapp-web.js`](https://github.com/pedroslopez/whatsapp-web.js), com licença Apache 2.0. A conexão funciona como um dispositivo vinculado por QR Code; não usa a Cloud API da Meta. A biblioteca é não oficial: mudanças no WhatsApp podem interromper a conexão e há risco de restrição da conta.
+`WhatsAppChannel` usa [`baileys`](https://github.com/WhiskeySockets/Baileys), com licença MIT. A conexão funciona como um dispositivo vinculado por QR Code; não usa a Cloud API da Meta. A biblioteca é não oficial: mudanças no WhatsApp podem interromper a conexão e há risco de restrição da conta.
 
-O worker executa um Chromium separado para cada ligação. Configure `JIAN_WHATSAPP_CHROMIUM` com o caminho absoluto do executável, por exemplo `/usr/bin/chromium` no Linux ou `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` no macOS. A imagem Docker inclui Chromium, mas o host precisa permitir seu sandbox; o Gateway não adiciona `--no-sandbox`. Não é necessário instalar navegador nos processos que executam somente a API.
+O worker fala o protocolo multi-dispositivo direto por WebSocket, sem navegador. Cada ligação abre um socket próprio; não há executável externo a instalar nem variável de ambiente a configurar. Processos que executam somente a API não abrem socket algum.
 
 Crie uma ligação usando `type: "whatsapp"`, a sessão existente e os contatos autorizados em `actorIds` e `chatIds`. Para conversas diretas, ambos usam o mesmo JID, como `5511999999999@c.us`. O driver resolve identificadores LID para telefone quando o WhatsApp fornece esse mapeamento; IDs `@lid` também podem ser autorizados explicitamente. Não informe `credentialId`: a credencial é criada pelo pareamento. O `webhookToken` do contrato comum não é usado pelo WhatsApp; o canal não aceita entrada HTTP pública.
 
@@ -65,9 +65,9 @@ Todas as operações abaixo exigem o token de administrador, inclusive a consult
 
 No telefone, use **Aparelhos conectados → Conectar um aparelho** e leia o QR renderizado pelo cliente. Ele expira e pode ser substituído durante o pareamento: consulte `/qr` novamente se receber `409`. Nunca envie o QR para geradores externos. O Gateway não imprime o QR, cookies, chaves ou arquivos de sessão nos logs.
 
-O estado `connected` indica que é possível enviar mensagens; `sessionSavedAt` indica que um backup recuperável já foi persistido. O primeiro backup aguarda aproximadamente um minuto para a sincronização inicial, conforme o funcionamento do [RemoteAuth](https://wwebjs.dev/guide/creating-your-bot/authentication.html#remoteauth-strategy). Não encerre o worker antes desse primeiro backup se quiser restaurar a conexão sem outro QR.
+O estado `connected` indica que é possível enviar mensagens; `sessionSavedAt` indica que um backup recuperável já foi persistido. As credenciais do pareamento são gravadas antes de o estado virar `connected`, e gravações seguintes são agrupadas em cerca de um segundo. A parada normal descarrega o que estiver pendente; um encerramento abrupto pode perder a última rotação de chaves e exigir novo QR.
 
-As sessões e o QR são criptografados com o mesmo keyring AES-256-GCM do Gateway e vinculados ao perfil/canal por dados autenticados. O arquivo de sessão é limitado a 64 MiB e dividido em partes autenticadas. Chromium precisa de arquivos temporários em texto claro enquanto roda: ficam em diretório privado `0700`, removido na parada normal. Use `TMPDIR` em armazenamento efêmero, preferencialmente tmpfs, no worker; encerramentos abruptos podem deixar arquivos até a limpeza do volume. O navegador realiza sua própria comunicação com o WhatsApp, fora do cliente HTTP usado pelos providers/MCPs.
+As sessões e o QR são criptografados com o mesmo keyring AES-256-GCM do Gateway e vinculados ao perfil/canal por dados autenticados. A sessão é serializada em JSON, limitada a 64 MiB e dividida em partes autenticadas. Ela existe em texto claro apenas na memória do worker: nenhum arquivo de sessão é escrito em disco. O socket do WhatsApp faz sua própria comunicação, fora do cliente HTTP usado pelos providers/MCPs.
 
 Uma lease no banco atribui a conexão a um worker. A geração e o contador de posse impedem que callbacks ou backups antigos restabeleçam uma sessão desconectada. Revogar a ligação também apaga suas credenciais recuperáveis. O logout remoto é tentado pelo worker; se ele estiver indisponível, remova o dispositivo no próprio telefone para revogar também no WhatsApp.
 
@@ -75,4 +75,4 @@ Mensagens de texto diretas são persistidas em uma caixa de entrada, deduplicada
 
 Respostas usam a fila de entregas comum. `sent` significa que a biblioteca confirmou o envio, não que o destinatário leu a mensagem. Confirmações perdidas viram `unknown` e não provocam reenvio automático. Os IDs remotos são strings no WhatsApp e continuam numéricos no Telegram.
 
-A validação automatizada usa um dispositivo simulado. O pareamento, a restauração do perfil Chromium e a entrega real exigem um worker com navegador e um telefone. Os testes locais não conectam uma conta real.
+A validação automatizada usa um dispositivo simulado. O pareamento, a restauração da sessão e a entrega real exigem um worker com saída para o WhatsApp e um telefone. Os testes locais não conectam uma conta real.

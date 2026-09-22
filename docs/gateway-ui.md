@@ -21,7 +21,7 @@ A aplicação usa uma página estática, com navegação por fragmentos (`/ui/#c
 
 O login ChatGPT usa o backend Codex com o mesmo ciclo de contexto, ferramentas e registro de uso do Jian. Tokens OAuth ficam criptografados no cofre e são renovados pelo gateway. Não cole tokens de login no campo de chave de API. Perfis antigos com `model` e `contextPolicy` continuam legíveis e funcionais.
 
-Para WhatsApp, abra **Conexão**, gere o QR Code e leia-o no celular em **Dispositivos conectados**. O worker precisa de Chromium. O painel acompanha a conexão e a primeira cópia criptografada da sessão. O QR expira e não é gravado no navegador.
+Para WhatsApp, abra **Conexão**, gere o QR Code e leia-o no celular em **Dispositivos conectados**. O painel acompanha a conexão e a primeira cópia criptografada da sessão. O QR expira e não é gravado no navegador.
 
 Para Telegram, cadastre o token do BotFather como credencial de canal. Depois da criação, o painel mostra a URL e o segredo do webhook uma única vez. O registro de `setWebhook` no Telegram continua sendo uma etapa externa; consulte [canais](channels.md). O webhook HTTP genérico recebe mensagens, mas não envia respostas a um serviço externo.
 
@@ -39,6 +39,6 @@ Chaves de acesso são isoladas por perfil, têm escopos e data de expiração. O
 - Mudanças de perfil usam `expectedVersion`; submissões de mensagem conservam a chave de idempotência quando a resposta HTTP é incerta.
 - Listagens seguem os limites atuais da API: até 100 sessões, mensagens recentes, memórias e entregas. O painel não substitui a API de histórico paginado.
 
-Infraestrutura permanece na configuração do servidor: PostgreSQL, keyring de criptografia, token administrativo, papel API/worker, Chromium, HTTPS e regras de rede. A UI não transforma esta instalação de dono único em um SaaS multiusuário.
+Infraestrutura permanece na configuração do servidor: PostgreSQL, keyring de criptografia, token administrativo, papel API/worker, HTTPS e regras de rede. A UI não transforma esta instalação de dono único em um SaaS multiusuário.
 
 A prévia local de desenvolvimento usa dados sintéticos em memória. Validação visual e testes HTTP locais não comprovam persistência PostgreSQL, entrega por serviços externos ou pareamento real do WhatsApp.

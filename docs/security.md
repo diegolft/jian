@@ -49,6 +49,4 @@ Não publique credenciais ou provas com dados privados em issues. Antes de dispo
 
 Parear por QR concede acesso à conta. Conexão, estado e QR exigem token de administrador; o QR é criptografado no banco, expira e usa `Cache-Control: no-store`. Backups da sessão são criptografados e isolados por perfil/canal. Callbacks de gerações ou posses antigas não podem regravar credenciais após desconexão/revogação.
 
-Chromium usa diretório temporário privado em texto claro durante a execução; prefira tmpfs no worker e limpe o volume após falhas abruptas. Mantenha o sandbox do navegador e o próprio Chromium atualizados. O processo acessa o WhatsApp diretamente; aplique controles de saída também ao worker. A integração não é uma API oficial da Meta.
-
-O pnpm mantém Puppeteer 25.11.0 para evitar o `extract-zip` vulnerável da dependência original de `whatsapp-web.js`. Downloads automáticos de navegador ficam desativados: o executável é fornecido pelo operador ou pela imagem Docker.
+A sessão em texto claro existe somente na memória do worker; nada é escrito em disco. O worker abre um WebSocket direto para o WhatsApp: aplique controles de saída também a ele. A integração não é uma API oficial da Meta.

@@ -149,8 +149,7 @@ function Pairing({
         </p>
       )}
       <p className="note">
-        O Gateway precisa de Chromium instalado. Esta conexão usa um dispositivo vinculado; mantenha
-        o QR privado.
+        Esta conexão usa um dispositivo vinculado ao seu WhatsApp; mantenha o QR privado.
       </p>
       <footer>
         <Button variant="secondary" onClick={close}>

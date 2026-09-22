@@ -14,7 +14,7 @@ export const MAX_DEVICE_SESSION_BYTES = 64 * 1024 * 1024;
 type Receiver = (id: string, input: IncomingMessage, generation: number) => Promise<unknown>;
 type LocalDevice = { device: LinkedDevice; generation: number; fence: number };
 
-/** Database leases keep API replicas independent from the worker that owns the browser. */
+/** Database leases keep API replicas independent from the worker that owns the device socket. */
 export class WhatsAppConnections {
   private readonly owner = randomUUID();
   private readonly devices = new Map<string, LocalDevice>();
@@ -76,7 +76,7 @@ export class WhatsAppConnections {
     await this.store.transaction(profileId, async (tx) => {
       const current = await tx.get('channelConnection', id);
 
-      // Incrementing the generation fences every callback and backup from the old browser.
+      // Incrementing the generation fences every callback and backup from the old device.
       await tx.put('channelConnection', id, profileId, {
         id,
         profileId,
@@ -312,7 +312,7 @@ export class WhatsAppConnections {
           qr: undefined,
           qrExpiresAt: undefined,
           error:
-            'WhatsApp connection failed. Check Chromium and worker configuration, then reconnect.',
+            'WhatsApp connection failed. Check the worker configuration and network, then reconnect.',
         }),
     });
 
@@ -328,7 +328,7 @@ export class WhatsAppConnections {
         qr: undefined,
         qrExpiresAt: undefined,
         error:
-          'WhatsApp connection failed. Check Chromium and worker configuration, then reconnect.',
+          'WhatsApp connection failed. Check the worker configuration and network, then reconnect.',
       }).catch(() => {});
     });
   }

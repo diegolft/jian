@@ -1,108 +1,156 @@
-import { chmod, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import WhatsApp from 'whatsapp-web.js';
+import {
+  type AuthenticationCreds,
+  type AuthenticationState,
+  BufferJSON,
+  DisconnectReason,
+  initAuthCreds,
+  jidDecode,
+  makeWASocket,
+  proto,
+  type SignalDataTypeMap,
+  type WAMessage,
+  type WASocket,
+} from 'baileys';
 import { MAX_DEVICE_SESSION_BYTES } from './connections.js';
 import type { DeviceFactory } from './types.js';
 import { DEVICE_SEND_TIMEOUT_MS } from './types.js';
 
-/** Upstream exposes this method at runtime, but omits it from its RemoteAuth declaration. */
-type SessionBackup = { storeRemoteSession(options?: { emit: boolean }): Promise<void> };
+/** Signal rotates keys in bursts; one grouped write per burst instead of one per key. */
+const SESSION_WRITE_DELAY_MS = 1000;
 
-export function createWhatsAppDeviceFactory(executablePath?: string): DeviceFactory {
-  return async (id, store, callbacks) => {
-    if (!executablePath) {
-      throw new Error('JIAN_WHATSAPP_CHROMIUM is required');
+/** Keeps a fresh QR inside the 45 s window the panel publishes; the library defaults to 60 s. */
+const QR_REFRESH_MS = 30_000;
+
+const CONTACT_JID = /^\d+@(c\.us|lid)$/;
+
+/** Servers the protocol uses for a single person, mapped onto the JIDs the channel contract takes. */
+const CONTACT_SERVERS: Record<string, 'c.us' | 'lid' | undefined> = {
+  'c.us': 'c.us',
+  hosted: 'c.us',
+  's.whatsapp.net': 'c.us',
+  'hosted.lid': 'lid',
+  lid: 'lid',
+};
+
+interface SilentLogger {
+  level: string;
+  child(): SilentLogger;
+  trace(): void;
+  debug(): void;
+  info(): void;
+  warn(): void;
+  error(): void;
+}
+
+/** The socket demands a logger. Session material flows through it, so it stays a sink. */
+const silent: SilentLogger = {
+  level: 'silent',
+  child: () => silent,
+  trace: () => {},
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+};
+
+/** The gateway stores `@c.us`/`@lid` allowlists; the protocol addresses users by `@s.whatsapp.net`. */
+const toContactJid = (jid: string | null | undefined) => {
+  const decoded = jidDecode(jid ?? undefined);
+  const server = decoded && CONTACT_SERVERS[decoded.server];
+  const contact = server ? `${decoded?.user}@${server}` : '';
+
+  return CONTACT_JID.test(contact) ? contact : undefined;
+};
+
+const toDeviceJid = (chatId: string) =>
+  CONTACT_JID.test(chatId) ? chatId.replace(/@c\.us$/, '@s.whatsapp.net') : undefined;
+
+const textOf = (message: WAMessage) =>
+  message.message?.conversation ?? message.message?.extendedTextMessage?.text ?? undefined;
+
+/** The close reason travels as a Boom payload; read it structurally rather than depend on Boom. */
+const statusCodeOf = (error: unknown) =>
+  (error as { output?: { statusCode?: number } } | undefined)?.output?.statusCode;
+
+/** The persisted shape: credentials plus the Signal key buckets, both JSON with encoded binaries. */
+type StoredSession = { creds: AuthenticationCreds; keys: Record<string, Record<string, unknown>> };
+
+export function createWhatsAppDeviceFactory(): DeviceFactory {
+  return async (_id, store, callbacks) => {
+    const saved = await store.load();
+    const session: StoredSession = saved
+      ? (JSON.parse(saved.toString('utf8'), BufferJSON.reviver) as StoredSession)
+      : { creds: initAuthCreds(), keys: {} };
+
+    if (!session?.creds?.noiseKey) {
+      throw new Error('Stored WhatsApp session is unusable');
     }
 
-    // Chromium needs plaintext while running. Keep its working files private and ephemeral;
-    // only encrypted session archives are persisted by the gateway's store.
-    const directory = await mkdtemp(join(tmpdir(), 'jian-whatsapp-'));
-    await chmod(directory, 0o700);
-    const sessionName = `RemoteAuth-${id}`;
-    const archive = join(directory, `${sessionName}.zip`);
+    let socket: WASocket | undefined;
     let closed = false;
-    let backupTimer: ReturnType<typeof setTimeout> | undefined;
-    let backup: Promise<void> = Promise.resolve();
-    let initialization: Promise<void> | undefined;
+    let dirty = false;
+    let writing: Promise<void> = Promise.resolve();
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let stopping: Promise<void> | undefined;
 
-    const checkSession = (session: string, path?: string) => {
-      if (session !== sessionName || (path !== undefined && path !== archive)) {
-        throw new Error('Device session path mismatch');
+    const persist = async () => {
+      dirty = false;
+      const data = Buffer.from(JSON.stringify(session, BufferJSON.replacer), 'utf8');
+
+      if (data.length > MAX_DEVICE_SESSION_BYTES) {
+        throw new Error('Device session size limit exceeded');
       }
+
+      // Serialize the writes: the store rewrites the whole session, so order decides the survivor.
+      writing = writing.catch(() => {}).then(() => store.save(data));
+      await writing;
     };
 
-    const auth = new WhatsApp.RemoteAuth({
-      clientId: id,
-      dataPath: directory,
-      backupSyncIntervalMs: 60_000,
-      store: {
-        sessionExists: async ({ session }) => {
-          checkSession(session);
-          return !!(await store.load());
-        },
-        save: async ({ session }) => {
-          checkSession(session);
+    const flush = async () => {
+      clearTimeout(timer);
+      timer = undefined;
 
-          if ((await stat(archive)).size > MAX_DEVICE_SESSION_BYTES) {
-            throw new Error('Device session size limit exceeded');
-          }
+      if (dirty) {
+        await persist();
+      }
 
-          await store.save(await readFile(archive));
-        },
-        extract: async ({ session, path }) => {
-          checkSession(session, path);
-          const data = await store.load();
+      await writing;
+    };
 
-          if (!data) {
-            throw new Error('Device session missing');
-          }
+    const scheduleWrite = () => {
+      dirty = true;
 
-          await writeFile(path, data, { mode: 0o600 });
-        },
-        delete: async ({ session }) => {
-          checkSession(session);
-          await store.clear();
-        },
-      },
-    });
+      if (timer || closed) return;
 
-    // Own the backup timer so a late authentication callback cannot restart it after shutdown.
-    auth.afterAuthReady = async () => {};
-
-    const client = new WhatsApp.Client({
-      authStrategy: auth,
-      deviceName: 'Jian Gateway',
-      browserName: 'Chrome',
-      qrMaxRetries: 5,
-      takeoverOnConflict: false,
-      webVersionCache: { type: 'none' },
-      puppeteer: {
-        executablePath,
-        headless: true,
-        args: ['--disable-dev-shm-usage'],
-        timeout: 30_000,
-      },
-    });
+      timer = setTimeout(() => {
+        timer = undefined;
+        void persist().catch(failed);
+      }, SESSION_WRITE_DELAY_MS);
+      timer.unref();
+    };
 
     const stop = (logout: boolean): Promise<void> => {
       if (stopping) return stopping;
-      closed = true;
-      clearTimeout(backupTimer);
-      client.removeAllListeners();
 
       stopping = (async () => {
+        const current = socket;
+        closed = true;
+        current?.ev.removeAllListeners('connection.update');
+        current?.ev.removeAllListeners('creds.update');
+        current?.ev.removeAllListeners('messages.upsert');
+
         if (logout) {
-          await client.logout().catch(() => {});
+          clearTimeout(timer);
+          timer = undefined;
+          dirty = false;
+          await current?.logout().catch(() => {});
+          await store.clear().catch(() => {});
+        } else {
+          // A dropped last write unpairs the device on the next start; never leave one pending.
+          await flush().catch(() => {});
         }
 
-        await client.destroy().catch(() => {});
-        // initialize may have been awaiting Chromium launch when shutdown was requested.
-        await initialization?.catch(() => {});
-        await client.destroy().catch(() => {});
-        await backup.catch(() => {});
-        await rm(directory, { recursive: true, force: true });
+        await current?.end(undefined).catch(() => {});
       })();
 
       return stopping;
@@ -118,80 +166,135 @@ export function createWhatsAppDeviceFactory(executablePath?: string): DeviceFact
       if (!closed) void action().catch(failed);
     };
 
-    const scheduleBackup = () => {
-      if (closed) return;
+    const auth: AuthenticationState = {
+      creds: session.creds,
+      keys: {
+        get: <T extends keyof SignalDataTypeMap>(type: T, ids: string[]) => {
+          const bucket = session.keys[type];
+          const found: { [id: string]: SignalDataTypeMap[T] } = {};
 
-      backupTimer = setTimeout(() => {
-        // The first minute lets WhatsApp finish synchronizing its multi-device credentials.
-        backup = (auth as unknown as SessionBackup).storeRemoteSession({ emit: true });
-        void backup.then(scheduleBackup, failed);
-      }, 60_000);
-      backupTimer.unref();
+          for (const id of ids) {
+            const value = bucket?.[id];
+
+            if (value === undefined || value === null) continue;
+
+            // JSON keeps this one as a plain object; the socket expects the decoded protobuf.
+            found[id] = (
+              type === 'app-state-sync-key'
+                ? proto.Message.AppStateSyncKeyData.fromObject(value as Record<string, unknown>)
+                : value
+            ) as SignalDataTypeMap[T];
+          }
+
+          return found;
+        },
+        set: (data) => {
+          for (const [type, entries] of Object.entries(data)) {
+            session.keys[type] ??= {};
+            const bucket = session.keys[type];
+
+            for (const [id, value] of Object.entries(entries ?? {})) {
+              if (value === null || value === undefined) {
+                delete bucket[id];
+              } else {
+                bucket[id] = value;
+              }
+            }
+          }
+
+          scheduleWrite();
+        },
+      },
     };
 
-    client.on('qr', (value) => handle(() => callbacks.qr(value)));
-    client.on('ready', () =>
-      handle(async () => {
-        await callbacks.ready(client.info.wid._serialized);
-        clearTimeout(backupTimer);
-        scheduleBackup();
-      }),
-    );
-    client.on('auth_failure', () => {
-      void failed();
-    });
-    client.on('disconnected', (reason) =>
-      handle(async () => {
-        await callbacks.disconnected(reason === 'LOGOUT');
-        // Destroy on the next worker tick; waiting here can deadlock upstream's disconnect handler.
-      }),
-    );
-    client.on('message', (message) =>
-      handle(async () => {
-        if (
-          message.fromMe ||
-          message.type !== 'chat' ||
-          message.hasMedia ||
-          !/^\d+@(c\.us|lid)$/.test(message.from) ||
-          !message.body.trim() ||
-          message.body.length > 8000
-        ) {
-          return;
-        }
+    const opened = async () => {
+      const accountId = toContactJid(socket?.user?.id);
 
-        // WhatsApp may identify contacts by LID. Resolve its authenticated phone mapping so
-        // an existing phone allowlist still works after WhatsApp switches identifier formats.
-        let sender = message.from;
+      if (!accountId) {
+        throw new Error('WhatsApp did not report a linked account');
+      }
 
-        if (sender.endsWith('@lid')) {
-          const contacts = await client.getContactLidAndPhone([sender]);
-          const mapped = contacts.find((contact) => contact.lid === sender)?.pn;
+      // Pairing credentials are only durable once written; report connected after they land.
+      await flush();
+      await callbacks.ready(accountId);
+    };
 
-          if (mapped && /^\d+@c\.us$/.test(mapped)) {
-            sender = mapped;
-          }
-        }
+    const dropped = async (loggedOut: boolean) => {
+      if (!loggedOut) {
+        await flush().catch(() => {});
+      }
 
-        // Use the authenticated message's sender, never an actor ID supplied inside its text.
-        await callbacks.message({
-          actorId: sender,
-          chatId: sender,
-          text: message.body,
-          requestKey: message.id._serialized,
-        });
-      }),
-    );
+      closed = true;
+      clearTimeout(timer);
+      timer = undefined;
+      await callbacks.disconnected(loggedOut);
+    };
+
+    const deliver = async (message: WAMessage) => {
+      const text = textOf(message);
+      const requestKey = message.key.id;
+
+      if (message.key.fromMe || !requestKey || !text?.trim() || text.length > 8000) {
+        return;
+      }
+
+      // WhatsApp may address a contact by LID. Resolve its authenticated phone mapping so an
+      // existing phone allowlist still works after WhatsApp switches identifier formats.
+      const remote = message.key.remoteJid;
+      const phone = remote?.endsWith('@lid')
+        ? (message.key.remoteJidAlt ??
+          (await socket?.signalRepository.lidMapping.getPNForLID(remote)))
+        : undefined;
+      const sender = toContactJid(phone) ?? toContactJid(remote);
+
+      if (!sender) return;
+
+      // Use the authenticated message's sender, never an actor ID supplied inside its text.
+      await callbacks.message({ actorId: sender, chatId: sender, text, requestKey });
+    };
 
     return {
-      start: () => {
-        if (!initialization) {
-          initialization = client.initialize();
-        }
+      start: async () => {
+        if (socket || closed) return;
 
-        return initialization;
+        socket = makeWASocket({
+          auth,
+          logger: silent,
+          browser: ['Jian Gateway', 'Chrome', '1.0.0'],
+          qrTimeout: QR_REFRESH_MS,
+          markOnlineOnConnect: false,
+          syncFullHistory: false,
+          shouldSyncHistoryMessage: () => false,
+        });
+
+        socket.ev.on('creds.update', scheduleWrite);
+        socket.ev.on('connection.update', (update) => {
+          const qr = update.qr;
+
+          if (qr) {
+            handle(() => callbacks.qr(qr));
+          }
+
+          if (update.connection === 'open') {
+            handle(opened);
+          }
+
+          if (update.connection === 'close') {
+            const reason = statusCodeOf(update.lastDisconnect?.error);
+            handle(() => dropped(reason === DisconnectReason.loggedOut));
+          }
+        });
+        socket.ev.on('messages.upsert', ({ messages }) => {
+          // Messages queued while the worker was down arrive as 'append'; the inbox dedupes them.
+          for (const message of messages) {
+            handle(() => deliver(message));
+          }
+        });
       },
       send: async (chatId, text, signal) => {
-        if (closed || !/^\d+@(c\.us|lid)$/.test(chatId)) {
+        const jid = toDeviceJid(chatId);
+
+        if (closed || !socket || !jid) {
           throw new Error('Device unavailable');
         }
 
@@ -204,20 +307,13 @@ export function createWhatsAppDeviceFactory(executablePath?: string): DeviceFact
         });
 
         try {
-          const result = await Promise.race([
-            client.sendMessage(chatId, text, {
-              linkPreview: false,
-              sendSeen: false,
-              waitUntilMsgSent: true,
-            }),
-            interrupted,
-          ]);
+          const result = await Promise.race([socket.sendMessage(jid, { text }), interrupted]);
 
-          if (!result?.id._serialized) {
+          if (!result?.key.id) {
             throw new Error('WhatsApp send was not confirmed');
           }
 
-          return result.id._serialized;
+          return result.key.id;
         } catch {
           // Closing the socket prevents later sends; the caller records this effect as uncertain.
           void failed();

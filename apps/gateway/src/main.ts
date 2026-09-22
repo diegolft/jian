@@ -26,7 +26,6 @@ const config = z
     JIAN_MASTER_KEYS: z.string().min(1),
     JIAN_ALLOW_PRIVATE_ORIGINS: z.string().default(''),
     JIAN_API_TOKEN: z.string().min(32),
-    JIAN_WHATSAPP_CHROMIUM: z.string().min(1).optional(),
     HOST: z.string().default('127.0.0.1'),
     PORT: z.coerce.number().int().min(1).max(65535).default(4310),
     JIAN_ROLE: z.enum(['all', 'api', 'worker']).default('all'),
@@ -73,11 +72,7 @@ const outbound = createSafeFetch({
 });
 
 const coordination = new Coordination(services);
-const whatsapp = new WhatsAppConnections(
-  store,
-  box,
-  createWhatsAppDeviceFactory(config.data.JIAN_WHATSAPP_CHROMIUM),
-);
+const whatsapp = new WhatsAppConnections(store, box, createWhatsAppDeviceFactory());
 const channelRegistry = new ChannelRegistry([
   new GenericChannel(),
   new TelegramChannel(),
