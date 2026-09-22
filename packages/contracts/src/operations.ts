@@ -24,6 +24,7 @@ import {
   memoryKeySchema,
   profilePatchSchema,
   profileSchema,
+  sessionRenameSchema,
   sessionSchema,
   submitSchema,
 } from './profile.js';
@@ -422,6 +423,14 @@ export const operations: Operation[] = [
     body: sessionSchema,
     response: sessionRecordSchema,
     status: 201,
+  },
+  {
+    method: 'PATCH',
+    path: session,
+    operationId: 'renameSession',
+    access: 'admin',
+    body: sessionRenameSchema,
+    response: sessionRecordSchema,
   },
   {
     method: 'GET',

@@ -15,6 +15,13 @@
       "when": 1790082669750,
       "tag": "0001_openrouter",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790083380920,
+      "tag": "0002_session-title",
+      "breakpoints": true
     }
   ]
 }

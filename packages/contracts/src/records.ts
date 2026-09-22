@@ -15,6 +15,8 @@ export const profileRecordSchema = profileSchema.extend({
 });
 
 export const sessionRecordSchema = sessionSchema.extend({
+  // Null until the agent has read the first message and named it.
+  title: z.string().max(160).nullable(),
   id: uuid,
   profileId: uuid,
   // Only on the session a pair of agents shares: the profile on the other side of it. The

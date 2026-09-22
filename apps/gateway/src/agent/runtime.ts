@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { MCPClient } from '@ai-sdk/mcp';
-import { stepCountIs, ToolLoopAgent, type ToolSet } from 'ai';
+import type { Run } from '@jian/contracts';
+import { generateText, type LanguageModel, stepCountIs, ToolLoopAgent, type ToolSet } from 'ai';
 import { fitPrompt, tokenCounter } from '../context/budget.js';
 import type { ContextSource } from '../context/port.js';
 import { reasoningProviderOptions } from '../providers/effort.js';
@@ -25,6 +26,42 @@ export class AgentRuntime {
     private model: ModelResolver = resolveModel,
     private options: RuntimeOptions = {},
   ) {}
+
+  /**
+   * Names the conversation from its first exchange, once. Deliberately after the run is
+   * already finished and outside its budget: a failure here costs a nameless conversation the
+   * owner can rename, never an answer they already earned.
+   */
+  private async nameConversation(run: Run, model: LanguageModel, secrets: Set<string>) {
+    try {
+      // Checked before the call, not after: a conversation that already has a name must not
+      // cost a model request on every answer.
+      const session = await this.services.sessions.session(run.profileId, run.sessionId);
+
+      if (session.title) {
+        return;
+      }
+
+      const { text } = await generateText({
+        model,
+        maxOutputTokens: 64,
+        prompt:
+          'Escreva um título curto para esta conversa, de três a seis palavras, no idioma da mensagem. ' +
+          'Responda apenas com o título, sem aspas e sem pontuação final.\n\n' +
+          `Mensagem: ${run.input.slice(0, 2000)}`,
+      });
+
+      const title = redactText(text, secrets)
+        .trim()
+        .replace(/^["']|["'.]+$/g, '');
+
+      if (title) {
+        await this.services.sessions.nameIfUnnamed(run.profileId, run.sessionId, title);
+      }
+    } catch {
+      // A conversation with no name is a cosmetic gap; it is not worth a failed run.
+    }
+  }
 
   cancel(runId: string) {
     this.controllers.get(runId)?.abort();
@@ -301,6 +338,8 @@ export class AgentRuntime {
         'completed',
         redactText(result.text, secrets),
       );
+
+      await this.nameConversation(run, model, secrets);
     } catch (error) {
       const current = await this.services.runs.run(profileId, runId);
 

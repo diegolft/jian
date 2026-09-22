@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { AGENT_SESSION_CHANNEL, type Profile, type Session, sessionSchema } from '@jian/contracts';
+import {
+  AGENT_SESSION_CHANNEL,
+  type Profile,
+  type Session,
+  sessionRenameSchema,
+  sessionSchema,
+} from '@jian/contracts';
 import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';
@@ -10,6 +16,7 @@ import {
   insertSession,
   listSessionMessages,
   listSessions,
+  renameSession,
 } from './repository.js';
 
 /** The lookup a session needs from profiles, reading through whatever transaction it is given. */
@@ -33,6 +40,7 @@ export class Sessions {
 
       const session: Session = {
         ...data,
+        title: data.title ?? null,
         id: randomUUID(),
         profileId,
         createdAt: nowIso(this.clock),
@@ -45,6 +53,39 @@ export class Sessions {
     };
 
     return transaction ? write(transaction) : this.store.transaction(profileId, write);
+  }
+
+  /**
+   * Names a conversation. The owner may do this at any time; the agent does it once, from the
+   * first message, and only while the name is still empty — a rename is never overwritten.
+   */
+  async renameSession(profileId: string, sessionId: string, input: unknown) {
+    const { title } = sessionRenameSchema.parse(input);
+
+    return this.store.transaction(profileId, async (tx) => {
+      const session = assertFound(await renameSession(tx, profileId, sessionId, title), 'Session');
+
+      await recordEvent(tx, this.clock, profileId, 'session.renamed', session);
+
+      return session;
+    });
+  }
+
+  /** Used by the agent after the first exchange; a session already named is left alone. */
+  async nameIfUnnamed(profileId: string, sessionId: string, title: string) {
+    await this.store.transaction(profileId, async (tx) => {
+      const current = await findSession(tx, profileId, sessionId);
+
+      if (!current || current.title) {
+        return;
+      }
+
+      const named = await renameSession(tx, profileId, sessionId, title.slice(0, 160));
+
+      if (named) {
+        await recordEvent(tx, this.clock, profileId, 'session.renamed', named);
+      }
+    });
   }
 
   /**
@@ -70,6 +111,8 @@ export class Sessions {
 
       const session: Session = {
         ...sessionSchema.parse({ title, channel: AGENT_SESSION_CHANNEL }),
+        // A peer session is named by the pair it belongs to, never by the agent.
+        title,
         id: randomUUID(),
         profileId,
         peerProfileId,

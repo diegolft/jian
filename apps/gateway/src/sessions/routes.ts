@@ -3,9 +3,10 @@ import type { Coordination } from '../coordination/service.js';
 import type { ProfileParams, SessionParams } from '../http/params.js';
 import type { RunWriter } from '../runs/port.js';
 import type { SessionWriter } from './port.js';
+import type { Sessions } from './service.js';
 
 type SessionRouteServices = {
-  sessions: SessionWriter;
+  sessions: SessionWriter & Pick<Sessions, 'renameSession'>;
   runs: RunWriter;
   // History spans every message of a profile or a session, so it comes from coordination.
   coordination: Pick<Coordination, 'history'>;
@@ -18,6 +19,12 @@ export function registerSessionRoutes(app: FastifyInstance, deps: SessionRouteSe
 
   app.post<{ Params: ProfileParams }>('/v1/profiles/:profileId/sessions', async (request, reply) =>
     reply.code(201).send(await deps.sessions.createSession(request.params.profileId, request.body)),
+  );
+
+  app.patch<{ Params: SessionParams }>(
+    '/v1/profiles/:profileId/sessions/:sessionId',
+    async (request) =>
+      deps.sessions.renameSession(request.params.profileId, request.params.sessionId, request.body),
   );
 
   app.get<{ Params: SessionParams }>(

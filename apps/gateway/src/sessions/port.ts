@@ -7,6 +7,11 @@ export interface SessionReader {
   messages(profileId: string, sessionId: string, limit?: number): Promise<Message[]>;
 }
 
+/** Naming is the agent's one write to a session, and only while it has no name. */
+export interface SessionNamer {
+  nameIfUnnamed(profileId: string, sessionId: string, title: string): Promise<void>;
+}
+
 export interface SessionWriter extends SessionReader {
   createSession(profileId: string, input: unknown, transaction?: Queryable): Promise<Session>;
 }

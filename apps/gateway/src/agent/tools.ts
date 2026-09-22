@@ -8,7 +8,7 @@ import type { MemoryWriter } from '../memories/port.js';
 import type { PeerAgents } from '../peers/port.js';
 import type { ProfileAdmin } from '../profiles/port.js';
 import type { RunExecution, RunReader } from '../runs/port.js';
-import type { SessionReader } from '../sessions/port.js';
+import type { SessionNamer, SessionReader } from '../sessions/port.js';
 import type { Store } from '../storage/database.js';
 import { artifacts, checkpoints } from '../storage/schema.js';
 
@@ -16,7 +16,7 @@ import { artifacts, checkpoints } from '../storage/schema.js';
 export type ToolServices = {
   profiles: ProfileAdmin;
   memories: MemoryWriter;
-  sessions: SessionReader;
+  sessions: SessionReader & SessionNamer;
   runs: RunReader;
   peers: PeerAgents;
   lifecycle: RunExecution;

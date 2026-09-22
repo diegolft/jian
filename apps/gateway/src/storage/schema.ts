@@ -124,7 +124,7 @@ export const sessions = pgTable(
     profileId: uuid('profile_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
-    title: text('title').notNull(),
+    title: text('title'),
     channel: text('channel').notNull(),
     // Set on the session a pair of agents shares; the peer never reads it.
     peerProfileId: uuid('peer_profile_id').references(() => profiles.id, { onDelete: 'set null' }),

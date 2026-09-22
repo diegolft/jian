@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowUp, MessageSquare, Plus, Square } from 'lucide-react';
+import { ArrowUp, MessageSquare, Pencil, Plus, Square } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
   date,
@@ -319,9 +319,8 @@ export function Sessions({
   mutate: Mutation;
   busy: boolean;
 }) {
+  const [renaming, setRenaming] = useState<string>();
   const [selected, setSelected] = useState(data.sessions[0]?.id);
-  const [creating, setCreating] = useState(false);
-  const [failed, setFailed] = useState(false);
   const active = data.sessions.find((item) => item.id === selected);
 
   return (
@@ -331,9 +330,13 @@ export function Sessions({
         description="Sessões independentes, conectadas pela memória do perfil."
         action={
           <Button
-            onClick={() => {
-              setFailed(false);
-              setCreating(true);
+            busy={busy}
+            onClick={async () => {
+              await mutate(async () => {
+                const session = await api.createSession(profile.id, 'web');
+
+                setSelected(session.id);
+              }, 'Conversa criada.');
             }}
           >
             <Plus size={16} />
@@ -345,21 +348,33 @@ export function Sessions({
         <div className="sessions-layout">
           <aside className="session-list" aria-label="Sessões">
             {data.sessions.map((item) => (
-              <button
-                type="button"
-                className={selected === item.id ? 'selected' : ''}
+              <div
+                className={`session-row ${selected === item.id ? 'selected' : ''}`}
                 key={item.id}
-                onClick={() => setSelected(item.id)}
-                aria-pressed={selected === item.id}
               >
-                <MessageSquare size={17} />
-                <span>
-                  <strong>{item.title}</strong>
-                  <small>
-                    {item.channel} · {date(item.createdAt)}
-                  </small>
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setSelected(item.id)}
+                  aria-pressed={selected === item.id}
+                >
+                  <MessageSquare size={17} />
+                  <span>
+                    <strong className={item.title ? '' : 'unnamed'}>
+                      {item.title ?? 'Sem título'}
+                    </strong>
+                    <small>
+                      {item.channel} · {date(item.createdAt)}
+                    </small>
+                  </span>
+                </button>
+                <Button
+                  variant="quiet"
+                  aria-label={`Renomear ${item.title ?? 'conversa sem título'}`}
+                  onClick={() => setRenaming(item.id)}
+                >
+                  <Pencil size={15} />
+                </Button>
+              </div>
             ))}
           </aside>
           {active ? (
@@ -381,7 +396,17 @@ export function Sessions({
         <Empty
           title="Tudo começa com uma conversa"
           action={
-            <Button variant="secondary" onClick={() => setCreating(true)}>
+            <Button
+              variant="secondary"
+              busy={busy}
+              onClick={async () => {
+                await mutate(async () => {
+                  const session = await api.createSession(profile.id, 'web');
+
+                  setSelected(session.id);
+                }, 'Conversa criada.');
+              }}
+            >
               Criar conversa
             </Button>
           }
@@ -389,30 +414,24 @@ export function Sessions({
           Crie uma sessão para conversar pelo painel ou vinculá-la a um canal.
         </Empty>
       )}
-      {creating && (
-        <Modal title="Nova conversa" close={() => setCreating(false)}>
+      {renaming && (
+        <Modal title="Renomear conversa" close={() => setRenaming(undefined)}>
           <form
             method="post"
             action="/ui/"
             onSubmit={async (event) => {
               event.preventDefault();
 
-              const form = new FormData(event.currentTarget);
+              const title = String(new FormData(event.currentTarget).get('title')).trim();
 
-              const ok = await mutate(async () => {
-                const session = await api.createSession(
-                  profile.id,
-                  String(form.get('title')),
-                  'web',
-                );
-
-                setSelected(session.id);
-              }, 'Conversa criada.');
-
-              setFailed(!ok);
-
-              if (ok) {
-                setCreating(false);
+              if (
+                title &&
+                (await mutate(
+                  () => api.renameSession(profile.id, renaming, title),
+                  'Conversa renomeada.',
+                ))
+              ) {
+                setRenaming(undefined);
               }
             }}
           >
@@ -421,20 +440,16 @@ export function Sessions({
                 name="title"
                 required
                 maxLength={160}
+                defaultValue={data.sessions.find((item) => item.id === renaming)?.title ?? ''}
                 placeholder="Ex.: Planejamento da semana"
               />
             </Field>
-            {failed && (
-              <p className="form-error" role="alert">
-                Não foi possível criar a conversa.
-              </p>
-            )}
             <footer>
-              <Button variant="secondary" onClick={() => setCreating(false)}>
+              <Button variant="secondary" onClick={() => setRenaming(undefined)}>
                 Cancelar
               </Button>
               <Button type="submit" busy={busy}>
-                Criar conversa
+                Salvar
               </Button>
             </footer>
           </form>

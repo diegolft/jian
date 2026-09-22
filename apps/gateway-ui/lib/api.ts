@@ -181,11 +181,18 @@ export function gatewayApi() {
       ),
     sessions: (profileId: string) =>
       result(client.GET('/v1/profiles/{profileId}/sessions', { params: profile(profileId) })),
-    createSession: (profileId: string, title: string, channel = 'api') =>
+    createSession: (profileId: string, channel = 'api') =>
       result(
         client.POST('/v1/profiles/{profileId}/sessions', {
           params: profile(profileId),
-          body: { title, channel },
+          body: { channel },
+        }),
+      ),
+    renameSession: (profileId: string, sessionId: string, title: string) =>
+      result(
+        client.PATCH('/v1/profiles/{profileId}/sessions/{sessionId}', {
+          params: { path: { profileId, sessionId } },
+          body: { title },
         }),
       ),
     messages: (profileId: string, sessionId: string) =>

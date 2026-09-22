@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { testServices } from './helpers/services.js';
 
 const profileInput = {
@@ -73,4 +73,45 @@ it('allows parallel sessions and exposes their actual activity', async () => {
   expect((await services.runs.activities(profile.id)).map((r) => r.status)).toEqual(
     expect.arrayContaining(['running', 'queued']),
   );
+});
+
+describe('naming a conversation', () => {
+  it('opens without a name, takes the one the agent writes, and keeps a rename', async () => {
+    const services = await testServices();
+    const profile = await services.profiles.createProfile({ name: 'Atlas', instructions: 'Help.' });
+
+    const session = await services.sessions.createSession(profile.id, { channel: 'web' });
+
+    expect(session.title).toBeNull();
+
+    await services.sessions.nameIfUnnamed(profile.id, session.id, 'Plano de migração');
+
+    expect((await services.sessions.session(profile.id, session.id)).title).toBe(
+      'Plano de migração',
+    );
+
+    // The agent names once; a second answer never renames what is already named.
+    await services.sessions.nameIfUnnamed(profile.id, session.id, 'Outro assunto');
+
+    expect((await services.sessions.session(profile.id, session.id)).title).toBe(
+      'Plano de migração',
+    );
+
+    const renamed = await services.sessions.renameSession(profile.id, session.id, {
+      title: 'Migração do banco',
+    });
+
+    expect(renamed.title).toBe('Migração do banco');
+  });
+
+  it('refuses to rename a session of another profile', async () => {
+    const services = await testServices();
+    const mine = await services.profiles.createProfile({ name: 'Mine', instructions: 'Help.' });
+    const other = await services.profiles.createProfile({ name: 'Other', instructions: 'Help.' });
+    const session = await services.sessions.createSession(mine.id, { channel: 'web' });
+
+    await expect(
+      services.sessions.renameSession(other.id, session.id, { title: 'Roubada' }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
 });

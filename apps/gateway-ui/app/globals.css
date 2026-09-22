@@ -1225,6 +1225,24 @@ legend {
   overflow: hidden;
   min-height: 580px;
 }
+.session-row {
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+}
+/* The rename control stays out of the way until the row is hovered or focused. */
+.session-row .button.quiet {
+  opacity: 0;
+  padding: 6px;
+}
+.session-row:hover .button.quiet,
+.session-row:focus-within .button.quiet {
+  opacity: 1;
+}
+.session-list strong.unnamed {
+  color: var(--muted);
+  font-style: italic;
+}
 .session-list {
   background: #f8fafd;
   padding: 12px;
@@ -1262,9 +1280,9 @@ legend {
   font-size: 9px;
   margin-top: 5px;
 }
-.session-list button.selected {
+.session-row.selected {
   background: white;
-  border-color: #e4eaf5;
+  border: 1px solid #e4eaf5;
   box-shadow: 0 2px 4px #14264404;
 }
 .conversation {

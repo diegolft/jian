@@ -145,11 +145,18 @@ export const profilePatchSchema = profileSchema.partial().extend({
 });
 
 export const sessionSchema = z.strictObject({
-  title: z.string().trim().min(1).max(160),
+  // Absent on purpose: the agent names the conversation from its first message, and the owner
+  // renames it whenever they like. Asking for a name before there is anything to name is not
+  // a decision anyone can make well.
+  title: z.string().trim().min(1).max(160).optional(),
   channel: z
     .string()
     .regex(/^[a-z0-9_-]{1,40}$/)
     .default('api'),
+});
+
+export const sessionRenameSchema = z.strictObject({
+  title: z.string().trim().min(1).max(160),
 });
 
 export const submitSchema = z.strictObject({

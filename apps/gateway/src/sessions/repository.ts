@@ -158,3 +158,19 @@ export async function pageMessages(
     nextCursor: rows.length > where.limit ? (page.at(-1)?.id ?? null) : null,
   };
 }
+
+/** Only the owner's own session, and only its name. */
+export async function renameSession(
+  db: Queryable,
+  profileId: string,
+  sessionId: string,
+  title: string,
+): Promise<Session | null> {
+  const [row] = await db
+    .update(sessions)
+    .set({ title })
+    .where(and(eq(sessions.id, sessionId), eq(sessions.profileId, profileId)))
+    .returning();
+
+  return row ? toSession(row) : null;
+}
