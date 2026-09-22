@@ -14,7 +14,17 @@ interface McpContext {
   signal: AbortSignal;
 }
 
-/** Discover approved tools now; expose their full schemas only when the agent selects them. */
+/**
+ * The exposed name has to be unique across servers and legal as a tool name, and the hash is
+ * what keeps two long names from colliding once they are truncated.
+ */
+function exposedName(server: string, tool: string): string {
+  const suffix = createHash('sha256').update(tool).digest('hex').slice(0, 8);
+
+  return `mcp_${server}_${tool.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 18)}_${suffix}`;
+}
+
+/** Discover what each server offers now; expose a full schema only when the agent selects it. */
 export async function connectMcpTools(run: Run, tools: ToolSet, context: McpContext) {
   const mcpToolNames: string[] = [];
   const selectedMcpTools = new Set<string>();
@@ -51,30 +61,22 @@ export async function connectMcpTools(run: Run, tools: ToolSet, context: McpCont
 
     context.clients.push(client);
 
-    const available = await client.tools();
-
-    for (const name of config.allowedTools) {
-      const remote = available[name];
-
-      if (!remote) {
-        throw new Error('Configured MCP tool is not available');
-      }
-
-      const suffix = createHash('sha256').update(name).digest('hex').slice(0, 8);
-      const exposedName = `mcp_${config.name}_${name.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 18)}_${suffix}`;
-
-      tools[exposedName] = remote;
-      mcpToolNames.push(exposedName);
+    // Everything the server offers. A long catalog costs nothing per turn: only the tools the
+    // agent has loaded are sent with a request, so a server with a hundred of them is no
+    // heavier than one with three until they are used.
+    for (const [name, remote] of Object.entries(await client.tools())) {
+      tools[exposedName(config.name, name)] = remote;
+      mcpToolNames.push(exposedName(config.name, name));
     }
   }
 
   if (mcpToolNames.length > 0) {
     tools.load_mcp_tools = tool({
-      description: `Select approved MCP tools before calling them. Available names: ${mcpToolNames.slice(0, 10).join(', ')}${mcpToolNames.length > 10 ? '. Use search_mcp_tools for the rest.' : ''}`,
+      description: `Select the MCP tools to use before calling them. Available names: ${mcpToolNames.slice(0, 10).join(', ')}${mcpToolNames.length > 10 ? '. Use search_mcp_tools for the rest.' : ''}`,
       inputSchema: z.object({ names: z.array(z.string()).min(1).max(10) }),
       execute: async ({ names }) => {
         if (names.some((name) => !mcpToolNames.includes(name))) {
-          throw new Error('MCP tool is not approved');
+          throw new Error('No connected MCP server offers that tool');
         }
 
         selectedMcpTools.clear();
@@ -91,7 +93,7 @@ export async function connectMcpTools(run: Run, tools: ToolSet, context: McpCont
   if (mcpToolNames.length > 10) {
     tools.search_mcp_tools = tool({
       description:
-        'Search the approved MCP tool catalog by name or description. Load chosen names with load_mcp_tools.',
+        'Search the connected MCP servers by tool name or description. Load chosen names with load_mcp_tools.',
       inputSchema: z.object({ query: z.string().min(1).max(100) }),
       execute: async ({ query }) =>
         mcpToolNames

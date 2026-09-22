@@ -1,10 +1,13 @@
 import type { FastifyInstance } from 'fastify';
+import { probeMcpServer } from '../agent/mcp-probe.js';
 import type { ProfileParams } from '../http/params.js';
+import type { Vault } from '../security/vault.js';
 import type { ProfileAdmin } from './port.js';
 import type { Profiles } from './service.js';
 
 type ProfileRouteServices = {
   profiles: ProfileAdmin & Pick<Profiles, 'revisions'>;
+  vault: Vault;
 };
 
 export function registerProfileRoutes(app: FastifyInstance, deps: ProfileRouteServices): void {
@@ -24,5 +27,15 @@ export function registerProfileRoutes(app: FastifyInstance, deps: ProfileRouteSe
 
   app.get<{ Params: ProfileParams }>('/v1/profiles/:profileId/revisions', async (request) =>
     deps.profiles.revisions(request.params.profileId),
+  );
+
+  app.post<{ Params: ProfileParams & { name: string } }>(
+    '/v1/profiles/:profileId/mcp-servers/:name/check',
+    async (request) =>
+      probeMcpServer(
+        await deps.profiles.profile(request.params.profileId),
+        request.params.name,
+        deps.vault,
+      ),
   );
 }

@@ -50,6 +50,13 @@
       "when": 1790094388291,
       "tag": "0006_delivery-preview",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790094388292,
+      "tag": "0007_mcp-all-tools",
+      "breakpoints": true
     }
   ]
 }

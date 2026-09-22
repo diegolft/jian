@@ -20,6 +20,7 @@ export type Contact = JsonResponse<'listContacts', 200>[number];
 export type Group = JsonResponse<'listGroups', 200>[number];
 export type Memory = JsonResponse<'listMemories', 200>[number];
 export type BuiltinSkill = JsonResponse<'listBuiltinSkills', 200>[number];
+export type McpStatus = JsonResponse<'checkMcpServer', 200>;
 export type Run = JsonResponse<'getRun', 200>;
 export type Delivery = JsonResponse<'listDeliveries', 200>[number];
 export type Connection = JsonResponse<'getChannelConnection', 200>;

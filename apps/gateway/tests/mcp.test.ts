@@ -9,7 +9,7 @@ import { mockModel } from './helpers/model.js';
 import { testServices } from './helpers/services.js';
 
 it.each([false, true])(
-  'executes only allowlisted tools through HTTP MCP (large catalog: %s)',
+  'sends a server tool to the model only after the agent loads it (large catalog: %s)',
   async (largeCatalog) => {
     const called: string[] = [];
 
@@ -61,7 +61,7 @@ it.each([false, true])(
             },
             {
               name: 'delete_everything',
-              description: 'Must not be available',
+              description: 'Offered by the server, and never sent to the model unloaded',
               inputSchema: { type: 'object', properties: {} },
             },
           ],
@@ -203,7 +203,6 @@ it.each([false, true])(
           {
             name: 'docs',
             url: `${origin}/mcp`,
-            allowedTools: ['search', ...extraTools.map((tool) => tool.name)],
           },
         ],
       });
@@ -313,7 +312,7 @@ it.each(['disconnect', 'isError'])(
         name: 'Effect test',
         instructions: 'Help.',
         model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
-        mcpServers: [{ name: 'effects', url: `${origin}/mcp`, allowedTools: ['mutate'] }],
+        mcpServers: [{ name: 'effects', url: `${origin}/mcp` }],
       });
 
       const session = await services.sessions.createSession(profile.id, { title: 'Effects' });

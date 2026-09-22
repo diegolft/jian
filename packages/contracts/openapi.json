@@ -10356,6 +10356,266 @@
         }
       }
     },
+    "/v1/profiles/{profileId}/mcp-servers/{name}/check": {
+      "post": {
+        "operationId": "checkMcpServer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Required permission: admin.",
+        "parameters": [
+          {
+            "name": "profileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]{1,30}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "reachable": {
+                      "type": "boolean"
+                    },
+                    "tools": {
+                      "default": [],
+                      "maxItems": 500,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string",
+                            "maxLength": 600
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "error": {
+                      "type": "string",
+                      "maxLength": 300
+                    },
+                    "checkedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "reachable",
+                    "tools",
+                    "checkedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/profiles/{profileId}/built-in-skills": {
       "get": {
         "operationId": "listBuiltinSkills",
@@ -11215,21 +11475,11 @@
                           "bearerTokenEnv": {
                             "type": "string",
                             "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
-                          },
-                          "allowedTools": {
-                            "minItems": 1,
-                            "maxItems": 30,
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "pattern": "^[a-zA-Z0-9_.-]{1,100}$"
-                            }
                           }
                         },
                         "required": [
                           "name",
-                          "url",
-                          "allowedTools"
+                          "url"
                         ],
                         "additionalProperties": false
                       }
@@ -11759,21 +12009,11 @@
                             "bearerTokenEnv": {
                               "type": "string",
                               "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
-                            },
-                            "allowedTools": {
-                              "minItems": 1,
-                              "maxItems": 30,
-                              "type": "array",
-                              "items": {
-                                "type": "string",
-                                "pattern": "^[a-zA-Z0-9_.-]{1,100}$"
-                              }
                             }
                           },
                           "required": [
                             "name",
-                            "url",
-                            "allowedTools"
+                            "url"
                           ],
                           "additionalProperties": false
                         }
@@ -12284,21 +12524,11 @@
                         "bearerTokenEnv": {
                           "type": "string",
                           "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
-                        },
-                        "allowedTools": {
-                          "minItems": 1,
-                          "maxItems": 30,
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "pattern": "^[a-zA-Z0-9_.-]{1,100}$"
-                          }
                         }
                       },
                       "required": [
                         "name",
-                        "url",
-                        "allowedTools"
+                        "url"
                       ],
                       "additionalProperties": false
                     }
@@ -12609,21 +12839,11 @@
                           "bearerTokenEnv": {
                             "type": "string",
                             "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
-                          },
-                          "allowedTools": {
-                            "minItems": 1,
-                            "maxItems": 30,
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "pattern": "^[a-zA-Z0-9_.-]{1,100}$"
-                            }
                           }
                         },
                         "required": [
                           "name",
-                          "url",
-                          "allowedTools"
+                          "url"
                         ],
                         "additionalProperties": false
                       }
@@ -13162,21 +13382,11 @@
                           "bearerTokenEnv": {
                             "type": "string",
                             "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
-                          },
-                          "allowedTools": {
-                            "minItems": 1,
-                            "maxItems": 30,
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "pattern": "^[a-zA-Z0-9_.-]{1,100}$"
-                            }
                           }
                         },
                         "required": [
                           "name",
-                          "url",
-                          "allowedTools"
+                          "url"
                         ],
                         "additionalProperties": false
                       }
@@ -13674,21 +13884,11 @@
                         "bearerTokenEnv": {
                           "type": "string",
                           "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
-                        },
-                        "allowedTools": {
-                          "minItems": 1,
-                          "maxItems": 30,
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "pattern": "^[a-zA-Z0-9_.-]{1,100}$"
-                          }
                         }
                       },
                       "required": [
                         "name",
-                        "url",
-                        "allowedTools"
+                        "url"
                       ],
                       "additionalProperties": false
                     }
@@ -14002,21 +14202,11 @@
                           "bearerTokenEnv": {
                             "type": "string",
                             "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
-                          },
-                          "allowedTools": {
-                            "minItems": 1,
-                            "maxItems": 30,
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "pattern": "^[a-zA-Z0-9_.-]{1,100}$"
-                            }
                           }
                         },
                         "required": [
                           "name",
-                          "url",
-                          "allowedTools"
+                          "url"
                         ],
                         "additionalProperties": false
                       }
@@ -14568,21 +14758,11 @@
                                 "bearerTokenEnv": {
                                   "type": "string",
                                   "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
-                                },
-                                "allowedTools": {
-                                  "minItems": 1,
-                                  "maxItems": 30,
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string",
-                                    "pattern": "^[a-zA-Z0-9_.-]{1,100}$"
-                                  }
                                 }
                               },
                               "required": [
                                 "name",
-                                "url",
-                                "allowedTools"
+                                "url"
                               ],
                               "additionalProperties": false
                             }

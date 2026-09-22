@@ -83,7 +83,6 @@ describe('profile vault', () => {
     const server = {
       name: 'tracker',
       url: 'https://mcp.example.com/mcp',
-      allowedTools: ['search'],
     };
 
     const updated = await services.profiles.updateProfile(profile.id, {
@@ -97,7 +96,7 @@ describe('profile vault', () => {
     // A patch that omits the token keeps the stored one.
     const kept = await services.profiles.updateProfile(profile.id, {
       expectedVersion: updated.version,
-      mcpServers: [{ ...server, allowedTools: ['search', 'create'] }],
+      mcpServers: [{ ...server }],
     });
 
     expect(await services.vault.read(profile.id, mcpSecret('tracker'))).toBe('synthetic-mcp-token');

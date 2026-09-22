@@ -2,12 +2,12 @@
 
 import { BookOpen, Pencil, Plug, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { lines } from '../../lib/format';
 import type { SectionProps } from '../props';
 import { Button, Confirm, Empty, Field, Modal, SectionHeading } from '../ui';
 import { BuiltinSkills } from './built-in';
 import { SkillCatalog } from './catalog';
 import { SkillImport } from './import';
+import { McpCheck } from './mcp-check';
 
 export function Capabilities({
   kind,
@@ -31,7 +31,7 @@ export function Capabilities({
         description={
           isSkill
             ? 'Instruções especializadas, carregadas pelo agente quando necessárias.'
-            : 'Conecte ferramentas e escolha explicitamente o que o agente pode executar.'
+            : 'Servidores MCP. O agente descobre as ferramentas e carrega o que precisa.'
         }
         action={
           <Button
@@ -66,13 +66,7 @@ export function Capabilities({
                     </a>
                   </div>
                 )}
-                {'allowedTools' in item && (
-                  <div className="tag-list">
-                    {item.allowedTools.map((tool) => (
-                      <code key={tool}>{tool}</code>
-                    ))}
-                  </div>
-                )}
+                {!isSkill && <McpCheck profile={profile} name={item.name} api={api} />}
               </div>
               <Button
                 variant="quiet"
@@ -99,8 +93,9 @@ export function Capabilities({
           Nenhuma skill instalada. Escolha no catálogo abaixo ou importe do seu repositório.
         </p>
       ) : (
-        <Empty title="Ferramentas, com limites claros">
-          Adicione um endpoint MCP HTTP e a lista de ferramentas autorizadas para este perfil.
+        <Empty title="Conecte uma ferramenta">
+          Informe o endereço do servidor MCP. As ferramentas vêm dele, e o agente carrega uma antes
+          de poder usá-la.
         </Empty>
       )}
       {isSkill && <SkillCatalog profile={profile} api={api} mutate={mutate} busy={busy} />}
@@ -127,7 +122,6 @@ export function Capabilities({
                 : {
                     name,
                     url: String(form.get('url')),
-                    allowedTools: lines(String(form.get('tools'))),
                     ...(form.get('token') ? { bearerToken: String(form.get('token')) } : {}),
                     ...(form.get('env') ? { bearerTokenEnv: String(form.get('env')) } : {}),
                   };
@@ -197,17 +191,6 @@ export function Capabilities({
                     required
                     defaultValue={mcp?.url ?? ''}
                     placeholder="https://mcp.exemplo.com/mcp"
-                  />
-                </Field>
-                <Field
-                  label="Ferramentas permitidas"
-                  hint="Nomes exatos, um por linha. Até 30 ferramentas."
-                >
-                  <textarea
-                    name="tools"
-                    rows={4}
-                    required
-                    defaultValue={mcp?.allowedTools.join('\n') ?? ''}
                   />
                 </Field>
                 <Field

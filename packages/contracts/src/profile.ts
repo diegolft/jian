@@ -78,10 +78,19 @@ export const mcpSchema = z.strictObject({
     .string()
     .regex(/^JIAN_MCP_[A-Z0-9_]+$/)
     .optional(),
-  allowedTools: z
-    .array(z.string().regex(/^[a-zA-Z0-9_.-]{1,100}$/))
-    .min(1)
-    .max(30),
+});
+
+/** What a server answered when the owner asked whether it works. */
+export const mcpStatusSchema = z.strictObject({
+  name: z.string(),
+  reachable: z.boolean(),
+  /** Everything the server offers. The agent still loads a tool before it can call it. */
+  tools: z
+    .array(z.strictObject({ name: z.string(), description: z.string().max(600).optional() }))
+    .max(500)
+    .default([]),
+  error: z.string().max(300).optional(),
+  checkedAt: z.iso.datetime(),
 });
 
 export const identitySchema = z.strictObject({
@@ -191,6 +200,7 @@ export const memorySchema = z.strictObject({
   expectedVersion: z.number().int().nonnegative(),
 });
 
+export type McpStatus = z.infer<typeof mcpStatusSchema>;
 export type Skill = z.infer<typeof skillSchema>;
 export type McpServer = z.infer<typeof mcpSchema>;
 export type Identity = z.infer<typeof identitySchema>;

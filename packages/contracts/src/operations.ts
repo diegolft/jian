@@ -22,6 +22,7 @@ import {
 } from './coordination.js';
 import {
   builtinSkillSchema,
+  mcpStatusSchema,
   memoryKeySchema,
   profilePatchSchema,
   profileSchema,
@@ -354,6 +355,15 @@ export const operations: Operation[] = [
     operationId: 'endPanelSession',
     access: 'admin',
     response: panelSessionEndSchema,
+  },
+  {
+    // A check the owner asks for, so it runs the connection now instead of reading a cache.
+    method: 'POST',
+    path: `${profile}/mcp-servers/:name/check`,
+    operationId: 'checkMcpServer',
+    access: 'admin',
+    params: z.strictObject({ profileId: z.uuid(), name: z.string().regex(/^[a-z0-9_]{1,30}$/) }),
+    response: mcpStatusSchema,
   },
   {
     method: 'GET',

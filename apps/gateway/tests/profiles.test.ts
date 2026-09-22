@@ -78,7 +78,7 @@ describe('profile configuration changes', () => {
       skills: [
         { name: 'deploy', description: 'Deployment guide', instructions: 'Check the release.' },
       ],
-      mcpServers: [{ name: 'docs', url: 'https://example.com/mcp', allowedTools: ['search'] }],
+      mcpServers: [{ name: 'docs', url: 'https://example.com/mcp' }],
     });
 
     const updated = await services.profiles.updateProfile(profile.id, {
