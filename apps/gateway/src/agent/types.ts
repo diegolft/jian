@@ -1,4 +1,4 @@
-import type { ModelConfig, Run } from '@elos/contracts';
+import type { ModelConfig, Run } from '@jian/contracts';
 import type { LanguageModel } from 'ai';
 import type { CodexLogin } from '../providers/codex/login.js';
 import type { Credentials } from '../security/credentials.js';

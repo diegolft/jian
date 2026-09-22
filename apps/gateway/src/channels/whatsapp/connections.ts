@@ -121,7 +121,7 @@ export class WhatsAppConnections {
     }
 
     return {
-      qr: this.box.decrypt(current.qr, `elos:whatsapp:qr:${profileId}:${id}`),
+      qr: this.box.decrypt(current.qr, `jian:whatsapp:qr:${profileId}:${id}`),
       expiresAt: new Date(current.qrExpiresAt as number).toISOString(),
     };
   }
@@ -158,7 +158,7 @@ export class WhatsAppConnections {
 
   private sessionStore(record: ConnectionRecord): DeviceSessionStore {
     const aad = (index: number, total: number) =>
-      `elos:whatsapp:auth:${record.profileId}:${record.id}:${index}:${total}`;
+      `jian:whatsapp:auth:${record.profileId}:${record.id}:${index}:${total}`;
 
     return {
       load: () =>
@@ -264,7 +264,7 @@ export class WhatsAppConnections {
       qr: (value) =>
         this.update(record, {
           status: 'qr',
-          qr: this.box.encrypt(value, `elos:whatsapp:qr:${record.profileId}:${record.id}`),
+          qr: this.box.encrypt(value, `jian:whatsapp:qr:${record.profileId}:${record.id}`),
           qrExpiresAt: this.clock() + QR_LIFETIME_MS,
         }),
       ready: async (accountId) => {
@@ -497,7 +497,7 @@ export class WhatsAppConnections {
   start(receive: Receiver) {
     const poll = async () => {
       if (this.stopped) return;
-      this.pending = this.tick(receive).catch(() => console.error('elos: WhatsApp worker failed'));
+      this.pending = this.tick(receive).catch(() => console.error('jian: WhatsApp worker failed'));
       await this.pending;
 
       if (!this.stopped) {

@@ -64,7 +64,7 @@ function Login({ connected }: { connected: (profiles: Profile[]) => void }) {
         <a className="brand" href="/ui/">
           <Mark />
           <span>
-            elos<span className="brand-label">GATEWAY</span>
+            jian<span className="brand-label">GATEWAY</span>
           </span>
         </a>
         <div className="login-copy">
@@ -155,7 +155,7 @@ function Login({ connected }: { connected: (profiles: Profile[]) => void }) {
               Onde encontro meu token?
             </summary>
             <p>
-              Use o valor de <code>ELOS_API_TOKEN</code> definido na configuração do servidor.
+              Use o valor de <code>JIAN_API_TOKEN</code> definido na configuração do servidor.
               Chaves de perfil não permitem administrar o Gateway.
             </p>
           </details>
@@ -543,7 +543,7 @@ function Workspace({
         <a className="brand" href="#overview">
           <Mark />
           <span>
-            elos<span className="brand-label">GATEWAY</span>
+            jian<span className="brand-label">GATEWAY</span>
           </span>
         </a>
         <div className="profile-selector">

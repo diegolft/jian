@@ -198,7 +198,7 @@ it.each([false, true])(
       const profile = await services.profiles.createProfile({
         name: 'MCP test',
         instructions: 'Help.',
-        model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+        model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
         mcpServers: [
           {
             name: 'docs',
@@ -312,7 +312,7 @@ it.each(['disconnect', 'isError'])(
       const profile = await services.profiles.createProfile({
         name: 'Effect test',
         instructions: 'Help.',
-        model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+        model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
         mcpServers: [{ name: 'effects', url: `${origin}/mcp`, allowedTools: ['mutate'] }],
       });
 

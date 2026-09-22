@@ -5,7 +5,7 @@ import {
   keyInputSchema,
   type keyMetadataSchema,
   type Scope,
-} from '@elos/contracts';
+} from '@jian/contracts';
 import type { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
 import type { Store } from '../core/store.js';
@@ -33,7 +33,7 @@ export class Credentials {
   }
 
   private aad(record: Pick<CredentialRecord, 'id' | 'profileId' | 'kind'>) {
-    return `elos:credential:${record.profileId}:${record.kind}:${record.id}`;
+    return `jian:credential:${record.profileId}:${record.kind}:${record.id}`;
   }
 
   async create(profileId: string, input: unknown) {

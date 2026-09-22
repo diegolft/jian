@@ -3,14 +3,14 @@ import { appendFile, chmod, readFile, writeFile } from 'node:fs/promises';
 
 const masterKeys = JSON.stringify({ v1: randomBytes(32).toString('base64') });
 const password = randomBytes(24).toString('hex');
-const contents = `ELOS_API_TOKEN=${randomBytes(32).toString('hex')}
-ELOS_ACTIVE_KEY_ID=v1
-ELOS_MASTER_KEYS='${masterKeys}'
+const contents = `JIAN_API_TOKEN=${randomBytes(32).toString('hex')}
+JIAN_ACTIVE_KEY_ID=v1
+JIAN_MASTER_KEYS='${masterKeys}'
 POSTGRES_PASSWORD=${password}
-DATABASE_URL=postgres://elos:${password}@localhost:5432/elos
+DATABASE_URL=postgres://jian:${password}@localhost:5432/jian
 HOST=127.0.0.1
 PORT=4310
-ELOS_ROLE=all
+JIAN_ROLE=all
 OPENAI_API_KEY=
 ANTHROPIC_API_KEY=
 ANTHROPIC_API_TOKEN=
@@ -25,8 +25,8 @@ try {
   if (error.code === 'EEXIST') {
     const path = new URL('../.env', import.meta.url);
     const existing = await readFile(path, 'utf8');
-    if (!/^\s*(?:export\s+)?ELOS_MASTER_KEYS\s*=/m.test(existing)) {
-      await appendFile(path, `\nELOS_ACTIVE_KEY_ID=v1\nELOS_MASTER_KEYS='${masterKeys}'\n`);
+    if (!/^\s*(?:export\s+)?JIAN_MASTER_KEYS\s*=/m.test(existing)) {
+      await appendFile(path, `\nJIAN_ACTIVE_KEY_ID=v1\nJIAN_MASTER_KEYS='${masterKeys}'\n`);
       await chmod(path, 0o600);
       console.log('Cofre configurado em .env; configurações existentes preservadas.');
     } else console.log('.env já existe; nenhuma alteração feita.');

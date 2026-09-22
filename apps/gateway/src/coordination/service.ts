@@ -8,7 +8,7 @@ import {
   type mailSchema,
   pageQuerySchema,
   type Run,
-} from '@elos/contracts';
+} from '@jian/contracts';
 import { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
 import type { Store } from '../core/store.js';

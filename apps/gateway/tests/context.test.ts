@@ -17,7 +17,7 @@ async function fixture() {
       goals: ['Find deployment facts'],
       boundaries: ['No external writes'],
     },
-    model: { provider: 'openai', modelId: 'gpt-4o', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+    model: { provider: 'openai', modelId: 'gpt-4o', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
     skills: [
       { name: 'lookup', description: 'Search the catalog', instructions: 'Private skill body' },
     ],
@@ -40,7 +40,7 @@ describe('context', () => {
     const profile = await services.profiles.createProfile({
       name: 'Zero history',
       instructions: 'Help.',
-      model: { provider: 'openai', modelId: 'gpt-4o', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+      model: { provider: 'openai', modelId: 'gpt-4o', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
       contextPolicy: { historyTokens: 0 },
     });
 

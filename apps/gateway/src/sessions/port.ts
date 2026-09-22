@@ -1,4 +1,4 @@
-import type { Message, Session } from '@elos/contracts';
+import type { Message, Session } from '@jian/contracts';
 import type { Reader } from '../core/store.js';
 
 export interface SessionReader {

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Message, Run } from '@elos/contracts';
+import type { Message, Run } from '@jian/contracts';
 import { type Clock, nowIso } from '../core/clock.js';
 import { GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';

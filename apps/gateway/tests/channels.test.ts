@@ -18,7 +18,7 @@ async function setup(fetcher: typeof fetch) {
   const profile = await services.profiles.createProfile({
     name: 'P',
     instructions: 'Help',
-    model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+    model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
   });
 
   const session = await services.sessions.createSession(profile.id, { title: 'Telegram' });

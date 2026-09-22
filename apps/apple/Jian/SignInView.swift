@@ -30,6 +30,6 @@ struct SignInView: View {
       }
     }
     .formStyle(.grouped)
-    .navigationTitle("Elos Agent")
+    .navigationTitle("Jian")
   }
 }

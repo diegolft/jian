@@ -1,4 +1,4 @@
-import type { channelConnectionSchema } from '@elos/contracts';
+import type { channelConnectionSchema } from '@jian/contracts';
 import type { z } from 'zod';
 import type { EncryptedSecret } from '../../security/crypto.js';
 import type { IncomingMessage } from '../channel.js';

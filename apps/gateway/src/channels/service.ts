@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { channelInputSchema, type channelSchema, type deliverySchema } from '@elos/contracts';
+import { channelInputSchema, type channelSchema, type deliverySchema } from '@jian/contracts';
 import type { z } from 'zod';
 import { assertFound, GatewayError } from '../core/errors.js';
 import type { Store } from '../core/store.js';
@@ -45,7 +45,7 @@ export class Channels {
         return;
       }
 
-      this.pending = this.dispatch().catch(() => console.error('elos: channel dispatch failed'));
+      this.pending = this.dispatch().catch(() => console.error('jian: channel dispatch failed'));
       await this.pending;
 
       if (!this.stopped) {

@@ -22,18 +22,18 @@ jobs:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_DB: elos_test
-          POSTGRES_USER: elos
+          POSTGRES_DB: jian_test
+          POSTGRES_USER: jian
           POSTGRES_PASSWORD: ci-only-password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U elos -d elos_test"
+          --health-cmd "pg_isready -U jian -d jian_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      TEST_DATABASE_URL: postgres://elos:ci-only-password@localhost:5432/elos_test
+      TEST_DATABASE_URL: postgres://jian:ci-only-password@localhost:5432/jian_test
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -43,4 +43,4 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run test:integration
-      - run: docker build -t elos:ci .
+      - run: docker build -t jian:ci .

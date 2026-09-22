@@ -1,4 +1,4 @@
-import { ingressSchema } from '@elos/contracts';
+import { ingressSchema } from '@jian/contracts';
 import { GatewayError } from '../../core/errors.js';
 import type {
   Channel,

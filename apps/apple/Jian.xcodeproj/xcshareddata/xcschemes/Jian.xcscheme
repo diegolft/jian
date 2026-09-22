@@ -6,9 +6,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "E10500000000000000000004"
-               BuildableName = "Elos Agent.app"
-               BlueprintName = "ElosAgent"
-               ReferencedContainer = "container:ElosAgent.xcodeproj">
+               BuildableName = "Jian.app"
+               BlueprintName = "Jian"
+               ReferencedContainer = "container:Jian.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -22,9 +22,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "E10500000000000000000004"
-            BuildableName = "Elos Agent.app"
-            BlueprintName = "ElosAgent"
-            ReferencedContainer = "container:ElosAgent.xcodeproj">
+            BuildableName = "Jian.app"
+            BlueprintName = "Jian"
+            ReferencedContainer = "container:Jian.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -33,9 +33,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "E10500000000000000000004"
-            BuildableName = "Elos Agent.app"
-            BlueprintName = "ElosAgent"
-            ReferencedContainer = "container:ElosAgent.xcodeproj">
+            BuildableName = "Jian.app"
+            BlueprintName = "Jian"
+            ReferencedContainer = "container:Jian.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

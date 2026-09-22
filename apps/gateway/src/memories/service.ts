@@ -1,4 +1,4 @@
-import { type Memory, memorySchema } from '@elos/contracts';
+import { type Memory, memorySchema } from '@jian/contracts';
 import { type Clock, nowIso } from '../core/clock.js';
 import { GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';

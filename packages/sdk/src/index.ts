@@ -7,7 +7,7 @@ export type { components, operations, paths } from './generated.js';
  * Keep credentials in the caller's secure storage; each client belongs to one access key.
  * A caller that authenticates by cookie, such as the panel, passes headers and no token.
  */
-export function createElosClient(options: {
+export function createJianClient(options: {
   baseUrl: string;
   token?: string;
   headers?: Record<string, string>;

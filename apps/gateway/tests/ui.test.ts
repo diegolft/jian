@@ -7,14 +7,14 @@ import { createApp } from '../src/app.js';
 import { testServices } from './helpers/services.js';
 
 it('serves the exported UI with hashed scripts without opening API or filesystem access', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'elos-ui-'));
-  const script = 'window.__elos = true;';
-  const html = `<html><script>${script}</script><body>Elos</body></html>`;
+  const root = await mkdtemp(join(tmpdir(), 'jian-ui-'));
+  const script = 'window.__jian = true;';
+  const html = `<html><script>${script}</script><body>Jian</body></html>`;
   const token = 'ui-test-admin-token-at-least-32-characters';
 
   await writeFile(join(root, 'index.html'), html);
   await writeFile(join(root, '.secret'), 'must-never-be-served');
-  await writeFile(join(root, 'app.js'), 'console.log("elos");');
+  await writeFile(join(root, 'app.js'), 'console.log("jian");');
 
   const app = createApp({
     ...testServices(),

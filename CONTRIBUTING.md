@@ -1,4 +1,4 @@
-# Contributing to Elos
+# Contributing to Jian
 
 Use Node.js 24+ and the pnpm version pinned in the repository. Install with
 `pnpm install --frozen-lockfile` and run `pnpm check` before opening a change.

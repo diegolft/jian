@@ -1,6 +1,6 @@
 import Foundation
 
-public enum ElosError: Error, Equatable {
+public enum JianError: Error, Equatable {
   /// The access key is missing, expired or revoked; the caller should sign in again.
   case unauthorized
   /// The key is valid but lacks the scope for this operation.
@@ -9,7 +9,7 @@ public enum ElosError: Error, Equatable {
   case gateway(status: Int, message: String)
 }
 
-extension ElosError: LocalizedError {
+extension JianError: LocalizedError {
   public var errorDescription: String? {
     switch self {
     case .unauthorized: "The access key was rejected. Sign in again."

@@ -1,5 +1,5 @@
 {
-  "name": "@elos/gateway",
+  "name": "@jian/gateway",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "@ai-sdk/mcp": "^2.0.55",
     "@ai-sdk/openai": "^4.0.72",
     "@ai-sdk/openai-compatible": "^3.0.53",
-    "@elos/contracts": "workspace:*",
+    "@jian/contracts": "workspace:*",
     "@fastify/helmet": "^13.1.1",
     "@fastify/rate-limit": "^11.2.0",
     "@fastify/static": "10.1.4",

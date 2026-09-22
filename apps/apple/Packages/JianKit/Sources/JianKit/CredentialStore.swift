@@ -13,7 +13,7 @@ public struct KeychainCredentialStore: CredentialStore {
   private let service: String
   private let account: String
 
-  public init(service: String = "com.elos.agent.gateway", account: String = "default") {
+  public init(service: String = "io.github.lucasaarch.jian.gateway", account: String = "default") {
     self.service = service
     self.account = account
   }

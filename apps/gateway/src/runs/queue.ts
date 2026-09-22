@@ -3,7 +3,7 @@ import type { AgentRuntime } from '../agent/runtime.js';
 import type { Store } from '../core/store.js';
 import type { RunRecovery } from './port.js';
 
-const queueName = 'elos-agent-runs';
+const queueName = 'jian-agent-runs';
 
 export class RunQueue {
   private timer?: ReturnType<typeof setTimeout>;
@@ -18,7 +18,7 @@ export class RunQueue {
   ) {}
 
   async start() {
-    this.boss.on('error', () => this.report('elos: queue connection failed'));
+    this.boss.on('error', () => this.report('jian: queue connection failed'));
     await this.boss.start();
 
     // Run leases handle recovery; queue retries must not replay an agent's external effects.
@@ -68,7 +68,7 @@ export class RunQueue {
     }
 
     this.pending = this.dispatch().catch(() =>
-      this.report('elos: run dispatch failed; will retry'),
+      this.report('jian: run dispatch failed; will retry'),
     );
 
     await this.pending;

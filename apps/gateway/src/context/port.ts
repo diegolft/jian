@@ -1,4 +1,4 @@
-import type { Run } from '@elos/contracts';
+import type { Run } from '@jian/contracts';
 
 export interface ContextSource {
   context(run: Run): Promise<{

@@ -8,7 +8,7 @@ import {
   providerInputSchema,
   providerRecordSchema,
   type Run,
-} from '@elos/contracts';
+} from '@jian/contracts';
 import { type Clock, nowIso } from '../core/clock.js';
 import { GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';

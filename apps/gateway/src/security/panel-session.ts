@@ -1,13 +1,13 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { issuePanelSession, verifyPanelSession } from './tokens.js';
 
-const NAME = 'elos_panel';
+const NAME = 'jian_panel';
 
 /**
  * A cross-site request can carry the cookie, but a custom header forces a CORS preflight that
  * this gateway never answers. Requiring the header is what keeps the cookie useless off-origin.
  */
-const HEADER = 'x-elos-panel';
+const HEADER = 'x-jian-panel';
 
 /** `Secure` is set only over TLS: plain HTTP on a LAN is a supported self-hosted setup. */
 function attributes(request: FastifyRequest, maxAgeSeconds: number) {

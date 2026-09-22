@@ -19,7 +19,7 @@ const services = { ...buildServices({ store }), store };
 const input = {
   name: 'CI',
   instructions: 'Help.',
-  model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+  model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
 };
 
 beforeAll(async () => {

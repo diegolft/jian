@@ -1,14 +1,14 @@
-# Elos Agent
+# Jian
 
-Native SwiftUI client for a self-hosted Elos gateway. One target builds for both iOS and
-macOS. Open `ElosAgent.xcodeproj` in Xcode 27 or later.
+Native SwiftUI client for a self-hosted Jian gateway. One target builds for both iOS and
+macOS. Open `Jian.xcodeproj` in Xcode 27 or later.
 
 The first build asks you to trust the OpenAPI generator plugin ("Trust & Enable"). From the
 command line, pass `-skipPackagePluginValidation` instead — `pnpm apple:build` already does.
 
 ## Where the types come from
 
-`Packages/ElosKit` holds everything testable. Its `ElosAPI` target carries a copy of the
+`Packages/JianKit` holds everything testable. Its `JianAPI` target carries a copy of the
 gateway's OpenAPI document and generates the Swift client from it on every build, so no
 generated Swift is committed and the client cannot drift from the contract.
 
@@ -19,7 +19,7 @@ regenerating breaks the build rather than the app at runtime.
 
 ```bash
 pnpm contracts:generate   # after changing packages/contracts
-pnpm apple:test           # ElosKit unit tests, no network, no gateway
+pnpm apple:test           # JianKit unit tests, no network, no gateway
 ```
 
 ## Scope
@@ -29,7 +29,7 @@ stored credential work end to end. The gateway URL and the scoped access key liv
 Keychain, never in UserDefaults and never in logs.
 
 Generated types nest a full copy of every schema inside each operation, because the OpenAPI
-document inlines schemas instead of referencing shared components. `ElosKit` maps them to
+document inlines schemas instead of referencing shared components. `JianKit` maps them to
 small domain models so the app never touches a generated type.
 
 ## Linting
@@ -46,7 +46,7 @@ pnpm apple:lint:fix   # rewrites what can be fixed automatically
 ## Editing outside Xcode
 
 Editors that use sourcekit-lsp understand Swift packages, not Xcode targets, so the files
-under `ElosAgent/` show phantom errors even when the build is clean. `pnpm apple:index`
+under `Jian/` show phantom errors even when the build is clean. `pnpm apple:index`
 writes a bridge (`buildServer.json` plus a compile database) that hands sourcekit-lsp the
 real compiler arguments for the app target. Both files hold absolute paths, so they stay out
 of git; rerun the command after adding a file or changing build settings, then reload the

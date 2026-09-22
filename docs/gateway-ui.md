@@ -4,22 +4,22 @@
 
 ## Build e hospedagem
 
-`pnpm build` e `pnpm --filter @elos/gateway build` compilam contratos, SDK, painel e servidor. O export é copiado para `apps/gateway/dist/ui` e incluído no pacote de produção e na imagem Docker. O runtime serve `/ui/` com Fastify; não precisa de Next.js instalado no servidor.
+`pnpm build` e `pnpm --filter @jian/gateway build` compilam contratos, SDK, painel e servidor. O export é copiado para `apps/gateway/dist/ui` e incluído no pacote de produção e na imagem Docker. O runtime serve `/ui/` com Fastify; não precisa de Next.js instalado no servidor.
 
-`pnpm --filter @elos/gateway build:server` compila apenas o servidor para desenvolvimento. Uma execução a partir do código-fonte serve o último export disponível em `dist/ui`. Reinicie o processo após substituir esse export, pois a CSP é calculada na inicialização; use o servidor de desenvolvimento do Next.js para atualização automática.
+`pnpm --filter @jian/gateway build:server` compila apenas o servidor para desenvolvimento. Uma execução a partir do código-fonte serve o último export disponível em `dist/ui`. Reinicie o processo após substituir esse export, pois a CSP é calculada na inicialização; use o servidor de desenvolvimento do Next.js para atualização automática.
 
 A aplicação usa uma página estática, com navegação por fragmentos (`/ui/#channels`, por exemplo). Não há Server Actions, cookies de sessão, SSR ou código de provider no navegador. Fontes, ícones e QR Code são locais, sem serviços externos de renderização.
 
 ## Configurar um perfil
 
-1. Entre com o token administrativo `ELOS_API_TOKEN`.
+1. Entre com o token administrativo `JIAN_API_TOKEN`.
 2. Crie um perfil com nome e instruções. Papel, tom e objetivos pertencem às instruções.
 3. Em **Providers**, configure a chave de Anthropic, Gemini ou OpenAI. `ANTHROPIC_API_KEY`, `ANTHROPIC_API_TOKEN`, `GEMINI_API_TOKEN` e `OPENAI_API_KEY` no ambiente são detectadas automaticamente. A OpenAI também aceita login ChatGPT por código de dispositivo.
 4. Uma credencial configurada já permite conversar. Em **Modelos padrão**, você pode escolher outro modelo para conversas ou canais; essa escolha é opcional.
 5. Adicione Skills e servidores MCP, com ferramentas explicitamente permitidas. Crie uma conversa, escolha um modelo no Composer se quiser substituir o padrão e teste uma mensagem. O worker precisa estar em execução para processar a fila.
 6. Em **Canais**, vincule uma sessão e informe as listas de remetentes e conversas autorizados.
 
-O login ChatGPT usa o backend Codex com o mesmo ciclo de contexto, ferramentas e registro de uso do Elos. Tokens OAuth ficam criptografados no cofre e são renovados pelo gateway. Não cole tokens de login no campo de chave de API. Perfis antigos com `model` e `contextPolicy` continuam legíveis e funcionais.
+O login ChatGPT usa o backend Codex com o mesmo ciclo de contexto, ferramentas e registro de uso do Jian. Tokens OAuth ficam criptografados no cofre e são renovados pelo gateway. Não cole tokens de login no campo de chave de API. Perfis antigos com `model` e `contextPolicy` continuam legíveis e funcionais.
 
 Para WhatsApp, abra **Conexão**, gere o QR Code e leia-o no celular em **Dispositivos conectados**. O worker precisa de Chromium. O painel acompanha a conexão e a primeira cópia criptografada da sessão. O QR expira e não é gravado no navegador.
 
@@ -31,8 +31,8 @@ Chaves de acesso são isoladas por perfil, têm escopos e data de expiração. O
 
 - A página de entrada e os assets são públicos. APIs administrativas continuam exigindo Bearer authentication.
 - O formulário de entrada só habilita o envio após a hidratação e usa POST como fallback, impedindo envio do token na URL. O token administrativo é trocado uma vez por um cookie de sessão e não fica no navegador; não há localStorage nem sessionStorage.
-- O cookie do painel é `HttpOnly`, `SameSite=Strict`, válido por 30 dias e `Secure` quando a requisição chega por HTTPS. Ele carrega apenas a própria validade e uma assinatura HMAC derivada de `ELOS_API_TOKEN`: nada é guardado no banco, e trocar o token do host encerra todas as sessões abertas. Recarregar mantém a sessão; sair apaga o cookie.
-- O gateway só aceita o cookie em requisições que também enviam `x-elos-panel: 1`. Cabeçalho personalizado exige preflight CORS, que o gateway não responde, então outro site não consegue usar o cookie. O login tem limite próprio de 10 tentativas por minuto.
+- O cookie do painel é `HttpOnly`, `SameSite=Strict`, válido por 30 dias e `Secure` quando a requisição chega por HTTPS. Ele carrega apenas a própria validade e uma assinatura HMAC derivada de `JIAN_API_TOKEN`: nada é guardado no banco, e trocar o token do host encerra todas as sessões abertas. Recarregar mantém a sessão; sair apaga o cookie.
+- O gateway só aceita o cookie em requisições que também enviam `x-jian-panel: 1`. Cabeçalho personalizado exige preflight CORS, que o gateway não responde, então outro site não consegue usar o cookie. O login tem limite próprio de 10 tentativas por minuto.
 - Requisições usam a mesma origem, sem cache, com tempo limite. O painel não contém credenciais no build.
 - A política CSP aceita scripts do próprio Gateway e hashes exatos dos scripts de hidratação do export. Enquadramento em iframe, plugins e alteração da URL-base são bloqueados.
 - Inputs são renderizados como texto; o histórico e as instruções não executam HTML.

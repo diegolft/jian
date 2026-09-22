@@ -12,10 +12,10 @@ RUN pnpm install --frozen-lockfile
 COPY apps/gateway apps/gateway
 COPY apps/gateway-ui apps/gateway-ui
 COPY packages packages
-RUN pnpm build && pnpm --filter @elos/gateway --prod deploy --legacy /runtime
+RUN pnpm build && pnpm --filter @jian/gateway --prod deploy --legacy /runtime
 
 FROM node:24-bookworm-slim
-ENV NODE_ENV=production HOST=0.0.0.0 PORT=4310 ELOS_WHATSAPP_CHROMIUM=/usr/bin/chromium
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=4310 JIAN_WHATSAPP_CHROMIUM=/usr/bin/chromium
 RUN apt-get update && apt-get install -y --no-install-recommends chromium \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app

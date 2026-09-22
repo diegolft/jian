@@ -12,12 +12,12 @@ type SessionBackup = { storeRemoteSession(options?: { emit: boolean }): Promise<
 export function createWhatsAppDeviceFactory(executablePath?: string): DeviceFactory {
   return async (id, store, callbacks) => {
     if (!executablePath) {
-      throw new Error('ELOS_WHATSAPP_CHROMIUM is required');
+      throw new Error('JIAN_WHATSAPP_CHROMIUM is required');
     }
 
     // Chromium needs plaintext while running. Keep its working files private and ephemeral;
     // only encrypted session archives are persisted by the gateway's store.
-    const directory = await mkdtemp(join(tmpdir(), 'elos-whatsapp-'));
+    const directory = await mkdtemp(join(tmpdir(), 'jian-whatsapp-'));
     await chmod(directory, 0o700);
     const sessionName = `RemoteAuth-${id}`;
     const archive = join(directory, `${sessionName}.zip`);
@@ -73,7 +73,7 @@ export function createWhatsAppDeviceFactory(executablePath?: string): DeviceFact
 
     const client = new WhatsApp.Client({
       authStrategy: auth,
-      deviceName: 'Elos Gateway',
+      deviceName: 'Jian Gateway',
       browserName: 'Chrome',
       qrMaxRetries: 5,
       takeoverOnConflict: false,

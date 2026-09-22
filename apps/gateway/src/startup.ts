@@ -42,5 +42,5 @@ function knownFailure(error: unknown, depth = 0): string | undefined {
 export function startupFailure(stage: StartupStage, error: unknown): string {
   const detail = knownFailure(error) ?? 'Unexpected failure. Check configuration and service logs.';
 
-  return `Elos startup failed [${stage}]. ${detail}`;
+  return `Jian startup failed [${stage}]. ${detail}`;
 }

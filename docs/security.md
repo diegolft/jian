@@ -2,13 +2,13 @@
 
 ## Fronteira de confiança
 
-Uma instalação pertence a um dono confiável. O token `ELOS_API_TOKEN` é administrativo: mantenha-o no host e use chaves com escopos nos clientes. Todas as sessões de um perfil compartilham o mesmo acesso aos dados e ferramentas daquele perfil. Não conecte públicos com permissões diferentes ao mesmo perfil.
+Uma instalação pertence a um dono confiável. O token `JIAN_API_TOKEN` é administrativo: mantenha-o no host e use chaves com escopos nos clientes. Todas as sessões de um perfil compartilham o mesmo acesso aos dados e ferramentas daquele perfil. Não conecte públicos com permissões diferentes ao mesmo perfil.
 
 As chaves de clientes são aleatórias, têm 256 bits de entropia e são persistidas como hash SHA-256, com perfil, escopos e expiração. Revogação é verificada a cada requisição e durante streams. Chaves de provider/MCP/canal são criptografadas e nunca retornadas em consultas do cofre.
 
 ## Criptografia e rotação
 
-`ELOS_MASTER_KEYS` é um objeto JSON de identificadores para chaves de 32 bytes em Base64. `ELOS_ACTIVE_KEY_ID` escolhe a chave usada para novas gravações. O setup cria um keyring em `.env` com permissão `0600`; na hospedagem, injete-o por um gerenciador de segredos. Não coloque esse keyring no banco, no Git ou no mesmo backup do banco.
+`JIAN_MASTER_KEYS` é um objeto JSON de identificadores para chaves de 32 bytes em Base64. `JIAN_ACTIVE_KEY_ID` escolhe a chave usada para novas gravações. O setup cria um keyring em `.env` com permissão `0600`; na hospedagem, injete-o por um gerenciador de segredos. Não coloque esse keyring no banco, no Git ou no mesmo backup do banco.
 
 AES-256-GCM usa nonce aleatório por gravação. Os dados autenticados vinculam cada ciphertext ao ID, perfil e propósito da credencial, impedindo a troca de envelopes entre registros. Essa proteção cobre vazamento isolado do banco; um processo worker comprometido também pode acessar as chaves em memória.
 
@@ -25,7 +25,7 @@ O token administrativo legado fica no ambiente, separado do banco. Troque-o no h
 
 ## Rede e limites
 
-Providers e MCPs usam o mesmo transporte de saída. Ele exige HTTPS público, valida e fixa a resolução DNS na conexão, bloqueia redirecionamentos, credenciais embutidas e destinos privados. `ELOS_ALLOW_PRIVATE_ORIGINS` permite origens exatas para serviços internos administrados pelo dono, por exemplo `http://127.0.0.1:11434`. Endereços de metadata e link-local continuam proibidos.
+Providers e MCPs usam o mesmo transporte de saída. Ele exige HTTPS público, valida e fixa a resolução DNS na conexão, bloqueia redirecionamentos, credenciais embutidas e destinos privados. `JIAN_ALLOW_PRIVATE_ORIGINS` permite origens exatas para serviços internos administrados pelo dono, por exemplo `http://127.0.0.1:11434`. Endereços de metadata e link-local continuam proibidos.
 
 A API limita o corpo a 256 KiB, aplica rate limit por endereço de conexão e limita streams. Ela não confia automaticamente em `X-Forwarded-For`; atrás de um proxy todos os clientes podem compartilhar o limite. Configure limites adicionais no proxy conforme a implantação. Instâncias distintas têm contadores HTTP próprios; os limites de runs e as reservas de recursos ficam no banco.
 

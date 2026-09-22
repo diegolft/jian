@@ -1,4 +1,4 @@
-# Elos
+# Jian
 
 Self-hosted agent gateway. One trusted owner per installation, isolation per profile.
 TypeScript on Node 24+, Fastify, PostgreSQL, pg-boss. Native Apple client in Swift.
@@ -8,7 +8,7 @@ TypeScript on Node 24+, Fastify, PostgreSQL, pg-boss. Native Apple client in Swi
 ```text
 apps/gateway/       HTTP API, runtime, workers, tests
 apps/gateway-ui/    Next.js panel, statically exported into the gateway
-apps/apple/         Elos Agent, one SwiftUI target for iOS and macOS
+apps/apple/         Jian, one SwiftUI target for iOS and macOS
 packages/contracts/ Zod schemas — the source of the HTTP contract
 packages/sdk/       Generated TypeScript client
 docs/               Architecture, security, channels, panel
@@ -24,7 +24,7 @@ pnpm setup          # writes .env (0600) with local credentials; never prints se
 pnpm db:up          # PostgreSQL on 127.0.0.1:5432
 pnpm dev            # gateway on :4310 and the panel with hot reload on :3000
 pnpm check          # lint, typecheck, unit tests, build, contract drift
-pnpm apple:test     # ElosKit unit tests
+pnpm apple:test     # JianKit unit tests
 pnpm apple:lint     # SwiftLint, strict
 ```
 

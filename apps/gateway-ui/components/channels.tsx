@@ -366,7 +366,7 @@ export function Channels({
                   setPairing(created);
                 } else {
                   setSecret(
-                    `Webhook: ${window.location.origin}/v1/${type === 'telegram' ? 'telegram' : 'ingress'}/${created.id}\n${type === 'telegram' ? 'X-Telegram-Bot-Api-Secret-Token' : 'X-Elos-Channel-Token'}: ${created.webhookToken}`,
+                    `Webhook: ${window.location.origin}/v1/${type === 'telegram' ? 'telegram' : 'ingress'}/${created.id}\n${type === 'telegram' ? 'X-Telegram-Bot-Api-Secret-Token' : 'X-Jian-Channel-Token'}: ${created.webhookToken}`,
                   );
                 }
               }, 'Canal criado.');

@@ -133,8 +133,8 @@ export function createCodexModel(token: string, modelId: string, fetcher: typeof
     headers.set('authorization', `Bearer ${token}`);
     headers.set('content-type', 'application/json');
     headers.set('accept', 'text/event-stream');
-    headers.set('originator', 'elos');
-    headers.set('user-agent', 'Elos/0.1.0');
+    headers.set('originator', 'jian');
+    headers.set('user-agent', 'Jian/0.1.0');
     for (const [name, value] of Object.entries(accountHeaders(token))) headers.set(name, value);
 
     const response = await fetcher(String(input), {

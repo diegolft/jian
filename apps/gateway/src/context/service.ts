@@ -1,4 +1,4 @@
-import type { Run } from '@elos/contracts';
+import type { Run } from '@jian/contracts';
 import type { Store } from '../core/store.js';
 import type { RunReader } from '../runs/port.js';
 import type { SessionReader } from '../sessions/port.js';

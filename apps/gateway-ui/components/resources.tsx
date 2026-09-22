@@ -663,9 +663,9 @@ export function Capabilities({
                 >
                   <input
                     name="env"
-                    pattern="ELOS_MCP_[A-Z0-9_]+"
+                    pattern="JIAN_MCP_[A-Z0-9_]+"
                     defaultValue={mcp?.bearerTokenEnv ?? ''}
-                    placeholder="ELOS_MCP_SERVICO"
+                    placeholder="JIAN_MCP_SERVICO"
                   />
                 </Field>
               </>

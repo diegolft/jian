@@ -3,7 +3,7 @@ import { startupFailure } from '../src/startup.js';
 
 it('explains refused IPv4/IPv6 database connections without exposing driver details', () => {
   const failure = new AggregateError([
-    Object.assign(new Error('postgres://user:secret@localhost/elos'), { code: 'ECONNREFUSED' }),
+    Object.assign(new Error('postgres://user:secret@localhost/jian'), { code: 'ECONNREFUSED' }),
     Object.assign(new Error('private driver details'), { code: 'ECONNREFUSED' }),
   ]);
 
@@ -22,6 +22,6 @@ it('distinguishes authentication and listener failures while keeping unknown err
     'port is already in use',
   );
   expect(startupFailure('queue', { code: 'secret-code', message: 'secret-message' })).toBe(
-    'Elos startup failed [queue]. Unexpected failure. Check configuration and service logs.',
+    'Jian startup failed [queue]. Unexpected failure. Check configuration and service logs.',
   );
 });

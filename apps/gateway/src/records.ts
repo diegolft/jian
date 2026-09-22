@@ -9,7 +9,7 @@ import type {
   ProviderRecord,
   Run,
   Session,
-} from '@elos/contracts';
+} from '@jian/contracts';
 import type { ChannelRecord, DeliveryRecord } from './channels/service.js';
 import type { ConnectionRecord, DeviceAuthRecord, InboxRecord } from './channels/whatsapp/types.js';
 import type { ArtifactRecord, LeaseRecord, MailRecord } from './coordination/service.js';

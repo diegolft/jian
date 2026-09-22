@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { ProviderRecord } from '@elos/contracts';
+import type { ProviderRecord } from '@jian/contracts';
 
 export const providerCatalog = {
   anthropic: {

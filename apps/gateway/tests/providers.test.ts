@@ -1,4 +1,4 @@
-import { modelSchema } from '@elos/contracts';
+import { modelSchema } from '@jian/contracts';
 import { generateText } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { resolveModel } from '../src/providers/models.js';
@@ -10,11 +10,11 @@ describe('providers', () => {
       const config = modelSchema.parse({
         provider,
         modelId: 'chosen-model',
-        apiKeyEnv: 'ELOS_PROVIDER_A',
+        apiKeyEnv: 'JIAN_PROVIDER_A',
         ...(provider === 'openai-compatible' ? { baseURL: 'http://localhost:11434/v1' } : {}),
       });
 
-      const model = resolveModel(config, { ELOS_PROVIDER_A: 'test-only' });
+      const model = resolveModel(config, { JIAN_PROVIDER_A: 'test-only' });
 
       expect(typeof model).toBe('object');
 
@@ -27,7 +27,7 @@ describe('providers', () => {
   it('does not fall back to a global key if the selected credential is absent', () => {
     expect(() =>
       resolveModel(
-        { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_MISSING' },
+        { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_MISSING' },
         { OPENAI_API_KEY: 'other-profile-secret' },
       ),
     ).toThrow('Provider credential is not configured');
@@ -37,8 +37,8 @@ describe('providers', () => {
 it('rejects a compatible provider without an endpoint before making a request', () => {
   expect(() =>
     resolveModel(
-      { provider: 'openai-compatible', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_LOCAL' },
-      { ELOS_PROVIDER_LOCAL: 'local' },
+      { provider: 'openai-compatible', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_LOCAL' },
+      { JIAN_PROVIDER_LOCAL: 'local' },
     ),
   ).toThrow('baseURL is required for compatible providers');
 });

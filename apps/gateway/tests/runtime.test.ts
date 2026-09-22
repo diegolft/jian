@@ -9,7 +9,7 @@ import { testServices } from './helpers/services.js';
 const input = {
   name: 'Atlas',
   instructions: 'Help.',
-  model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+  model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
 };
 
 const usage = {
@@ -435,9 +435,9 @@ it('stores a large tool output and sends only a bounded reference to the model',
 it('redacts an escaped host credential from tool prompts, artifacts, checkpoints and final output', async () => {
   const secret = 'quote"\\\nline';
   const escaped = JSON.stringify(secret).slice(1, -1);
-  const previous = process.env.ELOS_PROVIDER_TEST;
+  const previous = process.env.JIAN_PROVIDER_TEST;
 
-  process.env.ELOS_PROVIDER_TEST = secret;
+  process.env.JIAN_PROVIDER_TEST = secret;
 
   try {
     const { services, profile, run } = await fixture();
@@ -500,9 +500,9 @@ it('redacts an escaped host credential from tool prompts, artifacts, checkpoints
     expect(result.output).toBe('Echo: [REDACTED] | [REDACTED]');
   } finally {
     if (previous === undefined) {
-      delete process.env.ELOS_PROVIDER_TEST;
+      delete process.env.JIAN_PROVIDER_TEST;
     } else {
-      process.env.ELOS_PROVIDER_TEST = previous;
+      process.env.JIAN_PROVIDER_TEST = previous;
     }
   }
 });

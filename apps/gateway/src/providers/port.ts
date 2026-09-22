@@ -1,4 +1,4 @@
-import type { ModelConfig, ModelSelection, ProviderRecord } from '@elos/contracts';
+import type { ModelConfig, ModelSelection, ProviderRecord } from '@jian/contracts';
 import type { Reader } from '../core/store.js';
 import type { ContextPolicy } from './service.js';
 

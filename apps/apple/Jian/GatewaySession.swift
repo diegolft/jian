@@ -1,4 +1,4 @@
-import ElosKit
+import JianKit
 import Foundation
 
 /// Holds the signed-in gateway for the whole app. Views never see the access key.
@@ -15,7 +15,7 @@ final class GatewaySession {
   private(set) var failure: String?
 
   private let store: any CredentialStore
-  private var client: ElosClient?
+  private var client: JianClient?
 
   init(store: any CredentialStore = KeychainCredentialStore()) {
     self.store = store
@@ -48,7 +48,7 @@ final class GatewaySession {
   }
 
   private func connect(with credentials: GatewayCredentials, persist: Bool = false) async {
-    let client = ElosClient(credentials: credentials)
+    let client = JianClient(credentials: credentials)
     state = .working
     await load(using: client)
     guard case .signedIn = state else { return }
@@ -56,13 +56,13 @@ final class GatewaySession {
     if persist { try? store.save(credentials) }
   }
 
-  private func load(using client: ElosClient) async {
+  private func load(using client: JianClient) async {
     do {
       state = .signedIn(try await client.listProfiles())
       failure = nil
     } catch {
       // A rejected key must not leave a stale session behind.
-      if case ElosError.unauthorized = error { self.client = nil }
+      if case JianError.unauthorized = error { self.client = nil }
       failure = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
       state = .signedOut
     }

@@ -1,12 +1,16 @@
-# Elos
+# Jian
 
-Elos is a self-hosted gateway that gives AI agents a persistent identity. A profile keeps
+Jian is a self-hosted gateway that gives AI agents a persistent identity. A profile keeps
 its own instructions, model, memory and tools, and every session and channel that belongs
 to it works from that same context — so a conversation started on WhatsApp continues in
 the web panel without repeating anything.
 
 It runs on your own server. Provider keys stay in an encrypted vault on your machine, not
 in a vendor's account.
+
+The name is the jian, the one-winged bird of the 比翼の鳥, which cannot fly by itself and
+takes off only once it is joined to another. That is the thesis: things that only work
+connected.
 
 ## What it does
 
@@ -29,7 +33,7 @@ multi-tenant SaaS.
 
 ## Clients
 
-The web panel ships inside the gateway. **Elos Agent**, a native SwiftUI app for iOS and
+The web panel ships inside the gateway. **Jian**, a native SwiftUI app for iOS and
 macOS, lives in `apps/apple` and talks to the same contract.
 
 ## Repository
@@ -37,7 +41,7 @@ macOS, lives in `apps/apple` and talks to the same contract.
 ```text
 apps/gateway/       HTTP API, runtime and workers
 apps/gateway-ui/    Web panel, exported into the gateway
-apps/apple/         Elos Agent, iOS and macOS
+apps/apple/         Jian, iOS and macOS
 packages/contracts/ Zod schemas — the source of the HTTP contract
 packages/sdk/       Generated TypeScript client
 docs/               Architecture, security, channels, panel

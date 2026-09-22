@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { createOpenAPI, operations } from '@elos/contracts';
+import { createOpenAPI, operations } from '@jian/contracts';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
 import { Channels } from '../src/channels/service.js';
@@ -30,7 +30,7 @@ async function setup() {
   const profile = await services.profiles.createProfile({
     name: 'P',
     instructions: 'Help',
-    model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+    model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
   });
 
   return { app, services, credentials, profile };
@@ -160,7 +160,7 @@ describe('public API contracts', () => {
         401,
       );
 
-      const headers = { 'x-elos-channel-token': binding.webhookToken };
+      const headers = { 'x-jian-channel-token': binding.webhookToken };
 
       expect(
         (

@@ -1,4 +1,4 @@
-import type { Checkpoint, Run } from '@elos/contracts';
+import type { Checkpoint, Run } from '@jian/contracts';
 import type { Reader } from '../core/store.js';
 
 export interface RunReader {

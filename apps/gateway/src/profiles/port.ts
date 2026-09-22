@@ -1,4 +1,4 @@
-import type { Profile } from '@elos/contracts';
+import type { Profile } from '@jian/contracts';
 import type { Reader } from '../core/store.js';
 
 /** Passing a reader keeps the lookup inside the caller's open transaction. */

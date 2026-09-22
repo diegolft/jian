@@ -1,6 +1,6 @@
-import { operationSchema, operations } from '@elos/contracts';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import { operationSchema, operations } from '@jian/contracts';
 import Fastify, { LogController } from 'fastify';
 import { registerChannelRoutes } from './channels/routes.js';
 import type { Channels } from './channels/service.js';
@@ -37,7 +37,7 @@ export function createApp(
   },
 ) {
   if (options.token.length < 32) {
-    throw new Error('ELOS_API_TOKEN must have at least 32 characters');
+    throw new Error('JIAN_API_TOKEN must have at least 32 characters');
   }
 
   const coordination = new Coordination(options);

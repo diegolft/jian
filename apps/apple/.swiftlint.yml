@@ -1,10 +1,10 @@
 included:
-  - ElosAgent
-  - Packages/ElosKit/Sources
-  - Packages/ElosKit/Tests
+  - Jian
+  - Packages/JianKit/Sources
+  - Packages/JianKit/Tests
 
 excluded:
-  - Packages/ElosKit/.build
+  - Packages/JianKit/.build
 
 opt_in_rules:
   - array_init

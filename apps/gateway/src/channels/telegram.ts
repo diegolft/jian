@@ -1,4 +1,4 @@
-import { telegramUpdateSchema } from '@elos/contracts';
+import { telegramUpdateSchema } from '@jian/contracts';
 import { GatewayError } from '../core/errors.js';
 import type {
   Channel,

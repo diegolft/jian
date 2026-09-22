@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct ElosAgentApp: App {
+struct JianApp: App {
   @State private var session = GatewaySession()
 
   var body: some Scene {

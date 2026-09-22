@@ -1,5 +1,5 @@
 {
-  "name": "elos",
+  "name": "jian",
   "description": "Gateway de agentes com identidade e contexto compartilhados entre sess\u00f5es",
   "version": "0.1.0",
   "private": true,
@@ -9,14 +9,14 @@
     "pnpm": ">=11 <12"
   },
   "scripts": {
-    "dev": "pnpm --filter @elos/contracts build && pnpm --filter @elos/sdk build && pnpm --parallel --filter @elos/gateway --filter @elos/gateway-ui dev",
+    "dev": "pnpm --filter @jian/contracts build && pnpm --filter @jian/sdk build && pnpm --parallel --filter @jian/gateway --filter @jian/gateway-ui dev",
     "db:up": "docker compose up -d --wait postgres",
     "db:stop": "docker compose stop postgres",
-    "build": "pnpm --filter @elos/gateway build",
-    "start": "pnpm --filter @elos/gateway start",
-    "typecheck": "pnpm --filter @elos/contracts build && pnpm --filter @elos/sdk build && pnpm -r --if-present run typecheck",
-    "test": "pnpm --filter @elos/contracts build && pnpm --filter @elos/gateway test",
-    "test:integration": "pnpm --filter @elos/contracts build && pnpm --filter @elos/gateway test:integration",
+    "build": "pnpm --filter @jian/gateway build",
+    "start": "pnpm --filter @jian/gateway start",
+    "typecheck": "pnpm --filter @jian/contracts build && pnpm --filter @jian/sdk build && pnpm -r --if-present run typecheck",
+    "test": "pnpm --filter @jian/contracts build && pnpm --filter @jian/gateway test",
+    "test:integration": "pnpm --filter @jian/contracts build && pnpm --filter @jian/gateway test:integration",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm contracts:check",
     "setup": "node scripts/setup.mjs",
     "lint": "biome check . --error-on-warnings",
@@ -24,13 +24,13 @@
     "format": "biome format --write .",
     "lint:staged": "lint-staged",
     "prepare": "node .husky/install.mjs",
-    "contracts:generate": "pnpm --filter @elos/contracts build && node packages/sdk/scripts/generate.mjs",
-    "contracts:check": "pnpm --filter @elos/contracts build && node packages/sdk/scripts/generate.mjs --check",
-    "apple:test": "cd apps/apple/Packages/ElosKit && swift test",
-    "apple:build": "xcodebuild -project apps/apple/ElosAgent.xcodeproj -scheme ElosAgent -destination 'generic/platform=iOS Simulator' -skipPackagePluginValidation build",
+    "contracts:generate": "pnpm --filter @jian/contracts build && node packages/sdk/scripts/generate.mjs",
+    "contracts:check": "pnpm --filter @jian/contracts build && node packages/sdk/scripts/generate.mjs --check",
+    "apple:test": "cd apps/apple/Packages/JianKit && swift test",
+    "apple:build": "xcodebuild -project apps/apple/Jian.xcodeproj -scheme Jian -destination 'generic/platform=iOS Simulator' -skipPackagePluginValidation build",
     "apple:lint": "cd apps/apple && swiftlint lint --quiet --strict",
     "apple:lint:fix": "cd apps/apple && swiftlint lint --quiet --fix",
-    "apple:index": "cd apps/apple && xcode-build-server config -project ElosAgent.xcodeproj -scheme ElosAgent && xcodebuild -project ElosAgent.xcodeproj -scheme ElosAgent -destination 'platform=macOS' -skipPackagePluginValidation build | xcode-build-server parse -a"
+    "apple:index": "cd apps/apple && xcode-build-server config -project Jian.xcodeproj -scheme Jian && xcodebuild -project Jian.xcodeproj -scheme Jian -destination 'platform=macOS' -skipPackagePluginValidation build | xcode-build-server parse -a"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

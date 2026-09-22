@@ -23,20 +23,20 @@ PostgreSQL applies `POSTGRES_PASSWORD` only when it initialises an empty volume.
 recreate `.env` afterwards, the gateway fails with `28P01`. Sync the two in one line:
 
 ```bash
-printf "ALTER USER elos WITH PASSWORD '%s';\n" "$POSTGRES_PASSWORD" | docker exec -i elos-postgres-1 psql -U elos -d elos
+printf "ALTER USER jian WITH PASSWORD '%s';\n" "$POSTGRES_PASSWORD" | docker exec -i jian-postgres-1 psql -U jian -d jian
 ```
 
 With PostgreSQL already available, set `DATABASE_URL` and run `pnpm dev`; it does not
 start a database for you. Lint, typecheck, build and unit tests need no Docker at all.
 
-`ELOS_ROLE=all` runs the API and the worker in one process. `api` and `worker` split them,
+`JIAN_ROLE=all` runs the API and the worker in one process. `api` and `worker` split them,
 and both halves must share the database and the keyring.
 
 ## The web panel
 
 `pnpm build` compiles the panel with Next.js `output: 'export'` and copies it into
 `apps/gateway/dist/ui`; there is no Next.js server in production. `pnpm start` then serves
-it at `http://localhost:4310/ui/`. Sign in with the server's `ELOS_API_TOKEN`.
+it at `http://localhost:4310/ui/`. Sign in with the server's `JIAN_API_TOKEN`.
 
 The panel keeps that token in the tab's memory only, so a reload asks again. Provider keys
 go to the gateway's encrypted vault, never to browser storage.
@@ -46,7 +46,7 @@ forwards `/v1` to the gateway. Port 4310 serves the copy from the last `pnpm bui
 
 ## First profile
 
-Every administrative call needs `Authorization: Bearer <ELOS_API_TOKEN>`, including
+Every administrative call needs `Authorization: Bearer <JIAN_API_TOKEN>`, including
 `GET /openapi.json`. A copy without secrets lives in
 [`packages/contracts/openapi.json`](../packages/contracts/openapi.json).
 
@@ -83,9 +83,9 @@ pnpm contracts:check      # fails when a generated file is stale
 ```
 
 ```typescript
-import { createElosClient } from '@elos/sdk';
+import { createJianClient } from '@jian/sdk';
 
-const client = createElosClient({ baseUrl, token });
+const client = createJianClient({ baseUrl, token });
 const { data, error } = await client.GET('/v1/profiles/{profileId}', {
   params: { path: { profileId } },
 });
@@ -130,7 +130,7 @@ and lint-staged guard staged files before every commit. CI additionally provisio
 disposable PostgreSQL 17, runs the persistence tests and builds the Docker image.
 
 ```bash
-TEST_DATABASE_URL='postgres://elos:password@localhost:5432/elos_test' pnpm test:integration
+TEST_DATABASE_URL='postgres://jian:password@localhost:5432/jian_test' pnpm test:integration
 ```
 
 The unit suite uses in-memory storage, synthetic models and a local HTTP MCP. Validation

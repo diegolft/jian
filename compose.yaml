@@ -1,17 +1,20 @@
 # PostgreSQL for local development. The Gateway runs on the host with `pnpm dev`.
+# Compose would otherwise name the project after the checkout directory, so the container
+# and volume names would follow whatever the clone is called.
+name: jian
 services:
   postgres:
     image: postgres:17-bookworm
     environment:
-      POSTGRES_DB: elos
-      POSTGRES_USER: elos
+      POSTGRES_DB: jian
+      POSTGRES_USER: jian
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run pnpm run setup first}
     ports:
       - '127.0.0.1:5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [CMD-SHELL, 'pg_isready -U elos -d elos']
+      test: [CMD-SHELL, 'pg_isready -U jian -d jian']
       interval: 5s
       timeout: 3s
       retries: 10

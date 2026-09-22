@@ -4,10 +4,10 @@ import { cp, rm } from 'node:fs/promises';
 const root = new URL('../../../', import.meta.url);
 const run = (args) => execFileSync('pnpm', args, { cwd: root, stdio: 'inherit' });
 
-run(['--filter', '@elos/contracts', 'build']);
-run(['--filter', '@elos/sdk', 'build']);
-run(['--filter', '@elos/gateway-ui', 'build']);
-run(['--filter', '@elos/gateway', 'build:server']);
+run(['--filter', '@jian/contracts', 'build']);
+run(['--filter', '@jian/sdk', 'build']);
+run(['--filter', '@jian/gateway-ui', 'build']);
+run(['--filter', '@jian/gateway', 'build:server']);
 
 const destination = new URL('../dist/ui/', import.meta.url);
 await rm(destination, { recursive: true, force: true });

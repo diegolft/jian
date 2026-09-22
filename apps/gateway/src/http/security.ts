@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
-import { operations } from '@elos/contracts';
+import { operations } from '@jian/contracts';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 import { GatewayError } from '../core/errors.js';

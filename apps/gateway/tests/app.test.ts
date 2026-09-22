@@ -13,7 +13,7 @@ const headers = { authorization: `Bearer ${token}` };
 const input = {
   name: 'Atlas',
   instructions: 'Help.',
-  model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+  model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
 };
 
 const apps: FastifyInstance[] = [];
@@ -247,7 +247,7 @@ it('streams committed events over HTTP and resumes after a cursor', async () => 
 });
 
 describe('panel session', () => {
-  const panel = { 'x-elos-panel': '1' };
+  const panel = { 'x-jian-panel': '1' };
 
   async function signIn(app: FastifyInstance) {
     const response = await app.inject({
@@ -260,9 +260,9 @@ describe('panel session', () => {
 
     const cookie = response.cookies[0];
 
-    assert(cookie && cookie.name === 'elos_panel');
+    assert(cookie && cookie.name === 'jian_panel');
 
-    return { cookie: `elos_panel=${cookie.value}`, raw: cookie, response };
+    return { cookie: `jian_panel=${cookie.value}`, raw: cookie, response };
   }
 
   it('hands the browser an unreadable cookie that authorizes administration', async () => {
@@ -310,7 +310,7 @@ describe('panel session', () => {
     ]) {
       const response = await app.inject({
         url: '/v1/profiles',
-        headers: { cookie: `elos_panel=${forged}`, ...panel },
+        headers: { cookie: `jian_panel=${forged}`, ...panel },
       });
 
       expect(response.statusCode).toBe(401);
@@ -328,7 +328,7 @@ describe('panel session', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.cookies[0]).toMatchObject({ name: 'elos_panel', value: '' });
+    expect(response.cookies[0]).toMatchObject({ name: 'jian_panel', value: '' });
     expect(response.cookies[0]?.maxAge).toBe(0);
   });
 });

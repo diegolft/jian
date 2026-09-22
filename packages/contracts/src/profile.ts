@@ -19,7 +19,7 @@ export const modelSchema = z
     apiKeyEnv: z
       .string()
       .regex(
-        /^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$/,
+        /^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$/,
       )
       .optional(),
     credentialId: z.uuid().optional(),
@@ -51,7 +51,7 @@ export const mcpSchema = z.strictObject({
   credentialId: z.uuid().optional(),
   bearerTokenEnv: z
     .string()
-    .regex(/^ELOS_MCP_[A-Z0-9_]+$/)
+    .regex(/^JIAN_MCP_[A-Z0-9_]+$/)
     .optional(),
   allowedTools: z
     .array(z.string().regex(/^[a-zA-Z0-9_.-]{1,100}$/))

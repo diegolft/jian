@@ -1,4 +1,4 @@
-import type { Run } from '@elos/contracts';
+import type { Run } from '@jian/contracts';
 import { tokenCounter } from '../context/budget.js';
 import type { RuntimeOptions } from './types.js';
 

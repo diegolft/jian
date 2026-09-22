@@ -22,20 +22,20 @@ import { PostgresStore } from './storage/postgres.js';
 const config = z
   .object({
     DATABASE_URL: z.string().min(1),
-    ELOS_ACTIVE_KEY_ID: z.string().min(1),
-    ELOS_MASTER_KEYS: z.string().min(1),
-    ELOS_ALLOW_PRIVATE_ORIGINS: z.string().default(''),
-    ELOS_API_TOKEN: z.string().min(32),
-    ELOS_WHATSAPP_CHROMIUM: z.string().min(1).optional(),
+    JIAN_ACTIVE_KEY_ID: z.string().min(1),
+    JIAN_MASTER_KEYS: z.string().min(1),
+    JIAN_ALLOW_PRIVATE_ORIGINS: z.string().default(''),
+    JIAN_API_TOKEN: z.string().min(32),
+    JIAN_WHATSAPP_CHROMIUM: z.string().min(1).optional(),
     HOST: z.string().default('127.0.0.1'),
     PORT: z.coerce.number().int().min(1).max(65535).default(4310),
-    ELOS_ROLE: z.enum(['all', 'api', 'worker']).default('all'),
+    JIAN_ROLE: z.enum(['all', 'api', 'worker']).default('all'),
   })
   .safeParse(process.env);
 
 if (!config.success) {
   console.error(
-    'Elos configuration is incomplete:',
+    'Jian configuration is incomplete:',
     config.error.issues.map((i) => i.path.join('.')).join(', '),
   );
 
@@ -50,16 +50,16 @@ let box: SecretBox;
 try {
   const keys = z
     .record(z.string(), z.string().regex(/^[A-Za-z0-9+/]{43}=$/))
-    .parse(JSON.parse(config.data.ELOS_MASTER_KEYS));
+    .parse(JSON.parse(config.data.JIAN_MASTER_KEYS));
 
   box = new SecretBox({
-    activeKeyId: config.data.ELOS_ACTIVE_KEY_ID,
+    activeKeyId: config.data.JIAN_ACTIVE_KEY_ID,
     keys: Object.fromEntries(
       Object.entries(keys).map(([id, key]) => [id, Buffer.from(key, 'base64')]),
     ),
   });
 } catch {
-  console.error('Invalid encryption keyring. Configure ELOS_MASTER_KEYS and ELOS_ACTIVE_KEY_ID.');
+  console.error('Invalid encryption keyring. Configure JIAN_MASTER_KEYS and JIAN_ACTIVE_KEY_ID.');
   process.exit(1);
 }
 
@@ -67,7 +67,7 @@ const credentials = new Credentials(services, box);
 const codexLogin = new CodexLogin(services, credentials);
 
 const outbound = createSafeFetch({
-  allowPrivateOrigins: config.data.ELOS_ALLOW_PRIVATE_ORIGINS.split(',')
+  allowPrivateOrigins: config.data.JIAN_ALLOW_PRIVATE_ORIGINS.split(',')
     .map((value) => value.trim())
     .filter(Boolean),
 });
@@ -76,7 +76,7 @@ const coordination = new Coordination(services);
 const whatsapp = new WhatsAppConnections(
   store,
   box,
-  createWhatsAppDeviceFactory(config.data.ELOS_WHATSAPP_CHROMIUM),
+  createWhatsAppDeviceFactory(config.data.JIAN_WHATSAPP_CHROMIUM),
 );
 const channelRegistry = new ChannelRegistry([
   new GenericChannel(),
@@ -93,19 +93,19 @@ const runtime = new AgentRuntime(services, undefined, {
 });
 
 const queue =
-  config.data.ELOS_ROLE !== 'api'
+  config.data.JIAN_ROLE !== 'api'
     ? new RunQueue(new PgBoss(config.data.DATABASE_URL), services, runtime)
     : undefined;
 
 const app =
-  config.data.ELOS_ROLE !== 'worker'
+  config.data.JIAN_ROLE !== 'worker'
     ? createApp({
         ...services,
         credentials,
         codexLogin,
         channels,
         whatsapp,
-        token: config.data.ELOS_API_TOKEN,
+        token: config.data.JIAN_API_TOKEN,
         onCancel: (id) => runtime.cancel(id),
       })
     : undefined;
@@ -144,7 +144,7 @@ try {
   startupStage = 'queue';
   await queue?.start();
 
-  if (config.data.ELOS_ROLE !== 'api') {
+  if (config.data.JIAN_ROLE !== 'api') {
     whatsapp.start((id, input, generation) => channels.receiveLinked(id, input, generation));
     channels.start();
   }
@@ -153,7 +153,7 @@ try {
     startupStage = 'http';
     await app.listen({ host: config.data.HOST, port: config.data.PORT });
   } else {
-    console.info('Elos worker started');
+    console.info('Jian worker started');
   }
 } catch (error) {
   console.error(startupFailure(startupStage, error));

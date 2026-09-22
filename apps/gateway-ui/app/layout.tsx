@@ -3,7 +3,7 @@ import '@fontsource-variable/ibm-plex-sans';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Elos · Gateway',
+  title: 'Jian · Gateway',
   description: 'Configure seus agentes, canais e conexões em um só lugar.',
   robots: { index: false, follow: false },
 };

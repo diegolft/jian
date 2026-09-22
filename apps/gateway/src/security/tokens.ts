@@ -16,7 +16,7 @@ export function hashToken(token: string): string {
 }
 
 export function issueToken(): { token: string; hash: string; prefix: string } {
-  const token = `elos_${randomBytes(32).toString('base64url')}`;
+  const token = `jian_${randomBytes(32).toString('base64url')}`;
 
   return { token, hash: hashToken(token), prefix: token.slice(0, 12) };
 }

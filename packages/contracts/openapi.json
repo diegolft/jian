@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Elos Gateway",
+    "title": "Jian Gateway",
     "version": "0.2.0"
   },
   "paths": {
@@ -2664,7 +2664,7 @@
                         },
                         "apiKeyEnv": {
                           "type": "string",
-                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                          "pattern": "^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                         },
                         "credentialId": {
                           "type": "string",
@@ -7714,7 +7714,7 @@
                     },
                     "service": {
                       "type": "string",
-                      "const": "elos"
+                      "const": "jian"
                     }
                   },
                   "required": [
@@ -8390,7 +8390,7 @@
                           },
                           "apiKeyEnv": {
                             "type": "string",
-                            "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                            "pattern": "^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                           },
                           "credentialId": {
                             "type": "string",
@@ -8572,7 +8572,7 @@
                             },
                             "bearerTokenEnv": {
                               "type": "string",
-                              "pattern": "^ELOS_MCP_[A-Z0-9_]+$"
+                              "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
                             },
                             "allowedTools": {
                               "minItems": 1,
@@ -8870,7 +8870,7 @@
                       },
                       "apiKeyEnv": {
                         "type": "string",
-                        "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                        "pattern": "^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                       },
                       "credentialId": {
                         "type": "string",
@@ -9037,7 +9037,7 @@
                         },
                         "bearerTokenEnv": {
                           "type": "string",
-                          "pattern": "^ELOS_MCP_[A-Z0-9_]+$"
+                          "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
                         },
                         "allowedTools": {
                           "minItems": 1,
@@ -9122,7 +9122,7 @@
                         },
                         "apiKeyEnv": {
                           "type": "string",
-                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                          "pattern": "^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                         },
                         "credentialId": {
                           "type": "string",
@@ -9304,7 +9304,7 @@
                           },
                           "bearerTokenEnv": {
                             "type": "string",
-                            "pattern": "^ELOS_MCP_[A-Z0-9_]+$"
+                            "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
                           },
                           "allowedTools": {
                             "minItems": 1,
@@ -9615,7 +9615,7 @@
                         },
                         "apiKeyEnv": {
                           "type": "string",
-                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                          "pattern": "^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                         },
                         "credentialId": {
                           "type": "string",
@@ -9797,7 +9797,7 @@
                           },
                           "bearerTokenEnv": {
                             "type": "string",
-                            "pattern": "^ELOS_MCP_[A-Z0-9_]+$"
+                            "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
                           },
                           "allowedTools": {
                             "minItems": 1,
@@ -10100,7 +10100,7 @@
                       },
                       "apiKeyEnv": {
                         "type": "string",
-                        "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                        "pattern": "^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                       },
                       "credentialId": {
                         "type": "string",
@@ -10250,7 +10250,7 @@
                         },
                         "bearerTokenEnv": {
                           "type": "string",
-                          "pattern": "^ELOS_MCP_[A-Z0-9_]+$"
+                          "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
                         },
                         "allowedTools": {
                           "minItems": 1,
@@ -10338,7 +10338,7 @@
                         },
                         "apiKeyEnv": {
                           "type": "string",
-                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                          "pattern": "^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                         },
                         "credentialId": {
                           "type": "string",
@@ -10520,7 +10520,7 @@
                           },
                           "bearerTokenEnv": {
                             "type": "string",
-                            "pattern": "^ELOS_MCP_[A-Z0-9_]+$"
+                            "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
                           },
                           "allowedTools": {
                             "minItems": 1,
@@ -10844,7 +10844,7 @@
                               },
                               "apiKeyEnv": {
                                 "type": "string",
-                                "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                                "pattern": "^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                               },
                               "credentialId": {
                                 "type": "string",
@@ -11026,7 +11026,7 @@
                                 },
                                 "bearerTokenEnv": {
                                   "type": "string",
-                                  "pattern": "^ELOS_MCP_[A-Z0-9_]+$"
+                                  "pattern": "^JIAN_MCP_[A-Z0-9_]+$"
                                 },
                                 "allowedTools": {
                                   "minItems": 1,
@@ -12236,7 +12236,7 @@
                         },
                         "apiKeyEnv": {
                           "type": "string",
-                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                          "pattern": "^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                         },
                         "credentialId": {
                           "type": "string",
@@ -13174,7 +13174,7 @@
                           },
                           "apiKeyEnv": {
                             "type": "string",
-                            "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                            "pattern": "^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                           },
                           "credentialId": {
                             "type": "string",
@@ -13596,7 +13596,7 @@
                         },
                         "apiKeyEnv": {
                           "type": "string",
-                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                          "pattern": "^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                         },
                         "credentialId": {
                           "type": "string",
@@ -14017,7 +14017,7 @@
                         },
                         "apiKeyEnv": {
                           "type": "string",
-                          "pattern": "^(?:ELOS_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
+                          "pattern": "^(?:JIAN_PROVIDER_[A-Z0-9_]+|ANTHROPIC_API_KEY|ANTHROPIC_API_TOKEN|GEMINI_API_TOKEN|OPENAI_API_KEY)$"
                         },
                         "credentialId": {
                           "type": "string",
@@ -16759,7 +16759,7 @@
       "channelWebhook": {
         "type": "apiKey",
         "in": "header",
-        "name": "X-Elos-Channel-Token"
+        "name": "X-Jian-Channel-Token"
       }
     }
   }

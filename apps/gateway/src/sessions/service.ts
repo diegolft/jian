@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { type Session, sessionSchema } from '@elos/contracts';
+import { type Session, sessionSchema } from '@jian/contracts';
 import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';

@@ -2,16 +2,16 @@ import Foundation
 import HTTPTypes
 import Testing
 
-@testable import ElosKit
+@testable import JianKit
 
 private let credentials = GatewayCredentials(
   serverURL: URL(string: "https://gateway.example")!,
-  accessKey: "elos_test_key"
+  accessKey: "jian_test_key"
 )
 
 @Test func listProfilesMapsTheGeneratedPayload() async throws {
   let recorder = RequestRecorder()
-  let client = ElosClient(
+  let client = JianClient(
     credentials: credentials,
     transport: StubTransport(
       respond: { _ in jsonResponse(status: 200, sampleProfileJSON) },
@@ -29,7 +29,7 @@ private let credentials = GatewayCredentials(
 
 @Test func everyRequestCarriesTheAccessKey() async throws {
   let recorder = RequestRecorder()
-  let client = ElosClient(
+  let client = JianClient(
     credentials: credentials,
     transport: StubTransport(
       respond: { _ in jsonResponse(status: 200, sampleProfileJSON) },
@@ -40,12 +40,12 @@ private let credentials = GatewayCredentials(
   _ = try await client.listProfiles()
 
   let sent = await recorder.requests
-  #expect(sent.first?.headerFields[.authorization] == "Bearer elos_test_key")
+  #expect(sent.first?.headerFields[.authorization] == "Bearer jian_test_key")
 }
 
 @Test func revokedKeySurfacesAsUnauthorized() async throws {
   let recorder = RequestRecorder()
-  let client = ElosClient(
+  let client = JianClient(
     credentials: credentials,
     transport: StubTransport(
       respond: { _ in jsonResponse(status: 401, #"{"error":"revoked"}"#) },
@@ -53,12 +53,12 @@ private let credentials = GatewayCredentials(
     )
   )
 
-  await #expect(throws: ElosError.unauthorized) { try await client.listProfiles() }
+  await #expect(throws: JianError.unauthorized) { try await client.listProfiles() }
 }
 
 @Test func gatewayErrorKeepsStatusAndMessage() async throws {
   let recorder = RequestRecorder()
-  let client = ElosClient(
+  let client = JianClient(
     credentials: credentials,
     transport: StubTransport(
       respond: { _ in jsonResponse(status: 503, #"{"error":"database unavailable"}"#) },
@@ -66,7 +66,7 @@ private let credentials = GatewayCredentials(
     )
   )
 
-  await #expect(throws: ElosError.gateway(status: 503, message: "database unavailable")) {
+  await #expect(throws: JianError.gateway(status: 503, message: "database unavailable")) {
     try await client.listProfiles()
   }
 }

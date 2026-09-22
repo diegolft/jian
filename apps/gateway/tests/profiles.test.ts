@@ -4,7 +4,7 @@ import { testServices } from './helpers/services.js';
 const profileInput = {
   name: 'Atlas',
   instructions: 'Help with engineering.',
-  model: { provider: 'openai' as const, modelId: 'test-model', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+  model: { provider: 'openai' as const, modelId: 'test-model', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
 };
 
 afterEach(() => vi.unstubAllEnvs());

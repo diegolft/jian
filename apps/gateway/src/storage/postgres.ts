@@ -8,7 +8,7 @@ class PostgresReader implements Reader {
 
   async get<K extends Kind>(kind: K, id: string): Promise<Records[K] | null> {
     const result = await this.connection.query<{ data: Records[K] }>(
-      'SELECT data FROM elos_records WHERE kind = $1 AND id = $2',
+      'SELECT data FROM jian_records WHERE kind = $1 AND id = $2',
       [kind, id],
     );
 
@@ -33,7 +33,7 @@ class PostgresReader implements Reader {
       values.push(options.before);
 
       conditions.push(
-        `seq < (SELECT seq FROM elos_records WHERE kind = $1 AND id = $${values.length})`,
+        `seq < (SELECT seq FROM jian_records WHERE kind = $1 AND id = $${values.length})`,
       );
     }
 
@@ -62,7 +62,7 @@ class PostgresReader implements Reader {
     values.push(Math.max(1, Math.min(options.limit ?? 100, 1000)));
 
     const result = await this.connection.query<{ data: Records[K] }>(
-      `SELECT data FROM elos_records WHERE ${conditions.join(' AND ')} ORDER BY seq ${options.descending ? 'DESC' : 'ASC'} LIMIT $${values.length}`,
+      `SELECT data FROM jian_records WHERE ${conditions.join(' AND ')} ORDER BY seq ${options.descending ? 'DESC' : 'ASC'} LIMIT $${values.length}`,
       values,
     );
 
@@ -77,7 +77,7 @@ class PostgresReader implements Reader {
       type: string;
       data: unknown;
       created_at: Date;
-    }>('SELECT * FROM elos_events WHERE profile_id = $1 AND id > $2 ORDER BY id ASC LIMIT $3', [
+    }>('SELECT * FROM jian_events WHERE profile_id = $1 AND id > $2 ORDER BY id ASC LIMIT $3', [
       profileId,
       after,
       Math.min(limit, 1000),
@@ -110,7 +110,7 @@ export class PostgresStore extends PostgresReader implements Store {
     this.pool = pool;
 
     pool.on('error', () => {
-      console.error('elos: idle database connection failed');
+      console.error('jian: idle database connection failed');
     });
   }
 
@@ -119,14 +119,14 @@ export class PostgresStore extends PostgresReader implements Store {
 
     try {
       await client.query('BEGIN');
-      await client.query("SELECT pg_advisory_xact_lock(hashtextextended('elos:migrations', 0))");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended('jian:migrations', 0))");
 
       await client.query(
-        'CREATE TABLE IF NOT EXISTS elos_schema_migrations (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',
+        'CREATE TABLE IF NOT EXISTS jian_schema_migrations (version integer PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())',
       );
 
       const applied = await client.query<{ version: number }>(
-        'SELECT version FROM elos_schema_migrations ORDER BY version',
+        'SELECT version FROM jian_schema_migrations ORDER BY version',
       );
 
       const versions = new Set(applied.rows.map((row) => row.version));
@@ -146,7 +146,7 @@ export class PostgresStore extends PostgresReader implements Store {
 
         await client.query(migration.sql);
 
-        await client.query('INSERT INTO elos_schema_migrations (version) VALUES ($1)', [
+        await client.query('INSERT INTO jian_schema_migrations (version) VALUES ($1)', [
           migration.version,
         ]);
       }
@@ -181,8 +181,8 @@ export class PostgresStore extends PostgresReader implements Store {
           }
 
           const result = await client.query(
-            `INSERT INTO elos_records (kind, id, profile_id, data) VALUES ($1, $2, $3, $4)
-            ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data WHERE elos_records.profile_id = EXCLUDED.profile_id`,
+            `INSERT INTO jian_records (kind, id, profile_id, data) VALUES ($1, $2, $3, $4)
+            ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data WHERE jian_records.profile_id = EXCLUDED.profile_id`,
             [kind, id, ownerId, JSON.stringify(value)],
           );
 
@@ -196,7 +196,7 @@ export class PostgresStore extends PostgresReader implements Store {
           }
 
           await client.query(
-            'INSERT INTO elos_events (profile_id, run_id, type, data, created_at) VALUES ($1, $2, $3, $4, $5)',
+            'INSERT INTO jian_events (profile_id, run_id, type, data, created_at) VALUES ($1, $2, $3, $4, $5)',
             [
               event.profileId,
               event.runId ?? null,

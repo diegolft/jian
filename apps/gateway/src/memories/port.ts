@@ -1,4 +1,4 @@
-import type { Memory } from '@elos/contracts';
+import type { Memory } from '@jian/contracts';
 
 export interface MemoryWriter {
   memories(profileId: string): Promise<Memory[]>;

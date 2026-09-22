@@ -1,4 +1,4 @@
-import { createElosClient, type operations } from '@elos/sdk';
+import { createJianClient, type operations } from '@jian/sdk';
 
 type JsonResponse<
   K extends keyof operations,
@@ -90,9 +90,9 @@ async function result<T>(
  * no script can read. The header is what stops that cookie from working from another origin.
  */
 export function gatewayApi() {
-  const client = createElosClient({
+  const client = createJianClient({
     baseUrl: window.location.origin,
-    headers: { 'x-elos-panel': '1' },
+    headers: { 'x-jian-panel': '1' },
     fetch: (request, init) =>
       fetch(request, {
         ...init,

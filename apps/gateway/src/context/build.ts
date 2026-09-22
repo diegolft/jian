@@ -1,4 +1,4 @@
-import type { Memory, Message, Run } from '@elos/contracts';
+import type { Memory, Message, Run } from '@jian/contracts';
 import { tokenCounter } from './budget.js';
 
 export interface ContextSources {

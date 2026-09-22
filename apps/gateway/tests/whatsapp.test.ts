@@ -50,7 +50,7 @@ async function setup(send?: (chatId: string, text: string) => Promise<string>) {
   const profile = await services.profiles.createProfile({
     name: 'WhatsApp',
     instructions: 'Help.',
-    model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+    model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
   });
   const session = await services.sessions.createSession(profile.id, {
     title: 'WhatsApp',
@@ -240,7 +240,7 @@ describe('WhatsApp linked device', () => {
       await expect(
         f.channels.receive(f.binding.id, {
           type: 'whatsapp',
-          headers: { 'x-elos-channel-token': f.binding.webhookToken },
+          headers: { 'x-jian-channel-token': f.binding.webhookToken },
           payload: message,
         }),
       ).rejects.toThrow('does not accept webhooks');

@@ -1,17 +1,17 @@
-import ElosAPI
+import JianAPI
 import Foundation
 import OpenAPIRuntime
 import OpenAPIURLSession
 
-/// Talks to one Elos gateway installation with one scoped access key.
-public struct ElosClient: Sendable {
-  private let generated: ElosAPI.Client
+/// Talks to one Jian gateway installation with one scoped access key.
+public struct JianClient: Sendable {
+  private let generated: JianAPI.Client
 
   public init(
     credentials: GatewayCredentials,
     transport: any ClientTransport = URLSessionTransport()
   ) {
-    generated = ElosAPI.Client(
+    generated = JianAPI.Client(
       serverURL: credentials.serverURL,
       configuration: Configuration(dateTranscoder: GatewayDateTranscoder()),
       transport: transport,
@@ -38,7 +38,7 @@ public struct ElosClient: Sendable {
   /// Every operation shares one error envelope, so only the status tells these apart.
   /// Decoding the envelope may itself fail, and a failure to explain a failure is not
   /// worth raising over the original status.
-  private static func failure(from output: Operations.ListProfiles.Output) -> ElosError {
+  private static func failure(from output: Operations.ListProfiles.Output) -> JianError {
     switch output {
     case .ok:
       .gateway(status: 200, message: "The gateway returned success where none was expected.")

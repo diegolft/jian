@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { createCodexModel } from '../src/providers/codex/model.js';
 
 describe('ChatGPT Codex model adapter', () => {
-  it('keeps Elos instructions and returns a Responses result', async () => {
+  it('keeps Jian instructions and returns a Responses result', async () => {
     let request: Record<string, unknown> = {};
     let headers = new Headers();
     const fetcher: typeof fetch = async (_input, init) => {
@@ -38,12 +38,12 @@ describe('ChatGPT Codex model adapter', () => {
 
     const result = await generateText({
       model: createCodexModel('synthetic-token', 'gpt-5.6-terra', fetcher),
-      system: 'You are Elos.',
+      system: 'You are Jian.',
       prompt: 'Diga olá.',
     });
 
     expect(result.text).toBe('Olá.');
-    expect(request.instructions).toContain('You are Elos.');
+    expect(request.instructions).toContain('You are Jian.');
     expect(request.stream).toBe(true);
     expect(request.store).toBe(false);
     expect(headers.get('authorization')).toBe('Bearer synthetic-token');

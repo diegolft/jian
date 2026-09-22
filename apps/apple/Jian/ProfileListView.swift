@@ -1,4 +1,4 @@
-import ElosKit
+import JianKit
 import SwiftUI
 
 struct ProfileListView: View {

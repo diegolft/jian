@@ -1,4 +1,4 @@
-import { memorySchema, type Run, skillSchema } from '@elos/contracts';
+import { memorySchema, type Run, skillSchema } from '@jian/contracts';
 import { type ToolSet, tool } from 'ai';
 import { z } from 'zod';
 import { Coordination } from '../coordination/service.js';

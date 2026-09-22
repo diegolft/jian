@@ -10,7 +10,7 @@ async function setup() {
   const profile = await services.profiles.createProfile({
     name: 'Test',
     instructions: 'Help.',
-    model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'ELOS_PROVIDER_TEST' },
+    model: { provider: 'openai', modelId: 'test', apiKeyEnv: 'JIAN_PROVIDER_TEST' },
   });
 
   const vault = new Credentials(

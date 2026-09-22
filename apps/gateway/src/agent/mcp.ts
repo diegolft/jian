@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createMCPClient, type MCPClient } from '@ai-sdk/mcp';
-import type { Run } from '@elos/contracts';
+import type { Run } from '@jian/contracts';
 import { type ToolSet, tool } from 'ai';
 import { z } from 'zod';
 import type { RuntimeOptions } from './types.js';

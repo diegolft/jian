@@ -5,7 +5,7 @@ import {
   profileRecordSchema,
   type Run,
   submitSchema,
-} from '@elos/contracts';
+} from '@jian/contracts';
 import { type Clock, nowIso } from '../core/clock.js';
 import { assertFound, GatewayError } from '../core/errors.js';
 import { recordEvent } from '../core/events.js';

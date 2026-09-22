@@ -1,4 +1,4 @@
-import type { channelInputSchema, ingressSchema } from '@elos/contracts';
+import type { channelInputSchema, ingressSchema } from '@jian/contracts';
 import type { z } from 'zod';
 
 export type ChannelConfiguration = z.infer<typeof channelInputSchema>;

@@ -295,7 +295,7 @@ export const operations: Operation[] = [
     path: '/health',
     operationId: 'health',
     scope: 'public',
-    response: z.strictObject({ status: z.literal('ok'), service: z.literal('elos') }),
+    response: z.strictObject({ status: z.literal('ok'), service: z.literal('jian') }),
   },
   {
     // Public because the body carries the host token this route exists to verify.
@@ -617,13 +617,13 @@ export function createOpenAPI() {
 
   return {
     openapi: '3.1.0',
-    info: { title: 'Elos Gateway', version: '0.2.0' },
+    info: { title: 'Jian Gateway', version: '0.2.0' },
     paths,
     components: {
       securitySchemes: {
         bearerAuth: { type: 'http', scheme: 'bearer' },
         telegramWebhook: { type: 'apiKey', in: 'header', name: 'X-Telegram-Bot-Api-Secret-Token' },
-        channelWebhook: { type: 'apiKey', in: 'header', name: 'X-Elos-Channel-Token' },
+        channelWebhook: { type: 'apiKey', in: 'header', name: 'X-Jian-Channel-Token' },
       },
     },
   };

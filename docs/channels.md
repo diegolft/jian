@@ -6,7 +6,7 @@ Uma ligação associa um canal a uma sessão existente. O administrador define o
 
 ## Entrada genérica
 
-Envie `actorId`, `chatId`, `text` e `requestKey` a `POST /v1/ingress/{channelId}`, usando `X-Elos-Channel-Token`. O adapter que chama essa rota deve autenticar a identidade externa antes de preencher os IDs; quem possui o token pode representar atores permitidos. O retorno contém o ID do run. Consulte resultados com uma chave separada de escopo `read`.
+Envie `actorId`, `chatId`, `text` e `requestKey` a `POST /v1/ingress/{channelId}`, usando `X-Jian-Channel-Token`. O adapter que chama essa rota deve autenticar a identidade externa antes de preencher os IDs; quem possui o token pode representar atores permitidos. O retorno contém o ID do run. Consulte resultados com uma chave separada de escopo `read`.
 
 ## Telegram
 
@@ -38,7 +38,7 @@ O vínculo fixo foi escolhido para tornar o acesso explícito e evitar que o rem
 
 `WhatsAppChannel` usa [`whatsapp-web.js`](https://github.com/pedroslopez/whatsapp-web.js), com licença Apache 2.0. A conexão funciona como um dispositivo vinculado por QR Code; não usa a Cloud API da Meta. A biblioteca é não oficial: mudanças no WhatsApp podem interromper a conexão e há risco de restrição da conta.
 
-O worker executa um Chromium separado para cada ligação. Configure `ELOS_WHATSAPP_CHROMIUM` com o caminho absoluto do executável, por exemplo `/usr/bin/chromium` no Linux ou `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` no macOS. A imagem Docker inclui Chromium, mas o host precisa permitir seu sandbox; o Gateway não adiciona `--no-sandbox`. Não é necessário instalar navegador nos processos que executam somente a API.
+O worker executa um Chromium separado para cada ligação. Configure `JIAN_WHATSAPP_CHROMIUM` com o caminho absoluto do executável, por exemplo `/usr/bin/chromium` no Linux ou `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` no macOS. A imagem Docker inclui Chromium, mas o host precisa permitir seu sandbox; o Gateway não adiciona `--no-sandbox`. Não é necessário instalar navegador nos processos que executam somente a API.
 
 Crie uma ligação usando `type: "whatsapp"`, a sessão existente e os contatos autorizados em `actorIds` e `chatIds`. Para conversas diretas, ambos usam o mesmo JID, como `5511999999999@c.us`. O driver resolve identificadores LID para telefone quando o WhatsApp fornece esse mapeamento; IDs `@lid` também podem ser autorizados explicitamente. Não informe `credentialId`: a credencial é criada pelo pareamento. O `webhookToken` do contrato comum não é usado pelo WhatsApp; o canal não aceita entrada HTTP pública.
 

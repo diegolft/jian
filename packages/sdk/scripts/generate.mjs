@@ -26,7 +26,7 @@ const outputs = [
   // The Swift package generates its types from this copy at build time; keeping it under
   // --check makes a stale Apple client a failed `pnpm check` instead of a runtime surprise.
   [
-    new URL('../../../apps/apple/Packages/ElosKit/Sources/ElosAPI/openapi.json', import.meta.url),
+    new URL('../../../apps/apple/Packages/JianKit/Sources/JianAPI/openapi.json', import.meta.url),
     schema,
   ],
 ];
