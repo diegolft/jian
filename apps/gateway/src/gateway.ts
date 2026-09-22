@@ -1,36 +1,42 @@
 import { randomUUID } from 'node:crypto';
 import {
   continuationSchema,
-  type Memory,
   type Message,
   type ModelSelection,
-  memorySchema,
   modelDefaultsInputSchema,
   modelDefaultsRecordSchema,
-  type Profile,
   type ProviderRecord,
-  profilePatchSchema,
   profileRecordSchema,
-  profileSchema,
   providerInputSchema,
   providerRecordSchema,
   type Run,
-  type Session,
-  sessionSchema,
   submitSchema,
 } from '@elos/contracts';
 import { buildContext } from './context/build.js';
 import { assertFound, GatewayError } from './core/errors.js';
 import type { Reader, Store, Transaction } from './core/store.js';
+import { Memories } from './memories/service.js';
+import { Profiles } from './profiles/service.js';
 import { environmentProvider, type ProviderKind, providerCatalog } from './providers/catalog.js';
+import { Sessions } from './sessions/service.js';
 
 const active = (run: Run) => run.status === 'running' || run.status === 'queued';
 
+// Migration scaffold: this class is a pass-through to the area services while the split
+// proceeds, and it is deleted once the run, lifecycle and context services land.
 export class Gateway {
+  private readonly profileService: Profiles;
+  private readonly sessionService: Sessions;
+  private readonly memoryService: Memories;
+
   constructor(
     public readonly store: Store,
     private readonly clock = Date.now,
-  ) {}
+  ) {
+    this.profileService = new Profiles(store, clock);
+    this.sessionService = new Sessions(store, this.profileService, clock);
+    this.memoryService = new Memories(store, this.profileService, this.sessionService, clock);
+  }
 
   private now() {
     return new Date(this.clock()).toISOString();
@@ -46,75 +52,48 @@ export class Gateway {
     await tx.event({ profileId, type, data, runId, createdAt: this.now() });
   }
 
-  async profile(id: string, reader: Reader = this.store) {
-    return profileRecordSchema.parse(assertFound(await reader.get('profile', id), 'Profile'));
+  profile(id: string, reader?: Reader) {
+    return this.profileService.profile(id, reader);
   }
 
-  async profiles() {
-    return (await this.store.list('profile', { limit: 100 })).map((profile) =>
-      profileRecordSchema.parse(profile),
-    );
+  profiles() {
+    return this.profileService.profiles();
   }
 
-  async createProfile(input: unknown) {
-    const data = profileSchema.parse(input);
-
-    const profile: Profile = {
-      ...data,
-      id: randomUUID(),
-      version: 1,
-      createdAt: this.now(),
-      updatedAt: this.now(),
-    };
-
-    await this.store.transaction(profile.id, async (tx) => {
-      await this.validateCredentials(profile, tx);
-      await tx.put('profile', profile.id, profile.id, profile);
-
-      await tx.put('revision', `${profile.id}:1`, profile.id, {
-        id: `${profile.id}:1`,
-        profileId: profile.id,
-        profile,
-        createdAt: this.now(),
-      });
-
-      await this.event(tx, profile.id, 'profile.created', { profileId: profile.id, version: 1 });
-    });
-
-    return profile;
+  createProfile(input: unknown) {
+    return this.profileService.createProfile(input);
   }
 
-  private async validateCredentials(profile: Profile, reader: Reader) {
-    for (const names of [
-      profile.skills.map((skill) => skill.name),
-      profile.mcpServers.map((server) => server.name),
-    ]) {
-      if (new Set(names).size !== names.length) {
-        throw new GatewayError(400, 'Skill and MCP names must be unique within a profile');
-      }
-    }
+  updateProfile(id: string, input: unknown) {
+    return this.profileService.updateProfile(id, input);
+  }
 
-    const references = [
-      { id: profile.model.credentialId, kind: 'provider' },
-      ...profile.mcpServers.map((server) => ({ id: server.credentialId, kind: 'mcp' })),
-    ];
+  revisions(id: string) {
+    return this.profileService.revisions(id);
+  }
 
-    for (const reference of references) {
-      if (!reference.id) {
-        continue;
-      }
+  createSession(profileId: string, input: unknown) {
+    return this.sessionService.createSession(profileId, input);
+  }
 
-      const credential = await reader.get('credential', reference.id);
+  session(profileId: string, sessionId: string, reader?: Reader) {
+    return this.sessionService.session(profileId, sessionId, reader);
+  }
 
-      if (
-        !credential ||
-        credential.profileId !== profile.id ||
-        credential.kind !== reference.kind ||
-        credential.revokedAt
-      ) {
-        throw new GatewayError(400, 'Credential reference is not available to this profile');
-      }
-    }
+  sessions(profileId: string) {
+    return this.sessionService.sessions(profileId);
+  }
+
+  messages(profileId: string, sessionId: string, limit?: number) {
+    return this.sessionService.messages(profileId, sessionId, limit);
+  }
+
+  memories(profileId: string) {
+    return this.memoryService.memories(profileId);
+  }
+
+  remember(profileId: string, input: unknown, sourceSessionId?: string) {
+    return this.memoryService.remember(profileId, input, sourceSessionId);
   }
 
   async providers(profileId: string) {
@@ -320,83 +299,6 @@ export class Gateway {
     };
   }
 
-  async updateProfile(id: string, input: unknown) {
-    const { expectedVersion, ...patch } = profilePatchSchema.parse(input);
-
-    return this.store.transaction(id, async (tx) => {
-      const current = await this.profile(id, tx);
-
-      if (current.version !== expectedVersion) {
-        throw new GatewayError(409, 'Profile version changed; reload before editing');
-      }
-
-      const profile: Profile = {
-        ...current,
-        ...patch,
-        version: current.version + 1,
-        updatedAt: this.now(),
-      };
-
-      await this.validateCredentials(profile, tx);
-      await tx.put('profile', id, id, profile);
-
-      const revision = {
-        id: `${id}:${profile.version}`,
-        profileId: id,
-        profile,
-        createdAt: this.now(),
-      };
-
-      await tx.put('revision', revision.id, id, revision);
-      await this.event(tx, id, 'profile.updated', { profileId: id, version: profile.version });
-
-      return profile;
-    });
-  }
-
-  async revisions(id: string) {
-    await this.profile(id);
-
-    return (await this.store.list('revision', { profileId: id, descending: true, limit: 50 })).map(
-      (revision) => ({ ...revision, profile: profileRecordSchema.parse(revision.profile) }),
-    );
-  }
-
-  async createSession(profileId: string, input: unknown) {
-    const data = sessionSchema.parse(input);
-
-    return this.store.transaction(profileId, async (tx) => {
-      await this.profile(profileId, tx);
-
-      const session: Session = { ...data, id: randomUUID(), profileId, createdAt: this.now() };
-
-      await tx.put('session', session.id, profileId, session);
-      await this.event(tx, profileId, 'session.created', session);
-
-      return session;
-    });
-  }
-
-  async session(profileId: string, sessionId: string, reader: Reader = this.store) {
-    const session = await reader.get('session', sessionId);
-
-    return assertFound(session?.profileId === profileId ? session : null, 'Session');
-  }
-
-  async sessions(profileId: string) {
-    await this.profile(profileId);
-
-    return this.store.list('session', { profileId, descending: true, limit: 100 });
-  }
-
-  async messages(profileId: string, sessionId: string, limit = 100) {
-    await this.session(profileId, sessionId);
-
-    return (
-      await this.store.list('message', { profileId, where: { sessionId }, limit, descending: true })
-    ).reverse();
-  }
-
   async submit(
     profileId: string,
     sessionId: string,
@@ -554,50 +456,6 @@ export class Gateway {
     });
 
     return [...queued, ...running].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  }
-
-  async memories(profileId: string) {
-    await this.profile(profileId);
-
-    return this.store.list('memory', { profileId, descending: true, limit: 100 });
-  }
-
-  async remember(profileId: string, input: unknown, sourceSessionId?: string) {
-    const { expectedVersion, ...data } = memorySchema.parse(input);
-
-    return this.store.transaction(profileId, async (tx) => {
-      await this.profile(profileId, tx);
-
-      if (sourceSessionId) {
-        await this.session(profileId, sourceSessionId, tx);
-      }
-
-      const id = `${profileId}:${data.key}`;
-      const old = await tx.get('memory', id);
-
-      if ((old?.version ?? 0) !== expectedVersion) {
-        throw new GatewayError(409, 'Memory version changed; reload before editing');
-      }
-
-      const memory: Memory = {
-        ...data,
-        id,
-        profileId,
-        version: expectedVersion + 1,
-        sourceSessionId,
-        updatedAt: this.now(),
-      };
-
-      await tx.put('memory', id, profileId, memory);
-
-      await this.event(tx, profileId, 'memory.updated', {
-        key: memory.key,
-        version: memory.version,
-        sourceSessionId,
-      });
-
-      return memory;
-    });
   }
 
   async claim(runId: string, profileId: string, owner: string) {
